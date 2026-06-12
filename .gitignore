@@ -1,0 +1,20 @@
+# PlatformIO build files
+.pio/
+.pioenvs/
+.piolibdeps/
+.clang_complete
+.gcc-flags.json
+
+# VS Code files (excluding settings if needed, but safe to ignore all generated files)
+.vscode/
+
+# Compiler outputs
+compile_commands.json
+
+# System & Local directories
+.cache/
+NVIDIA Corporation/
+
+# SDK config (temporary files generated during build)
+sdkconfig
+sdkconfig.old
