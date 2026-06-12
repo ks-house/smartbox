@@ -27,15 +27,15 @@ void setup() {
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
 
-  pinMode(RELAY_MAIN_PIN, OUTPUT);
+  // 1채널 릴레이 초기 상태: OFF (INPUT 모드로 전환하여 3.3V 풀업 문제 회피)
+  pinMode(RELAY_MAIN_PIN, INPUT);
+  
   pinMode(RELAY_DIR_A_PIN, OUTPUT);
   pinMode(RELAY_DIR_B_PIN, OUTPUT);
 
   // 부팅 시 모든 릴레이 전원 강제 차단 (안전 제일)
-  digitalWrite(RELAY_MAIN_PIN,
-               LOW); // 모듈에 따라 HIGH일 때 꺼지는 경우도 있으니 테스트 필요
-  digitalWrite(RELAY_DIR_A_PIN, LOW);
-  digitalWrite(RELAY_DIR_B_PIN, LOW);
+  digitalWrite(RELAY_DIR_A_PIN, HIGH);
+  digitalWrite(RELAY_DIR_B_PIN, HIGH);
 
   Serial.println("스마트 수거함 시스템 부팅 완료. 감지 대기 중...");
 }
@@ -70,36 +70,37 @@ void loop() {
     Serial.println(
         "🏃‍♂️ 사람 감지됨! 뚜껑 개방 시퀀스 시작...");
 
-    // [STEP 1] 1채널 릴레이 ON: 액추에이터 모터 쪽으로 12V 메인 전원 길
-    // 열어주기
-    digitalWrite(RELAY_MAIN_PIN, HIGH);
+    // [STEP 1] 1채널 릴레이 ON: 액추에이터 모터 쪽으로 12V 메인 전원 길 열어주기
+    pinMode(RELAY_MAIN_PIN, OUTPUT);
+    digitalWrite(RELAY_MAIN_PIN, LOW);
     delay(100); // 릴레이 내부의 기계적 접점이 찰칵 하고 붙을 때까지 잠깐 대기
 
     // [STEP 2] 2채널 릴레이 제어: 뚜껑 열기 (정회전)
-    digitalWrite(RELAY_DIR_A_PIN, HIGH);
-    digitalWrite(RELAY_DIR_B_PIN, LOW);
+    digitalWrite(RELAY_DIR_A_PIN, LOW);
+    digitalWrite(RELAY_DIR_B_PIN, HIGH);
     Serial.println(">> 뚜껑 열리는 중...");
     delay(ACTUATOR_TIME);
 
     // [STEP 3] 뚜껑 다 열림 ➔ 쓰레기 버릴 동안 모든 전력 차단 (배터리 절약)
-    digitalWrite(RELAY_DIR_A_PIN, LOW);
-    digitalWrite(RELAY_DIR_B_PIN, LOW);
-    digitalWrite(RELAY_MAIN_PIN, LOW);
+    digitalWrite(RELAY_DIR_A_PIN, HIGH);
+    digitalWrite(RELAY_DIR_B_PIN, HIGH);
+    pinMode(RELAY_MAIN_PIN, INPUT); // 1채널 릴레이 OFF (INPUT 모드로 전환)
     Serial.println(">> 쓰레기 투척 대기 (5초간 정지 및 전력 차단)");
     delay(WAIT_TIME);
 
     // [STEP 4] 1채널 릴레이 다시 ON ➔ 뚜껑 닫기 (역회전)
-    digitalWrite(RELAY_MAIN_PIN, HIGH);
+    pinMode(RELAY_MAIN_PIN, OUTPUT);
+    digitalWrite(RELAY_MAIN_PIN, LOW);
     delay(100);
-    digitalWrite(RELAY_DIR_A_PIN, LOW);
-    digitalWrite(RELAY_DIR_B_PIN, HIGH);
+    digitalWrite(RELAY_DIR_A_PIN, HIGH);
+    digitalWrite(RELAY_DIR_B_PIN, LOW);
     Serial.println(">> 뚜껑 닫히는 중...");
     delay(ACTUATOR_TIME);
 
     // [STEP 5] 완료: 다시 완전 절전 모드로
-    digitalWrite(RELAY_DIR_A_PIN, LOW);
-    digitalWrite(RELAY_DIR_B_PIN, LOW);
-    digitalWrite(RELAY_MAIN_PIN, LOW);
+    digitalWrite(RELAY_DIR_A_PIN, HIGH);
+    digitalWrite(RELAY_DIR_B_PIN, HIGH);
+    pinMode(RELAY_MAIN_PIN, INPUT); // 1채널 릴레이 OFF (INPUT 모드로 전환)
     Serial.println("✅ 개폐 시퀀스 완료. 다시 감지 모드로 돌아갑니다.\n");
 
     // 사람이 완전히 물러날 때까지 약간의 쿨타임 대기 (중복 감지 방지)
