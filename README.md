@@ -13,6 +13,8 @@
 
 ## 🛠️ 하드웨어 명세서 (BOM & Specifications)
 
+상세한 하드웨어 부품 목록 및 사양은 [HARDWARE_BOM.md](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/HARDWARE_BOM.md)를 참고하세요.
+
 안정적인 구동을 위해 제어부(5V)와 구동부(12V)의 전원을 분리하여 설계했습니다.
 
 ### 1. 제어부 (Controller & Sensor)
