@@ -56,7 +56,23 @@ void SmartBoxController::update() {
         readSensors();
     }
     
+    // Battery low voltage 3-second guard filter
+    static unsigned long lowVoltGuardStart = 0;
+    if (batteryVoltage < config.voltageShutdownLimit && currentState != STATE_BATTERY_LOW_SHUTDOWN) {
+        if (lowVoltGuardStart == 0) {
+            lowVoltGuardStart = hw.getMillis();
+        } else if (hw.getMillis() - lowVoltGuardStart >= 3000) {
+            Serial.printf("[BATTERY] Critical battery voltage: %.2fV! Launching Shutdown.\n", batteryVoltage);
+            transitionTo(STATE_BATTERY_LOW_SHUTDOWN);
+            // Immediately start opening the lid using the remaining power
+            setRelayStates(true, true, false);
+        }
+    } else {
+        lowVoltGuardStart = 0;
+    }
+    
     // Cooldown management
+
     if (isCooldown && (hw.getMillis() - cooldownTimer >= config.cooldownTime)) {
         isCooldown = false;
         Serial.println("[SYSTEM] Cooldown active state finished.");
@@ -143,7 +159,10 @@ void SmartBoxController::update() {
             break;
             
         case STATE_BATTERY_LOW_SHUTDOWN:
-            // Will be implemented in Step 4
+            // After 3.8s, isolate all relays to high-impedance mode
+            if (hw.getMillis() - stateTimer >= config.actuatorTime) {
+                forceAllRelaysOff();
+            }
             break;
     }
 }
