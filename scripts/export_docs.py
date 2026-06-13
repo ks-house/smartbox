@@ -35,22 +35,33 @@ def clean_user_input(text):
     return text.strip()
 
 def clean_workspace_links(text, workspace_root=None):
-    """Replaces absolute file:/// links pointing inside the workspace with relative paths."""
+    """Replaces absolute workspace paths (both file:/// and raw) with relative paths."""
     if not text:
         return ""
     if workspace_root is None:
         workspace_root = os.getcwd()
     
-    # Normalize workspace root path to forward slashes
-    ws_path = os.path.abspath(workspace_root).replace('\\', '/').rstrip('/')
+    ws_path = os.path.abspath(workspace_root)
+    parts = re.split(r'[/\\]', ws_path)
+    parts_esc = [re.escape(p) for p in parts]
+    ws_pattern_str = r'[/\\]'.join(parts_esc)
     
-    # We want to match: file:/// followed by the workspace path (case-insensitive)
-    # E.g., file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/
-    pattern = re.compile(r'file:///' + re.escape(ws_path) + r'/', re.IGNORECASE)
+    # Match both file:/// and raw workspace paths
+    pattern = re.compile(
+        r'(file:///)?(' + ws_pattern_str + r')(?:[/\\]([^\s\)\`\'\"\]]*))?',
+        re.IGNORECASE
+    )
     
-    # Replace with '../' (since prompt and report are in subdirectories)
-    cleaned = pattern.sub('../', text)
-    return cleaned
+    def replace_match(match):
+        subpath = match.group(3) or ""
+        subpath_normalized = subpath.replace('\\', '/')
+        if subpath_normalized:
+            return '../' + subpath_normalized
+        else:
+            return '..'
+            
+    return pattern.sub(replace_match, text)
+
 
 
 def main():
