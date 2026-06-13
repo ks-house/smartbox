@@ -56,6 +56,10 @@ The motor direction is controlled by a 2-channel relay. The main 12V power is co
 ### 4.4. Memory and Partitions
 * The board has 16MB of Flash. If adding OTA (Over-The-Air) updates or a Web Server, ensure you reference the `default_16MB.csv` partition scheme in instructions.
 
+### 4.5. Documentation and Link Standards
+* **Relative Links Only:** When linking files within repository markdown documents (e.g., `README.md`, reports, manual), **always use relative paths** (e.g., `[main.cpp](../src/main.cpp)` or `[BOM](HARDWARE_BOM.md)`).
+* **No Absolute Local Paths:** **Never use absolute local paths** (e.g., `file:///c:/...` or `C:\Users\...`) in committed files. This prevents path breaking on other developers' machines.
+
 ---
 
 ## 5. Future Expansion Context

@@ -34,6 +34,25 @@ def clean_user_input(text):
         
     return text.strip()
 
+def clean_workspace_links(text, workspace_root=None):
+    """Replaces absolute file:/// links pointing inside the workspace with relative paths."""
+    if not text:
+        return ""
+    if workspace_root is None:
+        workspace_root = os.getcwd()
+    
+    # Normalize workspace root path to forward slashes
+    ws_path = os.path.abspath(workspace_root).replace('\\', '/').rstrip('/')
+    
+    # We want to match: file:/// followed by the workspace path (case-insensitive)
+    # E.g., file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/
+    pattern = re.compile(r'file:///' + re.escape(ws_path) + r'/', re.IGNORECASE)
+    
+    # Replace with '../' (since prompt and report are in subdirectories)
+    cleaned = pattern.sub('../', text)
+    return cleaned
+
+
 def main():
     parser = argparse.ArgumentParser(description="Export Antigravity IDE Chat transcript and reports.")
     parser.add_argument("title", help="Title for the exported files (e.g., '릴레이연결')")
@@ -110,13 +129,15 @@ def main():
                 if source == "USER_EXPLICIT" and step_type == "USER_INPUT":
                     cleaned_content = clean_user_input(content)
                     if cleaned_content:
+                        cleaned_content = clean_workspace_links(cleaned_content)
                         dialogue.append(("User", cleaned_content))
                 
                 # Model Response
                 elif source == "MODEL" and step_type == "PLANNER_RESPONSE":
                     if content and not content.startswith("I will"):
                         # Skip tool execution intents (e.g., "I will read...", "I will search...")
-                        dialogue.append(("AI", content))
+                        cleaned_content = clean_workspace_links(content)
+                        dialogue.append(("AI", cleaned_content))
             except Exception as parse_err:
                 # Silently skip malformed lines if any
                 continue
