@@ -16,7 +16,8 @@ enum State {
     STATE_CLOSE_START,
     STATE_CLOSING,
     STATE_EMERGENCY_STOP,
-    STATE_BATTERY_LOW_SHUTDOWN
+    STATE_BATTERY_LOW_SHUTDOWN,
+    STATE_STARTUP_OPEN
 };
 
 struct BoxConfig {
@@ -25,7 +26,8 @@ struct BoxConfig {
     unsigned long waitTime = 10000;
     unsigned long cooldownTime = 3000;
     float voltageShutdownLimit = 11.3f;
-    float currentStallLimit = 800.0f;
+    float currentStallLimit = 3000.0f; // Dual actuator: 100N/60mm/s x2 @ 12V, normal run ~2000mA
+    unsigned long emergencyRecoveryTime = 5000; // Auto-recovery from EMERGENCY_STOP (ms)
 };
 
 typedef void (*StateChangeCallback)(State prevState, State newState);
@@ -46,10 +48,12 @@ private:
     
     BoxConfig config;
     StateChangeCallback stateCallback;
+    State initialState;
     
     float batteryVoltage;
     float motorCurrent;
     float currentDistance;
+    bool relaysIsolated;
     
     void transitionTo(State newState);
     void updateDistanceBuffer();
@@ -69,6 +73,7 @@ public:
     void setConfig(const BoxConfig& newConfig) { config = newConfig; }
     BoxConfig getConfig() const { return config; }
     void registerStateCallback(StateChangeCallback cb) { stateCallback = cb; }
+    void setInitialState(State state) { initialState = state; }
     
     void forceOpen();
     void resetEmergency();

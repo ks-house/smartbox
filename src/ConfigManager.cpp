@@ -12,6 +12,7 @@ void ConfigManager::loadConfig(BoxConfig& config) {
         config.cooldownTime = prefs.getULong("cool_time", config.cooldownTime);
         config.voltageShutdownLimit = prefs.getFloat("volt_lim", config.voltageShutdownLimit);
         config.currentStallLimit = prefs.getFloat("curr_lim", config.currentStallLimit);
+        config.emergencyRecoveryTime = prefs.getULong("emrg_rec", config.emergencyRecoveryTime);
         prefs.end();
         Serial.println("[CONFIG] Configuration loaded from persistent Preferences.");
     } else {
@@ -36,7 +37,10 @@ void ConfigManager::loadConfig(BoxConfig& config) {
         config.voltageShutdownLimit = 11.3f;
     }
     if (config.currentStallLimit < 100.0f) {
-        config.currentStallLimit = 800.0f;
+        config.currentStallLimit = 3000.0f; // Dual actuator default
+    }
+    if (config.emergencyRecoveryTime < 1000) {
+        config.emergencyRecoveryTime = 5000; // 5s default auto-recovery
     }
 
     Serial.printf("[CONFIG] Active parameters: dist=%.1f, act=%lu, wait=%lu, volt=%.1f, stall=%.1f\n",
@@ -55,7 +59,32 @@ void ConfigManager::saveConfig(const BoxConfig& config) {
     prefs.putULong("cool_time", config.cooldownTime);
     prefs.putFloat("volt_lim", config.voltageShutdownLimit);
     prefs.putFloat("curr_lim", config.currentStallLimit);
+    prefs.putULong("emrg_rec", config.emergencyRecoveryTime);
     
     prefs.end();
     Serial.println("[CONFIG] Configuration saved to persistent Preferences.");
+}
+
+void ConfigManager::saveLidState(bool isOpen) {
+    Preferences prefs;
+    if (prefs.begin("smartbox", false)) {
+        prefs.putBool("lid_open", isOpen);
+        prefs.end();
+        Serial.printf("[CONFIG] Lid state saved: %s\n", isOpen ? "OPEN" : "CLOSED");
+    } else {
+        Serial.println("[CONFIG] Failed to open Preferences to save lid state.");
+    }
+}
+
+bool ConfigManager::loadLidState() {
+    Preferences prefs;
+    bool isOpen = false;
+    if (prefs.begin("smartbox", true)) {
+        isOpen = prefs.getBool("lid_open", false);
+        prefs.end();
+        Serial.printf("[CONFIG] Lid state loaded: %s\n", isOpen ? "OPEN" : "CLOSED");
+    } else {
+        Serial.println("[CONFIG] Failed to open Preferences to load lid state. Defaulting to CLOSED.");
+    }
+    return isOpen;
 }

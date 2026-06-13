@@ -10,7 +10,8 @@ static const int ECHO_PIN = 5;
 SmartBoxController::SmartBoxController(HardwareInterface& hardware) 
     : hw(hardware), currentState(STATE_IDLE), stateTimer(0), sensorTimer(0), 
       cooldownTimer(0), isCooldown(false), filterIdx(0), stateCallback(nullptr),
-      batteryVoltage(12.0f), motorCurrent(0.0f), currentDistance(999.0f) {
+      batteryVoltage(12.0f), motorCurrent(0.0f), currentDistance(999.0f), relaysIsolated(false),
+      initialState(STATE_IDLE) {
     for (int i = 0; i < FILTER_SIZE; i++) {
         distBuffer[i] = 999.0f;
     }
@@ -33,8 +34,9 @@ void SmartBoxController::init() {
     hw.setPinMode(ECHO_PIN, INPUT);
     hw.writePin(TRIG_PIN, LOW);
     
-    currentState = STATE_IDLE;
+    currentState = initialState;
     isCooldown = false;
+    relaysIsolated = false;
     
     // Fill median filter buffer
     for (int i = 0; i < FILTER_SIZE; i++) {
@@ -64,7 +66,9 @@ void SmartBoxController::update() {
         if (lowVoltGuardStart == 0) {
             lowVoltGuardStart = hw.getMillis();
         } else if (hw.getMillis() - lowVoltGuardStart >= 3000) {
-            Serial.printf("[BATTERY] Critical battery voltage: %.2fV! Launching Shutdown.\n", batteryVoltage);
+            Serial.printf("[BATTERY] CRITICAL LOW VOLTAGE DETECTED! Voltage: %.2f V (Limit: %.2f V) for 3+ seconds.\n", batteryVoltage, config.voltageShutdownLimit);
+            Serial.printf("[DIAGNOSTIC] Initializing emergency lid opening. State: %d, Curr: %.1f mA, Dist: %.1f cm\n",
+                          currentState, motorCurrent, currentDistance);
             transitionTo(STATE_BATTERY_LOW_SHUTDOWN);
             // Immediately start opening the lid using the remaining power
             setRelayStates(true, true, false);
@@ -81,6 +85,14 @@ void SmartBoxController::update() {
     }
     
     switch (currentState) {
+        case STATE_STARTUP_OPEN:
+            setRelayStates(false, false, false);
+            if (currentDistance > 0 && currentDistance < config.distThreshold && !isCooldown) {
+                Serial.printf("[SENSOR] Startup open: Human approach detected: %.1f cm. Starting 10s wait to close.\n", currentDistance);
+                transitionTo(STATE_HOLD);
+            }
+            break;
+
         case STATE_IDLE:
             setRelayStates(false, false, false);
             if (currentDistance > 0 && currentDistance < config.distThreshold && !isCooldown) {
@@ -95,22 +107,37 @@ void SmartBoxController::update() {
             transitionTo(STATE_OPENING);
             break;
             
-        case STATE_OPENING:
-            // Bypass motor inrush current for the first 300ms
-            if (hw.getMillis() - stateTimer > 300) {
+        case STATE_OPENING: {
+            // Bypass motor inrush current for the first 500ms (dual actuator startup)
+            static int openStallCount = 0;
+            if (hw.getMillis() - stateTimer > 500) {
                 if (motorCurrent > config.currentStallLimit) {
-                    Serial.printf("[EMERGENCY] Stall current detected: %.1f mA. Lock active.\n", motorCurrent);
-                    forceAllRelaysOff();
-                    transitionTo(STATE_EMERGENCY_STOP);
-                    break;
+                    openStallCount++;
+                    Serial.printf("[WARN] Stall candidate OPEN (%d/3): %.1f mA (Limit: %.1f mA)\n",
+                                  openStallCount, motorCurrent, config.currentStallLimit);
+                    if (openStallCount >= 3) {
+                        Serial.printf("[EMERGENCY] MOTOR STALL DETECTED DURING OPEN! Current: %.1f mA (Limit: %.1f mA)\n", motorCurrent, config.currentStallLimit);
+                        Serial.printf("[DIAGNOSTIC] Time Elapsed: %lu ms, Batt: %.2f V, Dist: %.1f cm\n",
+                                      hw.getMillis() - stateTimer, batteryVoltage, currentDistance);
+                        openStallCount = 0;
+                        forceAllRelaysOff();
+                        transitionTo(STATE_EMERGENCY_STOP);
+                        break;
+                    }
+                } else {
+                    openStallCount = 0; // Current normal — reset counter
                 }
+            } else {
+                openStallCount = 0; // Reset on re-entry
             }
             if (hw.getMillis() - stateTimer >= config.actuatorTime) {
                 Serial.println("[STATE] Opening completed. Entering hold.");
+                openStallCount = 0;
                 setRelayStates(false, false, false);
                 transitionTo(STATE_HOLD);
             }
             break;
+        }
             
         case STATE_HOLD:
             setRelayStates(false, false, false);
@@ -132,19 +159,33 @@ void SmartBoxController::update() {
             transitionTo(STATE_CLOSING);
             break;
             
-        case STATE_CLOSING:
-            // Bypass motor inrush current for the first 300ms
-            if (hw.getMillis() - stateTimer > 300) {
+        case STATE_CLOSING: {
+            // Bypass motor inrush current for the first 500ms (dual actuator startup)
+            static int closeStallCount = 0;
+            if (hw.getMillis() - stateTimer > 500) {
                 if (motorCurrent > config.currentStallLimit) {
-                    Serial.printf("[EMERGENCY] Stall current detected during close: %.1f mA. Lock active.\n", motorCurrent);
-                    forceAllRelaysOff();
-                    transitionTo(STATE_EMERGENCY_STOP);
-                    break;
+                    closeStallCount++;
+                    Serial.printf("[WARN] Stall candidate CLOSE (%d/3): %.1f mA (Limit: %.1f mA)\n",
+                                  closeStallCount, motorCurrent, config.currentStallLimit);
+                    if (closeStallCount >= 3) {
+                        Serial.printf("[EMERGENCY] MOTOR STALL DETECTED DURING CLOSE! Current: %.1f mA (Limit: %.1f mA)\n", motorCurrent, config.currentStallLimit);
+                        Serial.printf("[DIAGNOSTIC] Time Elapsed: %lu ms, Batt: %.2f V, Dist: %.1f cm\n",
+                                      hw.getMillis() - stateTimer, batteryVoltage, currentDistance);
+                        closeStallCount = 0;
+                        forceAllRelaysOff();
+                        transitionTo(STATE_EMERGENCY_STOP);
+                        break;
+                    }
+                } else {
+                    closeStallCount = 0; // Current normal — reset counter
                 }
+            } else {
+                closeStallCount = 0; // Reset on re-entry
             }
             // Safety reopen if human is detected during close
             if (currentDistance > 0 && currentDistance < config.distThreshold) {
                 Serial.printf("[SAFETY] Human re-approach during closing: %.1f cm! Reopening.\n", currentDistance);
+                closeStallCount = 0;
                 setRelayStates(false, false, false);
                 transitionTo(STATE_OPEN_START);
                 break;
@@ -152,15 +193,32 @@ void SmartBoxController::update() {
 
             if (hw.getMillis() - stateTimer >= config.actuatorTime) {
                 Serial.println("[STATE] Closing completed. Entering standby.");
+                closeStallCount = 0;
                 setRelayStates(false, false, false);
                 isCooldown = true;
                 cooldownTimer = hw.getMillis();
                 transitionTo(STATE_IDLE);
             }
             break;
+        }
             
         case STATE_EMERGENCY_STOP:
             forceAllRelaysOff();
+            // Auto-recovery after emergencyRecoveryTime (default 5s)
+            if (hw.getMillis() - stateTimer >= config.emergencyRecoveryTime) {
+                Serial.printf("[RECOVERY] Emergency lock expired (%lu ms). Checking sensor...\n",
+                              config.emergencyRecoveryTime);
+                relaysIsolated = false;
+                isCooldown = true;
+                cooldownTimer = hw.getMillis();
+                if (currentDistance > 0.0f && currentDistance < config.distThreshold) {
+                    Serial.printf("[RECOVERY] Human detected (%.1f cm) → Auto-opening lid.\n", currentDistance);
+                    transitionTo(STATE_OPEN_START);
+                } else {
+                    Serial.println("[RECOVERY] No human detected → Returning to IDLE.");
+                    transitionTo(STATE_IDLE);
+                }
+            }
             break;
             
         case STATE_BATTERY_LOW_SHUTDOWN:
@@ -183,6 +241,7 @@ void SmartBoxController::resetEmergency() {
         currentState = STATE_IDLE;
         isCooldown = true;
         cooldownTimer = hw.getMillis();
+        relaysIsolated = false;
         Serial.println("[SYSTEM] Emergency Lock released. Re-entering IDLE.");
     }
 }
@@ -231,7 +290,9 @@ void SmartBoxController::readSensors() {
 void SmartBoxController::setRelayStates(bool mainOn, bool dirOpen, bool dirClose) {
     // Interlock Guard 1: Mutex Lock on direction relays
     if (dirOpen && dirClose) {
-        Serial.println("[EMERGENCY] Interlock block! Both directions active. Forcing OFF.");
+        Serial.println("[EMERGENCY] INTERLOCK BLOCK DETECTED! Both directions active (dirOpen=true, dirClose=true) simultaneously.");
+        Serial.printf("[DIAGNOSTIC] State: %d, Batt: %.2f V, Curr: %.1f mA, Dist: %.1f cm\n",
+                      currentState, batteryVoltage, motorCurrent, currentDistance);
         forceAllRelaysOff();
         transitionTo(STATE_EMERGENCY_STOP);
         return;
@@ -270,6 +331,7 @@ void SmartBoxController::setRelayStates(bool mainOn, bool dirOpen, bool dirClose
     if (mainOn) {
         hw.setPinMode(RELAY_MAIN_PIN, OUTPUT);
         hw.writePin(RELAY_MAIN_PIN, LOW); // ON (Active-Low)
+        relaysIsolated = false; // Reset the isolation flag when active control resumes
     } else {
         hw.setPinMode(RELAY_MAIN_PIN, INPUT); // OFF (INPUT high-impedance mode to cut standby draw)
     }
@@ -279,7 +341,10 @@ void SmartBoxController::forceAllRelaysOff() {
     hw.setPinMode(RELAY_MAIN_PIN, INPUT);
     hw.setPinMode(RELAY_DIR_A_PIN, INPUT);
     hw.setPinMode(RELAY_DIR_B_PIN, INPUT);
-    Serial.println("[SAFETY] All relays forced OFF and isolated (0mA standby).");
+    if (!relaysIsolated) {
+        relaysIsolated = true;
+        Serial.println("[SAFETY] All relays forced OFF and isolated (0mA standby).");
+    }
 }
 
 
