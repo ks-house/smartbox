@@ -251,6 +251,71 @@ void test_config_and_callback_trigger(void) {
     TEST_ASSERT_EQUAL(STATE_OPENING, gNewState);
 }
 
+void test_hold_duration_and_retrigger(void) {
+    MockHardware hw;
+    SmartBoxController controller(hw);
+    controller.init();
+    
+    // 1. Trigger open: Human at 30cm (within threshold)
+    hw.setDistanceCm(30.0f);
+    for (int i = 0; i < 5; ++i) {
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
+    
+    // 2. Advance by actuatorTime to reach STATE_HOLD
+    hw.advanceMillis(3800);
+    controller.update();
+    TEST_ASSERT_EQUAL(STATE_HOLD, controller.getCurrentState());
+    
+    // 3. Human moves away (80cm)
+    hw.setDistanceCm(80.0f);
+    
+    // Advance 5 seconds. Since we removed early-close, it should remain in STATE_HOLD.
+    for (int i = 0; i < 100; ++i) {
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    TEST_ASSERT_EQUAL(STATE_HOLD, controller.getCurrentState());
+    
+    // 4. Human re-approaches (30cm) to trigger timer reset (must update 5 times to populate median filter)
+    hw.setDistanceCm(30.0f);
+    for (int i = 0; i < 5; ++i) {
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    
+    // 5. Human moves away again (80cm)
+    hw.setDistanceCm(80.0f);
+    
+    // Advance 8 seconds. Should still be in STATE_HOLD.
+    for (int i = 0; i < 160; ++i) {
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    TEST_ASSERT_EQUAL(STATE_HOLD, controller.getCurrentState());
+    
+    // Advance another 1.9 seconds (total 9.9 seconds since reset).
+    // Should still be in STATE_HOLD.
+    for (int i = 0; i < 38; ++i) {
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    TEST_ASSERT_EQUAL(STATE_HOLD, controller.getCurrentState());
+    
+    // 6. Advance another 250ms to cross the 10-second threshold (total 10.05 seconds since actual timer stop).
+    hw.advanceMillis(250);
+    
+    // First update must transition from STATE_HOLD to STATE_CLOSE_START
+    controller.update();
+    TEST_ASSERT_EQUAL(STATE_CLOSE_START, controller.getCurrentState());
+    
+    // Next update must transition from STATE_CLOSE_START to STATE_CLOSING
+    controller.update();
+    TEST_ASSERT_EQUAL(STATE_CLOSING, controller.getCurrentState());
+}
+
 
 void setup() {
     // Wait for serial connection on the target board
@@ -263,6 +328,7 @@ void setup() {
     RUN_TEST(test_low_battery_shutdown);
     RUN_TEST(test_ultrasonic_median_filter);
     RUN_TEST(test_config_and_callback_trigger);
+    RUN_TEST(test_hold_duration_and_retrigger);
     UNITY_END();
 }
 

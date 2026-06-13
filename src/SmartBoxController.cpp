@@ -114,10 +114,13 @@ void SmartBoxController::update() {
             
         case STATE_HOLD:
             setRelayStates(false, false, false);
-            if (currentDistance > config.distThreshold) {
-                Serial.printf("[SENSOR] Human departed: %.1f cm. Closing early.\n", currentDistance);
-                transitionTo(STATE_CLOSE_START);
-            } else if (hw.getMillis() - stateTimer >= config.waitTime) {
+            // If human is still detected within the threshold, reset the timer to keep the lid open
+            if (currentDistance > 0.0f && currentDistance < config.distThreshold) {
+                stateTimer = hw.getMillis();
+            }
+            
+            // Wait until the hold time (10 seconds by default) has elapsed without human presence
+            if (hw.getMillis() - stateTimer >= config.waitTime) {
                 Serial.println("[STATE] Hold timeout reached. Starting closing.");
                 transitionTo(STATE_CLOSE_START);
             }

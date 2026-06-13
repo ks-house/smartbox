@@ -22,7 +22,7 @@ enum State {
 struct BoxConfig {
     float distThreshold = 50.0f;
     unsigned long actuatorTime = 3800;
-    unsigned long waitTime = 5000;
+    unsigned long waitTime = 10000;
     unsigned long cooldownTime = 3000;
     float voltageShutdownLimit = 11.3f;
     float currentStallLimit = 800.0f;
