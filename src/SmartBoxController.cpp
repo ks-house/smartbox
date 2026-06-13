@@ -78,6 +78,15 @@ void SmartBoxController::update() {
             break;
             
         case STATE_OPENING:
+            // Bypass motor inrush current for the first 300ms
+            if (hw.getMillis() - stateTimer > 300) {
+                if (motorCurrent > config.currentStallLimit) {
+                    Serial.printf("[EMERGENCY] Stall current detected: %.1f mA. Lock active.\n", motorCurrent);
+                    forceAllRelaysOff();
+                    transitionTo(STATE_EMERGENCY_STOP);
+                    break;
+                }
+            }
             if (hw.getMillis() - stateTimer >= config.actuatorTime) {
                 Serial.println("[STATE] Opening completed. Entering hold.");
                 setRelayStates(false, false, false);
@@ -103,6 +112,15 @@ void SmartBoxController::update() {
             break;
             
         case STATE_CLOSING:
+            // Bypass motor inrush current for the first 300ms
+            if (hw.getMillis() - stateTimer > 300) {
+                if (motorCurrent > config.currentStallLimit) {
+                    Serial.printf("[EMERGENCY] Stall current detected during close: %.1f mA. Lock active.\n", motorCurrent);
+                    forceAllRelaysOff();
+                    transitionTo(STATE_EMERGENCY_STOP);
+                    break;
+                }
+            }
             // Safety reopen if human is detected during close
             if (currentDistance > 0 && currentDistance < config.distThreshold) {
                 Serial.printf("[SAFETY] Human re-approach during closing: %.1f cm! Reopening.\n", currentDistance);
@@ -110,6 +128,7 @@ void SmartBoxController::update() {
                 transitionTo(STATE_OPEN_START);
                 break;
             }
+
             if (hw.getMillis() - stateTimer >= config.actuatorTime) {
                 Serial.println("[STATE] Closing completed. Entering standby.");
                 setRelayStates(false, false, false);
@@ -234,10 +253,9 @@ void SmartBoxController::setRelayStates(bool mainOn, bool dirOpen, bool dirClose
 
 void SmartBoxController::forceAllRelaysOff() {
     hw.setPinMode(RELAY_MAIN_PIN, INPUT);
-    hw.writePin(RELAY_DIR_A_PIN, HIGH);
-    hw.writePin(RELAY_DIR_B_PIN, HIGH);
-    hw.setPinMode(RELAY_DIR_A_PIN, OUTPUT);
-    hw.setPinMode(RELAY_DIR_B_PIN, OUTPUT);
+    hw.setPinMode(RELAY_DIR_A_PIN, INPUT);
+    hw.setPinMode(RELAY_DIR_B_PIN, INPUT);
     Serial.println("[SAFETY] All relays forced OFF and isolated (0mA standby).");
 }
+
 
