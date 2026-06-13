@@ -178,6 +178,41 @@ void test_low_battery_shutdown(void) {
     TEST_ASSERT_EQUAL(INPUT, hw.getPinMode(RELAY_DIR_B_PIN));
 }
 
+void test_ultrasonic_median_filter(void) {
+    MockHardware hw;
+    SmartBoxController controller(hw);
+    controller.init();
+    
+    // Noise Test 1: mostly far, with 2 close spikes
+    // Input sequence: 10cm, 200cm, 10cm, 200cm, 200cm -> Sorted: 10, 10, 200, 200, 200 -> Median: 200cm
+    // FSM must remain IDLE.
+    float inputs1[5] = {10.0f, 200.0f, 10.0f, 200.0f, 200.0f};
+    for (int i = 0; i < 5; ++i) {
+        hw.setDistanceCm(inputs1[i]);
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    TEST_ASSERT_EQUAL(STATE_IDLE, controller.getCurrentState());
+    
+    // Noise Test 2: mostly close, with 2 sensor error (999cm) spikes
+    // Input sequence: 999cm, 30cm, 999cm, 30cm, 30cm -> Sorted: 30, 30, 30, 999, 999 -> Median: 30cm
+    float inputs2[5] = {999.0f, 30.0f, 999.0f, 30.0f, 30.0f};
+    for (int i = 0; i < 5; ++i) {
+        hw.setDistanceCm(inputs2[i]);
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    // FSM must transition to STATE_OPEN_START
+    TEST_ASSERT_EQUAL(STATE_OPEN_START, controller.getCurrentState());
+    
+    // One more update to transition from OPEN_START to OPENING
+    hw.advanceMillis(10);
+    controller.update();
+    TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
+}
+
+
+
 void setup() {
     // Wait for serial connection on the target board
     delay(2000);
@@ -187,8 +222,10 @@ void setup() {
     RUN_TEST(test_relay_interlock_and_guard_delay);
     RUN_TEST(test_stall_current_detection);
     RUN_TEST(test_low_battery_shutdown);
+    RUN_TEST(test_ultrasonic_median_filter);
     UNITY_END();
 }
+
 
 
 
