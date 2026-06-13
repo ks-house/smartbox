@@ -14,6 +14,13 @@ static SmartBoxController controller(hardware);
 // Callback to dispatch state changes asynchronously
 static void onStateChanged(State prevState, State newState) {
     SmartThingsReporter::reportStateChange(prevState, newState);
+    
+    // Save logical lid state in Preferences based on transition
+    if (newState == STATE_HOLD || newState == STATE_OPENING || newState == STATE_BATTERY_LOW_SHUTDOWN || newState == STATE_STARTUP_OPEN) {
+        ConfigManager::saveLidState(true);
+    } else if (newState == STATE_IDLE || newState == STATE_CLOSING) {
+        ConfigManager::saveLidState(false);
+    }
 }
 
 void setup() {
@@ -28,6 +35,12 @@ void setup() {
     BoxConfig config;
     ConfigManager::loadConfig(config);
     controller.setConfig(config);
+
+    // Load initial lid state and set FSM start state
+    bool lidWasOpen = ConfigManager::loadLidState();
+    if (lidWasOpen) {
+        controller.setInitialState(STATE_STARTUP_OPEN);
+    }
 
     // 3. Register state change callback
     controller.registerStateCallback(onStateChanged);

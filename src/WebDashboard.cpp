@@ -200,6 +200,13 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
             desc.innerText = 'Battery voltage dropped below 11.3V. Relays isolated.';
             card.classList.add('state-battery');
             break;
+          case 'STARTUP_OPEN':
+            badge.className = 'status-badge running';
+            badge.innerText = 'Startup Open';
+            title.innerText = 'Lid Open on Startup';
+            desc.innerText = 'Lid is open. Waiting for human approach to start 10s countdown to close.';
+            card.classList.add('state-running');
+            break;
         }
       } catch(e) {
         console.error(e);
@@ -274,6 +281,7 @@ void WebDashboard::init(SmartBoxController& controller) {
             case STATE_CLOSING: stateStr = "CLOSING"; break;
             case STATE_EMERGENCY_STOP: stateStr = "EMERGENCY_STOP"; break;
             case STATE_BATTERY_LOW_SHUTDOWN: stateStr = "BATTERY_LOW_SHUTDOWN"; break;
+            case STATE_STARTUP_OPEN: stateStr = "STARTUP_OPEN"; break;
             default: stateStr = "UNKNOWN"; break;
         }
         

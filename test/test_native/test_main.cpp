@@ -316,6 +316,47 @@ void test_hold_duration_and_retrigger(void) {
     TEST_ASSERT_EQUAL(STATE_CLOSING, controller.getCurrentState());
 }
 
+void test_startup_open_flow(void) {
+    MockHardware hw;
+    SmartBoxController controller(hw);
+    
+    // Set initial state to STATE_STARTUP_OPEN
+    controller.setInitialState(STATE_STARTUP_OPEN);
+    controller.init();
+    
+    // Check initial state
+    TEST_ASSERT_EQUAL(STATE_STARTUP_OPEN, controller.getCurrentState());
+    
+    // Relays must be isolated/standby (Main = INPUT, Directions = OUTPUT/HIGH)
+    TEST_ASSERT_EQUAL(INPUT, hw.getPinMode(RELAY_MAIN_PIN));
+    TEST_ASSERT_EQUAL(OUTPUT, hw.getPinMode(RELAY_DIR_A_PIN));
+    TEST_ASSERT_EQUAL(OUTPUT, hw.getPinMode(RELAY_DIR_B_PIN));
+    TEST_ASSERT_EQUAL(HIGH, hw.getPinValue(RELAY_DIR_A_PIN));
+    TEST_ASSERT_EQUAL(HIGH, hw.getPinValue(RELAY_DIR_B_PIN));
+    
+    // Simulate no human approach (80cm)
+    hw.setDistanceCm(80.0f);
+    for (int i = 0; i < 5; ++i) {
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    
+    // State should still be STARTUP_OPEN
+    TEST_ASSERT_EQUAL(STATE_STARTUP_OPEN, controller.getCurrentState());
+    
+    // Simulate human approach (30cm)
+    hw.setDistanceCm(30.0f);
+    for (int i = 0; i < 5; ++i) {
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    
+    // State should transition to STATE_HOLD
+    TEST_ASSERT_EQUAL(STATE_HOLD, controller.getCurrentState());
+    
+    // Relays should still be off/isolated in STATE_HOLD
+    TEST_ASSERT_EQUAL(INPUT, hw.getPinMode(RELAY_MAIN_PIN));
+}
 
 void setup() {
     // Wait for serial connection on the target board
@@ -329,6 +370,7 @@ void setup() {
     RUN_TEST(test_ultrasonic_median_filter);
     RUN_TEST(test_config_and_callback_trigger);
     RUN_TEST(test_hold_duration_and_retrigger);
+    RUN_TEST(test_startup_open_flow);
     UNITY_END();
 }
 
