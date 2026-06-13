@@ -211,6 +211,45 @@ void test_ultrasonic_median_filter(void) {
     TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
 }
 
+static State gPrevState = STATE_IDLE;
+static State gNewState = STATE_IDLE;
+static int gCallbackCount = 0;
+
+static void testStateCallback(State prev, State next) {
+    gPrevState = prev;
+    gNewState = next;
+    gCallbackCount++;
+}
+
+void test_config_and_callback_trigger(void) {
+    MockHardware hw;
+    SmartBoxController controller(hw);
+    controller.init();
+    
+    // Register test callback
+    gCallbackCount = 0;
+    controller.registerStateCallback(testStateCallback);
+    
+    // Modify config to increase range threshold to 100cm
+    BoxConfig cfg = controller.getConfig();
+    cfg.distThreshold = 100.0f;
+    controller.setConfig(cfg);
+    
+    // Proximity target at 80cm (outside default 50cm, inside new 100cm)
+    hw.setDistanceCm(80.0f);
+    for (int i = 0; i < 5; ++i) {
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    
+    // State machine should transition to STATE_OPENING
+    TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
+    
+    // Callback must be triggered exactly twice (IDLE -> OPEN_START -> OPENING)
+    TEST_ASSERT_EQUAL(2, gCallbackCount);
+    TEST_ASSERT_EQUAL(STATE_OPEN_START, gPrevState);
+    TEST_ASSERT_EQUAL(STATE_OPENING, gNewState);
+}
 
 
 void setup() {
@@ -223,6 +262,7 @@ void setup() {
     RUN_TEST(test_stall_current_detection);
     RUN_TEST(test_low_battery_shutdown);
     RUN_TEST(test_ultrasonic_median_filter);
+    RUN_TEST(test_config_and_callback_trigger);
     UNITY_END();
 }
 
