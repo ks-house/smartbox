@@ -57,8 +57,8 @@ float Esp32Hardware::getDistanceCm() {
     delayMicroseconds(10);
     digitalWrite(trigPin, LOW);
 
-    // Tight pulseIn timeout of 10000us (~1.7m max distance) to prevent blocking main loop
-    long duration = pulseIn(echoPin, HIGH, 10000);
+    // Increase timeout to 30000us (~5.1m max distance) to prevent timing misses from network interrupts
+    long duration = pulseIn(echoPin, HIGH, 30000);
 
     if (duration == 0) {
         return 999.0f; // Return out-of-range flag if timeout or error

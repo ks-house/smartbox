@@ -56,4 +56,15 @@ void loop() {
 
     // Run Web Dashboard updates
     WebDashboard::update();
+
+    // 1-second interval diagnostic print
+    static unsigned long lastDebug = 0;
+    if (millis() - lastDebug >= 1000) {
+        lastDebug = millis();
+        Serial.printf("[DEBUG] Dist: %.1f cm, Batt: %.2f V, Curr: %.1f mA, State: %d\n",
+                      controller.getDistance(),
+                      controller.getBatteryVoltage(),
+                      controller.getMotorCurrent(),
+                      (int)controller.getCurrentState());
+    }
 }

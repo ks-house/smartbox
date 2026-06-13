@@ -20,11 +20,13 @@ void SmartBoxController::init() {
     // 1. Set main relay to high-impedance mode first to prevent glitches and reset standby current
     hw.setPinMode(RELAY_MAIN_PIN, INPUT);
     
-    // 2. Pre-write HIGH (OFF for Active-Low) to direction pins, then set to OUTPUT to avoid glitch triggers
-    hw.writePin(RELAY_DIR_A_PIN, HIGH);
-    hw.writePin(RELAY_DIR_B_PIN, HIGH);
+    // 2. Set direction pins to INPUT_PULLUP to pull them HIGH safely, then convert to OUTPUT
+    hw.setPinMode(RELAY_DIR_A_PIN, INPUT_PULLUP);
+    hw.setPinMode(RELAY_DIR_B_PIN, INPUT_PULLUP);
     hw.setPinMode(RELAY_DIR_A_PIN, OUTPUT);
     hw.setPinMode(RELAY_DIR_B_PIN, OUTPUT);
+    hw.writePin(RELAY_DIR_A_PIN, HIGH);
+    hw.writePin(RELAY_DIR_B_PIN, HIGH);
     
     // 3. Setup ultrasonic pins
     hw.setPinMode(TRIG_PIN, OUTPUT);
