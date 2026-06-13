@@ -11,7 +11,7 @@ struct StateChangeEvent {
 static QueueHandle_t eventQueue = NULL;
 const char* SmartThingsReporter::webhookUrl = NULL;
 
-static void reporterTask(void* parameter) {
+void SmartThingsReporter::reporterTask(void* parameter) {
     StateChangeEvent ev;
     while(true) {
         // Block indefinitely until an event arrives in the queue

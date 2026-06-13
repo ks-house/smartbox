@@ -6,6 +6,7 @@
 class SmartThingsReporter {
 private:
     static const char* webhookUrl;
+    static void reporterTask(void* parameter);
     
 public:
     static void init(const char* url = nullptr);
