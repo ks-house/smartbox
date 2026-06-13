@@ -59,22 +59,22 @@
 
 ## Phase 3: 비동기 통신 & 설정 저장 구현 (Target)
 
-- [ ] **8단계: 비휘발성 저장 연동**
-  - [ ] [ConfigManager.h](../src/ConfigManager.h) [NEW] 및 [ConfigManager.cpp](../src/ConfigManager.cpp) [NEW]: ESP32 `Preferences` 라이브러리를 바인딩하여 설정값 로드 및 저장 구현
-  - [ ] 시스템 부팅 시 비휘발성 저장 영역에서 설정을 로드하고 `SmartBoxController`에 주입하는 플로우 생성
+- [x] **8단계: 비휘발성 저장 연동**
+  - [x] [ConfigManager.h](../src/ConfigManager.h) [NEW] 및 [ConfigManager.cpp](../src/ConfigManager.cpp) [NEW]: ESP32 `Preferences` 라이브러리를 바인딩하여 설정값 로드 및 저장 구현
+  - [x] 시스템 부팅 시 비휘발성 저장 영역에서 설정을 로드하고 `SmartBoxController`에 주입하는 플로우 생성
 
-- [ ] **9단계: 비동기 Wi-Fi 및 SmartThings API 연동**
-  - [ ] [WifiManager.h](../src/WifiManager.h) [NEW] / [WifiManager.cpp](../src/WifiManager.cpp) [NEW]: 아두이노 비동기 와이파이 이벤트 등록 및 연결 관리 기능 구현
-  - [ ] [SmartThingsReporter.h](../src/SmartThingsReporter.h) [NEW] / [SmartThingsReporter.cpp](../src/SmartThingsReporter.cpp) [NEW]:
-    - `SmartBoxController`의 상태 변경 콜백을 수신하여 이벤트를 큐에 Enqueue
-    - 백그라운드 FreeRTOS 태스크를 구동하여 큐에서 이벤트를 꺼내 비동기로 SmartThings REST API Webhook 전송을 처리하도록 구현
+- [x] **9단계: 비동기 Wi-Fi 및 SmartThings API 연동**
+  - [x] [WifiManager.h](../src/WifiManager.h) [NEW] / [WifiManager.cpp](../src/WifiManager.cpp) [NEW]: 아두이노 비동기 와이파이 이벤트 등록 및 연결 관리 기능 구현
+  - [x] [SmartThingsReporter.h](../src/SmartThingsReporter.h) [NEW] / [SmartThingsReporter.cpp](../src/SmartThingsReporter.cpp) [NEW]:
+    - [x] `SmartBoxController`의 상태 변경 콜백을 수신하여 이벤트를 큐에 Enqueue
+    - [x] 백그라운드 FreeRTOS 태스크를 구동하여 큐에서 이벤트를 꺼내 비동기로 SmartThings REST API Webhook 전송을 처리하도록 구현
 
-- [ ] **10단계: 비동기 웹 관리자 서버 및 실시간 WebSocket 통신**
-  - [ ] `ESPAsyncWebServer` 구동 및 기본 관리자용 HTML/JS/CSS 소스 바인딩 (Web UI 포함)
-  - [ ] WebSocket API 핸들러 작성: 실시간 센서값(거리, 전류, 전압) 및 FSM 상태 데이터를 500ms~1000ms 간격으로 브로드캐스트
-  - [ ] 관리자 조정 요청 REST API 핸들러 작성:
-    - 감도 설정 변경 시, 신규 파라미터를 파싱하여 `ConfigManager` 및 `SmartBoxController`에 실시간 업데이트하고 Preferences에 저장
-    - 강제 제어 명령(원격 열기, 비상 정지 해제) 수신 시 `SmartBoxController::forceOpen()` 또는 `SmartBoxController::resetEmergency()` 호출 연동
+- [x] **10단계: 비동기 웹 관리자 서버 및 실시간 WebSocket 통신**
+  - [x] `ESPAsyncWebServer` 구동 및 기본 관리자용 HTML/JS/CSS 소스 바인딩 (Web UI 포함)
+  - [x] WebSocket API 핸들러 작성: 실시간 센서값(거리, 전류, 전압) 및 FSM 상태 데이터를 500ms~1000ms 간격으로 브로드캐스트
+  - [x] 관리자 조정 요청 REST API 핸들러 작성:
+    - [x] 감도 설정 변경 시, 신규 파라미터를 파싱하여 `ConfigManager` 및 `SmartBoxController`에 실시간 업데이트하고 Preferences에 저장
+    - [x] 강제 제어 명령(원격 열기, 비상 정지 해제) 수신 시 `SmartBoxController::forceOpen()` 또는 `SmartBoxController::resetEmergency()` 호출 연동
 
 ---
 
