@@ -59,6 +59,10 @@ The motor direction is controlled by a 2-channel relay. The main 12V power is co
 ### 4.5. Documentation and Link Standards
 * **Relative Links Only:** When linking files within repository markdown documents (e.g., `README.md`, reports, manual), **always use relative paths** (e.g., `[main.cpp](../src/main.cpp)` or `[BOM](HARDWARE_BOM.md)`).
 * **No Absolute Local Paths:** **Never use absolute local paths** (e.g., `file:///c:/...` or `C:\Users\...`) in committed files. This prevents path breaking on other developers' machines.
+### 4.6. 전체 프롬프트 저장 규칙 (Export Transcript Rule)
+* 사용자가 **"전체 프롬프트 저장 해줘"** 또는 이에 상응하는 대화록 저장 요청을 하는 경우, AI 에이전트는 다음 자동화 스크립트를 실행하여 현재까지의 대화 로그를 Markdown 문서로 내보내야 합니다.
+  * *실행 명령어:* `python scripts/export_docs.py [주제명] --num [순번]` (예: `개발및검증_최종` / `03`)
+  * 내보낸 결과 파일(`prompts/YYYYMMDD[순번]_[주제명]_prompt.md`)과 복사/생성된 보고서 템플릿(`reports/YYYYMMDD[순번]_[주제명]_report.md`)을 확인하고 Git에 즉각 스테이징 및 커밋하여 변경 이력을 영구 보존해야 합니다.
 
 ---
 
