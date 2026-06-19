@@ -17,7 +17,8 @@ enum State {
     STATE_CLOSING,
     STATE_EMERGENCY_STOP,
     STATE_BATTERY_LOW_SHUTDOWN,
-    STATE_STARTUP_OPEN
+    STATE_STARTUP_OPEN,
+    STATE_OTA_UPDATING
 };
 
 struct BoxConfig {
@@ -55,14 +56,15 @@ private:
     float currentDistance;
     bool relaysIsolated;
     
-    void transitionTo(State newState);
     void updateDistanceBuffer();
     float getFilteredDistance();
     void readSensors();
     void setRelayStates(bool mainOn, bool dirOpen, bool dirClose);
-    void forceAllRelaysOff();
 
 public:
+    void transitionTo(State newState);
+    void forceAllRelaysOff();
+    bool isOtaMode() const { return currentState == STATE_OTA_UPDATING; }
     SmartBoxController(HardwareInterface& hardware);
     ~SmartBoxController() {}
     

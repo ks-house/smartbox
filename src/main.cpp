@@ -13,6 +13,12 @@ static SmartBoxController controller(hardware);
 
 // Callback to dispatch state changes asynchronously
 static void onStateChanged(State prevState, State newState) {
+    // OTA 모드 진입 시 lid state 변경하지 않음 (OTA 중 플래시 쓰기 방지)
+    if (newState == STATE_OTA_UPDATING) {
+        Serial.println("[SYSTEM] OTA mode entered. All background routines suspended.");
+        return;
+    }
+    
     SmartThingsReporter::reportStateChange(prevState, newState);
     
     // Save logical lid state in Preferences based on transition
@@ -61,6 +67,12 @@ void setup() {
 }
 
 void loop() {
+    // OTA 모드일 때 FSM/센서 루프 완전 정지 (이중 안전장치)
+    if (controller.isOtaMode()) {
+        delay(100); // Yield CPU to async web server for OTA data processing
+        return;
+    }
+
     // Run core FSM updates
     controller.update();
 

@@ -115,20 +115,30 @@ void test_stall_current_detection(void) {
     
     TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
     
-    // Advance virtual clock by 200ms (within 300ms inrush window)
-    hw.advanceMillis(200);
-    hw.setMotorCurrent(1000.0f); // Exceeds 800mA stall threshold
+    // Advance virtual clock by 400ms (within 500ms inrush window)
+    hw.advanceMillis(400);
+    hw.setMotorCurrent(4000.0f); // Exceeds 3000mA stall threshold
     controller.update();
     
     // Should still be OPENING (inrush bypass)
     TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
     
-    // Advance virtual clock by 150ms (total 400ms since opening, past the 300ms window)
+    // Advance virtual clock by 150ms (total 550ms since opening, past the 500ms window)
     hw.advanceMillis(150);
-    hw.setMotorCurrent(1000.0f);
-    controller.update();
     
-    // Should trigger EMERGENCY_STOP immediately
+    // Sample 1: exceeding threshold
+    hw.setMotorCurrent(4000.0f);
+    controller.update();
+    TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState()); // Needs 3 consecutive samples
+    
+    // Sample 2: exceeding threshold
+    hw.setMotorCurrent(4000.0f);
+    controller.update();
+    TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
+    
+    // Sample 3: exceeding threshold -> transition to EMERGENCY_STOP
+    hw.setMotorCurrent(4000.0f);
+    controller.update();
     TEST_ASSERT_EQUAL(STATE_EMERGENCY_STOP, controller.getCurrentState());
     
     // Relays must be isolated to INPUT (high impedance)
@@ -358,6 +368,50 @@ void test_startup_open_flow(void) {
     TEST_ASSERT_EQUAL(INPUT, hw.getPinMode(RELAY_MAIN_PIN));
 }
 
+void test_ota_state_isolation(void) {
+    MockHardware hw;
+    SmartBoxController controller(hw);
+    controller.init();
+    
+    // 1. Trigger opening first (simulate mid-operation OTA trigger)
+    hw.setDistanceCm(30.0f);
+    for (int i = 0; i < 5; ++i) {
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
+    
+    // 2. Simulate Pre-OTA interlock: forceAllRelaysOff() then transitionTo(STATE_OTA_UPDATING)
+    controller.forceAllRelaysOff();
+    
+    // All relay pins must be INPUT (high-impedance, 0mA standby)
+    TEST_ASSERT_EQUAL(INPUT, hw.getPinMode(RELAY_MAIN_PIN));
+    TEST_ASSERT_EQUAL(INPUT, hw.getPinMode(RELAY_DIR_A_PIN));
+    TEST_ASSERT_EQUAL(INPUT, hw.getPinMode(RELAY_DIR_B_PIN));
+    
+    controller.transitionTo(STATE_OTA_UPDATING);
+    TEST_ASSERT_EQUAL(STATE_OTA_UPDATING, controller.getCurrentState());
+    
+    // 3. Verify FSM is frozen: sensor stimulus should NOT cause state transitions
+    hw.setDistanceCm(10.0f); // Very close approach
+    hw.setBatteryVoltage(12.0f); // Normal battery
+    for (int i = 0; i < 20; ++i) {
+        hw.advanceMillis(200);
+        controller.update();
+    }
+    
+    // State must remain STATE_OTA_UPDATING despite sensor activity
+    TEST_ASSERT_EQUAL(STATE_OTA_UPDATING, controller.getCurrentState());
+    
+    // All relay pins must still be INPUT (no relay activity during OTA)
+    TEST_ASSERT_EQUAL(INPUT, hw.getPinMode(RELAY_MAIN_PIN));
+    TEST_ASSERT_EQUAL(INPUT, hw.getPinMode(RELAY_DIR_A_PIN));
+    TEST_ASSERT_EQUAL(INPUT, hw.getPinMode(RELAY_DIR_B_PIN));
+    
+    // 4. Verify isOtaMode() returns true
+    TEST_ASSERT_TRUE(controller.isOtaMode());
+}
+
 void setup() {
     // Wait for serial connection on the target board
     delay(2000);
@@ -371,6 +425,7 @@ void setup() {
     RUN_TEST(test_config_and_callback_trigger);
     RUN_TEST(test_hold_duration_and_retrigger);
     RUN_TEST(test_startup_open_flow);
+    RUN_TEST(test_ota_state_isolation);
     UNITY_END();
 }
 

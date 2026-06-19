@@ -91,3 +91,18 @@
   - [x] ESP32-C6 타겟 보드 업로드
   - [x] 시리얼 로그 확인을 통한 동작 상태 검증
   - [x] 모바일 기기로 웹 어드민 페이지에 접속하여 실시간 차트/모니터링, 감도 입력 수정 저장 및 원격 개방이 비동기적으로 지연 없이 안전하게 연동되는지 종합 시험 진행
+
+---
+
+## Phase 5: Web OTA 및 Pre-OTA 하드웨어 안전 셧다운 구현
+
+- [x] **13단계: 16MB 파티션 변경 및 FSM 상태 확장**
+  - [x] [platformio.ini](../platformio.ini) [MODIFY]: 16MB 플래시에 맞게 `default_16MB.csv` 파티션 구성 설정 추가
+  - [x] [SmartBoxController.h](../src/SmartBoxController.h) [MODIFY]: `STATE_OTA_UPDATING` 상태 추가, transitionTo 및 forceAllRelaysOff를 public으로 전환, `isOtaMode()` 추가
+  - [x] [SmartBoxController.cpp](../src/SmartBoxController.cpp) [MODIFY]: `update()` 최상단에 OTA 상태 가드 추가하여 FSM 동작 및 센서 스캔 격리
+- [x] **14단계: Pre-OTA 안전 셧다운 및 웹 업데이트 구현**
+  - [x] [WebDashboard.cpp](../src/WebDashboard.cpp) [MODIFY]: `POST /api/ota` API 핸들러 구현. 첫 번째 청크 수신 시 즉시 릴레이 강제 차단 및 FSM OTA 모드로 진입하는 Pre-OTA Hardware Interlock 적용. 실시간 업로드 프로그레스 웹 UI 카드 구축. 업로드 성공 후 리부팅 딜레이 추가.
+  - [x] [main.cpp](../src/main.cpp) [MODIFY]: OTA 모드 감지 시 loop() 내 FSM 갱신을 스킵하고 CPU를 양보하도록 `delay(100)` 삽입
+- [x] **15단계: OTA 상태 격리 유닛 테스트 검증**
+  - [x] [test_main.cpp](../test/test_native/test_main.cpp) [MODIFY]: `test_ota_state_isolation()` 단위 테스트 추가. OTA 진입 시 모든 릴레이가 고임피던스 INPUT으로 전환되고 센서 신호에 의한 FSM 전이가 격리 동결되는지 검증.
+

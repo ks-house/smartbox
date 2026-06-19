@@ -46,6 +46,11 @@ void SmartBoxController::init() {
 
 
 void SmartBoxController::update() {
+    // OTA 업데이트 중 — 모든 센서/액추에이터 루프 완전 정지
+    if (currentState == STATE_OTA_UPDATING) {
+        return;
+    }
+
     // Read ultrasonic distance every 50ms and update buffer
     if (hw.getMillis() - sensorTimer >= 50) {
         sensorTimer = hw.getMillis();
@@ -226,6 +231,12 @@ void SmartBoxController::update() {
             if (hw.getMillis() - stateTimer >= config.actuatorTime) {
                 forceAllRelaysOff();
             }
+            break;
+
+        case STATE_OTA_UPDATING:
+            // OTA 모드: 모든 릴레이 차단 상태 유지, 아무 동작도 하지 않음
+            // update() 상단의 early return으로 여기까지 도달하지 않지만 방어적 코드
+            forceAllRelaysOff();
             break;
     }
 }
