@@ -2,6 +2,9 @@
 #include "ConfigManager.h"
 #include <Arduino.h>
 #include <Update.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
+#include <HTTPUpdate.h>
 
 AsyncWebServer WebDashboard::server(80);
 SmartBoxController* WebDashboard::controllerPtr = nullptr;
@@ -137,6 +140,17 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       </div>
       <div id='otaStatus' style='display:none; padding: 12px; border-radius: 12px; margin-bottom: 15px; font-weight: 600; text-align: center;'></div>
       <button class='btn btn-primary' id='btnOta' onclick='uploadFirmware()' style='background: var(--warning); box-shadow: 0 8px 20px rgba(245,158,11,0.2);'>Upload Firmware</button>
+    </div>
+
+    <!-- NAS HTTPS OTA -->
+    <div class='card'>
+      <h3 style='font-size: 1.15rem; font-weight: 600; margin-bottom: 18px; color: var(--info);'>☁️ Firmware Update (from NAS)</h3>
+      <div class='form-group'>
+        <label>HTTPS Target URL</label>
+        <input type='text' id='nasUrl' class='form-control' value='***REMOVED***' readonly style='background: rgba(255,255,255,0.01); color: var(--text-muted);'>
+      </div>
+      <div id='nasOtaStatus' style='display:none; padding: 12px; border-radius: 12px; margin-bottom: 15px; font-weight: 600; text-align: center;'></div>
+      <button class='btn btn-primary' id='btnNasOta' onclick='updateFromNas()' style='background: var(--info); box-shadow: 0 8px 20px rgba(10,132,255,0.2);'>Fetch & Update</button>
     </div>
   </div>
 
@@ -357,6 +371,69 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       
       xhr.send(formData);
     }
+
+    async function updateFromNas() {
+      if (!confirm('⚠️ Fetch firmware from NAS and reboot the device?\n\nAll relays will be safely shut down before flashing.')) return;
+      
+      const statusDiv = document.getElementById('nasOtaStatus');
+      const btn = document.getElementById('btnNasOta');
+      
+      statusDiv.style.display = 'block';
+      statusDiv.style.background = 'rgba(10,132,255,0.15)';
+      statusDiv.style.color = 'var(--info)';
+      statusDiv.innerText = '⏳ 업데이트 중입니다. 전원을 끄지 마세요...';
+      btn.disabled = true;
+      btn.className = 'btn btn-disabled';
+      
+      try {
+        const res = await fetch('/api/update-from-nas');
+        const result = await res.json();
+        if (result.status === 'started') {
+          // Poll /api/status to see if it changes to OTA_UPDATING, and wait for disconnect or reboot
+          let checkInterval = setInterval(async () => {
+            try {
+              const checkRes = await fetch('/api/status');
+              const checkData = await checkRes.json();
+              if (checkData.state === 'OTA_UPDATING') {
+                statusDiv.innerText = '⏳ 업데이트 중입니다. 전원을 끄지 마세요... (플래싱 중)';
+              } else if (checkData.state === 'IDLE') {
+                // If it returned to IDLE, OTA must have failed
+                clearInterval(checkInterval);
+                statusDiv.style.background = 'rgba(239,68,68,0.15)';
+                statusDiv.style.color = 'var(--danger)';
+                statusDiv.innerText = '❌ NAS OTA 실패: 플래시 쓰기 오류 또는 네트워크 연결 실패';
+                btn.disabled = false;
+                btn.className = 'btn btn-primary';
+                btn.style.background = 'var(--info)';
+              }
+            } catch (e) {
+              // Fetch failed, probably because of reboot!
+              clearInterval(checkInterval);
+              statusDiv.style.background = 'rgba(16,185,129,0.15)';
+              statusDiv.style.color = 'var(--success)';
+              statusDiv.innerText = '✅ 업데이트 완료! 장치 재부팅 중...';
+              setTimeout(() => {
+                location.reload();
+              }, 5000);
+            }
+          }, 1500);
+        } else {
+          statusDiv.style.background = 'rgba(239,68,68,0.15)';
+          statusDiv.style.color = 'var(--danger)';
+          statusDiv.innerText = '❌ OTA 트리거 실패: ' + (result.message || 'Unknown error');
+          btn.disabled = false;
+          btn.className = 'btn btn-primary';
+          btn.style.background = 'var(--info)';
+        }
+      } catch (e) {
+        statusDiv.style.background = 'rgba(239,68,68,0.15)';
+        statusDiv.style.color = 'var(--danger)';
+        statusDiv.innerText = '❌ 서버와 통신 실패.';
+        btn.disabled = false;
+        btn.className = 'btn btn-primary';
+        btn.style.background = 'var(--info)';
+      }
+    }
     
     setInterval(updateStatus, 1000);
     updateStatus();
@@ -364,6 +441,54 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 </body>
 </html>
 )rawliteral";
+
+// FreeRTOS background task function for HTTPS Pull OTA from Synology NAS
+void WebDashboard::nasOtaTaskFunction(void *pvParameters) {
+    Serial.println("[OTA-NAS] Background task started.");
+    
+    // 1. Force all 12V relays OFF (GPIO 6,7,8 -> INPUT high-impedance)
+    if (controllerPtr != nullptr) {
+        controllerPtr->forceAllRelaysOff();
+        Serial.println("[OTA-NAS] Pre-OTA Safety Interlock: All relays forced OFF.");
+        
+        // 2. Transition FSM to OTA_UPDATING (suspends sensors, timers, battery guards)
+        controllerPtr->transitionTo(STATE_OTA_UPDATING);
+        Serial.println("[OTA-NAS] FSM transitioned and locked in STATE_OTA_UPDATING.");
+    }
+    
+    // Give some time for relays to physically open
+    delay(500);
+    
+    WiFiClientSecure client;
+    client.setInsecure(); // Bypass ROOT CA validation for HTTPS
+    
+    Serial.println("[OTA-NAS] Connecting and fetching firmware from NAS HTTPS: ***REMOVED***");
+    
+    // Start pull OTA update
+    t_httpUpdate_return ret = httpUpdate.update(client, "***REMOVED***");
+    
+    if (ret == HTTP_UPDATE_FAILED) {
+        Serial.printf("[OTA-NAS] HTTPS update FAILED! Error (%d): %s\n", 
+                      httpUpdate.getLastError(), 
+                      httpUpdate.getLastErrorString().c_str());
+        // Restore FSM to IDLE state on failure
+        if (controllerPtr != nullptr) {
+            controllerPtr->transitionTo(STATE_IDLE);
+        }
+    } else if (ret == HTTP_UPDATE_NO_UPDATES) {
+        Serial.println("[OTA-NAS] HTTP update: No updates available.");
+        if (controllerPtr != nullptr) {
+            controllerPtr->transitionTo(STATE_IDLE);
+        }
+    } else if (ret == HTTP_UPDATE_OK) {
+        Serial.println("[OTA-NAS] HTTPS update SUCCESS! Rebooting in 1.5 seconds...");
+        delay(1500);
+        ESP.restart();
+    }
+    
+    // Safety task deletion
+    vTaskDelete(NULL);
+}
 
 void WebDashboard::init(SmartBoxController& controller) {
     controllerPtr = &controller;
@@ -462,6 +587,32 @@ void WebDashboard::init(SmartBoxController& controller) {
         request->send(200, "application/json", "{\"status\":\"updated\"}");
     });
     
+    // ===== NAS HTTPS Pull OTA Endpoint =====
+    server.on("/api/update-from-nas", HTTP_GET, [](AsyncWebServerRequest *request){
+        if (controllerPtr == nullptr) {
+            request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Controller uninitialized\"}");
+            return;
+        }
+        
+        // Spawn FreeRTOS task with 16KB stack size for TLS handshake
+        BaseType_t result = xTaskCreate(
+            nasOtaTaskFunction,
+            "nas_ota_task",
+            16384, // 16KB stack size
+            NULL,
+            1, // Low priority
+            NULL
+        );
+        
+        if (result == pdPASS) {
+            Serial.println("[OTA-NAS] Triggered HTTPS OTA from NAS. Spawning background task.");
+            request->send(200, "application/json", "{\"status\":\"started\",\"message\":\"NAS HTTPS OTA triggered\"}");
+        } else {
+            Serial.println("[OTA-NAS] Failed to spawn background task for HTTPS OTA.");
+            request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Failed to create OTA task\"}");
+        }
+    });
+
     // ===== OTA Firmware Upload Endpoint =====
     server.on("/api/ota", HTTP_POST,
         // Request handler (called after upload completes)

@@ -8,6 +8,7 @@ class WebDashboard {
 private:
     static AsyncWebServer server;
     static SmartBoxController* controllerPtr;
+    static void nasOtaTaskFunction(void *pvParameters);
 
 public:
     static void init(SmartBoxController& controller);
