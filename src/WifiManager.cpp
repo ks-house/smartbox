@@ -1,5 +1,6 @@
 #include "WifiManager.h"
 #include <Arduino.h>
+#include <time.h>
 
 unsigned long WifiManager::lastConnectRetry = 0;
 bool WifiManager::connected = false;
@@ -15,6 +16,8 @@ void WifiManager::onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
             Serial.print("[WIFI] Station got IP address: ");
             Serial.println(WiFi.localIP());
             connected = true;
+            configTime(9 * 3600, 0, "pool.ntp.org", "time.nist.gov");
+            Serial.println("[TIME] NTP Sync initialized (KST, UTC+9).");
             break;
         case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
             if (connected) {

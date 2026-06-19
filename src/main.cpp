@@ -5,6 +5,7 @@
 #include "WifiManager.h"
 #include "SmartThingsReporter.h"
 #include "WebDashboard.h"
+#include "AutoOtaManager.h"
 
 // Hardware pin assignments as per AGENTS.md
 // TRIG = GPIO 4, ECHO = GPIO 5
@@ -66,6 +67,9 @@ void setup() {
     // 7. Initialize SmartThings webhook reporter
     SmartThingsReporter::init(nullptr); // Webhook can be passed here
 
+    // 8. Initialize Auto-OTA scheduler and manager
+    AutoOtaManager::init(controller);
+
     Serial.println("[SYSTEM] Initialization finished. FSM Loop running.");
 }
 
@@ -84,6 +88,9 @@ void loop() {
 
     // Run Web Dashboard updates
     WebDashboard::update();
+
+    // Run Auto-OTA scheduler
+    AutoOtaManager::update();
 
     // 1-second interval diagnostic print
     static unsigned long lastDebug = 0;

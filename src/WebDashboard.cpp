@@ -1,11 +1,8 @@
 #include "WebDashboard.h"
 #include "ConfigManager.h"
 #include "WifiManager.h"
+#include "AutoOtaManager.h"
 #include <Arduino.h>
-#include <Update.h>
-#include <WiFiClientSecure.h>
-#include <HTTPClient.h>
-#include <HTTPUpdate.h>
 
 AsyncWebServer WebDashboard::server(80);
 SmartBoxController* WebDashboard::controllerPtr = nullptr;
@@ -478,53 +475,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 </html>
 )rawliteral";
 
-// FreeRTOS background task function for HTTPS Pull OTA from Synology NAS
-void WebDashboard::nasOtaTaskFunction(void *pvParameters) {
-    Serial.println("[OTA-NAS] Background task started.");
-    
-    // 1. Force all 12V relays OFF (GPIO 6,7,8 -> INPUT high-impedance)
-    if (controllerPtr != nullptr) {
-        controllerPtr->forceAllRelaysOff();
-        Serial.println("[OTA-NAS] Pre-OTA Safety Interlock: All relays forced OFF.");
-        
-        // 2. Transition FSM to OTA_UPDATING (suspends sensors, timers, battery guards)
-        controllerPtr->transitionTo(STATE_OTA_UPDATING);
-        Serial.println("[OTA-NAS] FSM transitioned and locked in STATE_OTA_UPDATING.");
-    }
-    
-    // Give some time for relays to physically open
-    delay(500);
-    
-    WiFiClientSecure client;
-    client.setInsecure(); // Bypass ROOT CA validation for HTTPS
-    
-    Serial.println("[OTA-NAS] Connecting and fetching firmware from NAS HTTPS: ***REMOVED***");
-    
-    // Start pull OTA update
-    t_httpUpdate_return ret = httpUpdate.update(client, "***REMOVED***");
-    
-    if (ret == HTTP_UPDATE_FAILED) {
-        Serial.printf("[OTA-NAS] HTTPS update FAILED! Error (%d): %s\n", 
-                      httpUpdate.getLastError(), 
-                      httpUpdate.getLastErrorString().c_str());
-        // Restore FSM to IDLE state on failure
-        if (controllerPtr != nullptr) {
-            controllerPtr->transitionTo(STATE_IDLE);
-        }
-    } else if (ret == HTTP_UPDATE_NO_UPDATES) {
-        Serial.println("[OTA-NAS] HTTP update: No updates available.");
-        if (controllerPtr != nullptr) {
-            controllerPtr->transitionTo(STATE_IDLE);
-        }
-    } else if (ret == HTTP_UPDATE_OK) {
-        Serial.println("[OTA-NAS] HTTPS update SUCCESS! Rebooting in 1.5 seconds...");
-        delay(1500);
-        ESP.restart();
-    }
-    
-    // Safety task deletion
-    vTaskDelete(NULL);
-}
+
 
 void WebDashboard::init(SmartBoxController& controller) {
     controllerPtr = &controller;
@@ -679,22 +630,12 @@ void WebDashboard::init(SmartBoxController& controller) {
             return;
         }
         
-        // Spawn FreeRTOS task with 16KB stack size for TLS handshake
-        BaseType_t result = xTaskCreate(
-            nasOtaTaskFunction,
-            "nas_ota_task",
-            16384, // 16KB stack size
-            NULL,
-            1, // Low priority
-            NULL
-        );
-        
-        if (result == pdPASS) {
-            Serial.println("[OTA-NAS] Triggered HTTPS OTA from NAS. Spawning background task.");
+        if (AutoOtaManager::startOtaUpdate(true)) {
+            Serial.println("[OTA-NAS] Triggered HTTPS OTA from NAS (manual force).");
             request->send(200, "application/json", "{\"status\":\"started\",\"message\":\"NAS HTTPS OTA triggered\"}");
         } else {
-            Serial.println("[OTA-NAS] Failed to spawn background task for HTTPS OTA.");
-            request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Failed to create OTA task\"}");
+            Serial.println("[OTA-NAS] Failed to trigger HTTPS OTA.");
+            request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Failed to start OTA task\"}");
         }
     });
     
