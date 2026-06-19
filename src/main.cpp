@@ -55,7 +55,10 @@ void setup() {
     controller.init();
 
     // 5. Initialize Wi-Fi (AP SSID: SmartBox-WiFi)
-    WifiManager::init("SmartBox-WiFi", "");
+    String savedSsid = "";
+    String savedPass = "";
+    ConfigManager::loadWifiCredentials(savedSsid, savedPass);
+    WifiManager::init("SmartBox-WiFi", "", savedSsid.c_str(), savedPass.c_str());
 
     // 6. Initialize Web Dashboard
     WebDashboard::init(controller);

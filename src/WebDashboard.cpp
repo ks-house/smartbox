@@ -1,5 +1,6 @@
 #include "WebDashboard.h"
 #include "ConfigManager.h"
+#include "WifiManager.h"
 #include <Arduino.h>
 #include <Update.h>
 #include <WiFiClientSecure.h>
@@ -73,7 +74,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
   <div class='container'>
     <div class='header'>
       <h1>SmartBox ☀️</h1>
-      <p>Autonomous Solar Trash Collector | <span id='fwVersion'>v--</span></p>
+      <p>Autonomous Solar Trash Collector | <span id='fwVersion'>v--</span> | Wi-Fi: <span id='wifiStatusBadge' style='font-weight:600; color:var(--danger);'>Offline</span></p>
     </div>
     
     <div class='card status-card' id='statusCard'>
@@ -125,6 +126,24 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       <button class='btn btn-success' onclick='updateConfig()'>Save Settings</button>
     </div>
 
+    <!-- Network Configuration -->
+    <div class='card'>
+      <h3 style='font-size: 1.15rem; font-weight: 600; margin-bottom: 18px; color: var(--info);'>🌐 Network Configuration</h3>
+      <div class='form-group'>
+        <label>Select Wi-Fi Network</label>
+        <select id='wifiSsid' class='form-control' style='margin-bottom: 10px;'>
+          <option value=''>-- Click Scan to find networks --</option>
+        </select>
+        <button class='btn btn-primary' id='btnWifiScan' onclick='scanWifi()' style='background: var(--info); box-shadow: 0 8px 20px rgba(10,132,255,0.2);'>Scan Networks</button>
+      </div>
+      <div class='form-group'>
+        <label>Password</label>
+        <input type='password' id='wifiPassword' class='form-control' placeholder='Enter password'>
+      </div>
+      <div id='wifiStatus' style='display:none; padding: 12px; border-radius: 12px; margin-bottom: 15px; font-weight: 600; text-align: center;'></div>
+      <button class='btn btn-success' id='btnWifiConnect' onclick='connectWifi()'>Connect</button>
+    </div>
+
     <!-- OTA Firmware Update -->
     <div class='card'>
       <h3 style='font-size: 1.15rem; font-weight: 600; margin-bottom: 18px; color: var(--warning);'>🔄 Firmware Update (OTA)</h3>
@@ -173,6 +192,15 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         document.getElementById('valDistance').innerText = data.distance.toFixed(0) + ' cm';
         document.getElementById('valTime').innerText = (data.time / 1000).toFixed(1) + ' s';
         document.getElementById('fwVersion').innerText = 'v' + data.version;
+        
+        const wifiBadge = document.getElementById('wifiStatusBadge');
+        if (data.wifiConnected) {
+          wifiBadge.innerText = 'Online';
+          wifiBadge.style.color = 'var(--success)';
+        } else {
+          wifiBadge.innerText = 'Offline';
+          wifiBadge.style.color = 'var(--danger)';
+        }
         
         // Populate inputs once on load
         if (!configLoaded && data.config) {
@@ -435,6 +463,114 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         btn.style.background = 'var(--info)';
       }
     }
+
+    let scanPollingInterval = null;
+
+    async function scanWifi() {
+      const btnScan = document.getElementById('btnWifiScan');
+      const selectSsid = document.getElementById('wifiSsid');
+      
+      btnScan.disabled = true;
+      btnScan.className = 'btn btn-disabled';
+      btnScan.innerText = 'Scanning...';
+      
+      selectSsid.innerHTML = '<option value="">-- Scanning... --</option>';
+      
+      try {
+        const response = await fetch('/api/wifi/scan?start=true');
+        const data = await response.json();
+        
+        if (data.status === 'scanning') {
+          if (scanPollingInterval) clearInterval(scanPollingInterval);
+          
+          scanPollingInterval = setInterval(async () => {
+            try {
+              const pollResponse = await fetch('/api/wifi/scan');
+              const pollData = await pollResponse.json();
+              
+              if (pollData.status === 'complete') {
+                clearInterval(scanPollingInterval);
+                scanPollingInterval = null;
+                
+                btnScan.disabled = false;
+                btnScan.className = 'btn btn-primary';
+                btnScan.style.background = 'var(--info)';
+                btnScan.innerText = 'Scan Networks';
+                
+                selectSsid.innerHTML = '';
+                if (pollData.networks && pollData.networks.length > 0) {
+                  pollData.networks.forEach(net => {
+                    const opt = document.createElement('option');
+                    opt.value = net.ssid;
+                    opt.innerText = net.ssid + ' (' + net.rssi + ' dBm)';
+                    selectSsid.appendChild(opt);
+                  });
+                } else {
+                  selectSsid.innerHTML = '<option value="">No networks found</option>';
+                }
+              }
+            } catch (e) {
+              console.error('Error polling wifi scan:', e);
+            }
+          }, 1000);
+        }
+      } catch (e) {
+        console.error('Error starting wifi scan:', e);
+        btnScan.disabled = false;
+        btnScan.className = 'btn btn-primary';
+        btnScan.style.background = 'var(--info)';
+        btnScan.innerText = 'Scan Networks';
+        selectSsid.innerHTML = '<option value="">Error starting scan</option>';
+      }
+    }
+
+    async function connectWifi() {
+      const selectSsid = document.getElementById('wifiSsid');
+      const inputPass = document.getElementById('wifiPassword');
+      const statusDiv = document.getElementById('wifiStatus');
+      const btnConnect = document.getElementById('btnWifiConnect');
+      
+      const ssid = selectSsid.value;
+      const password = inputPass.value;
+      
+      if (!ssid) {
+        alert('Please select or scan a Wi-Fi network first.');
+        return;
+      }
+      
+      statusDiv.style.display = 'block';
+      statusDiv.style.background = 'rgba(10,132,255,0.15)';
+      statusDiv.style.color = 'var(--info)';
+      statusDiv.innerText = '⏳ 연결 시도 중...';
+      
+      btnConnect.disabled = true;
+      btnConnect.className = 'btn btn-disabled';
+      
+      try {
+        const response = await fetch('/api/wifi/connect?ssid=' + encodeURIComponent(ssid) + '&password=' + encodeURIComponent(password));
+        const data = await response.json();
+        
+        if (data.status === 'connecting') {
+          setTimeout(() => {
+            btnConnect.disabled = false;
+            btnConnect.className = 'btn btn-success';
+            statusDiv.style.display = 'none';
+          }, 5000);
+        } else {
+          statusDiv.style.background = 'rgba(239,68,68,0.15)';
+          statusDiv.style.color = 'var(--danger)';
+          statusDiv.innerText = '❌ 연결 실패: ' + (data.message || 'Unknown error');
+          btnConnect.disabled = false;
+          btnConnect.className = 'btn btn-success';
+        }
+      } catch (e) {
+        statusDiv.style.background = 'rgba(239,68,68,0.15)';
+        statusDiv.style.color = 'var(--danger)';
+        statusDiv.innerText = '❌ 서버와 통신 실패.';
+        btnConnect.disabled = false;
+        btnConnect.className = 'btn btn-success';
+      }
+    }
     
     setInterval(updateStatus, 1000);
     updateStatus();
@@ -527,6 +663,7 @@ void WebDashboard::init(SmartBoxController& controller) {
         String json = "{";
         json += "\"state\":\"" + stateStr + "\",";
         json += "\"version\":\"" + String(controllerPtr->getFirmwareVersion()) + "\",";
+        json += "\"wifiConnected\":" + String(WifiManager::isConnected() ? "true" : "false") + ",";
         json += "\"battery\":" + String(controllerPtr->getBatteryVoltage(), 2) + ",";
         json += "\"current\":" + String(controllerPtr->getMotorCurrent(), 2) + ",";
         json += "\"distance\":" + String(controllerPtr->getDistance(), 1) + ",";
@@ -587,6 +724,53 @@ void WebDashboard::init(SmartBoxController& controller) {
         ConfigManager::saveConfig(cfg);
         
         request->send(200, "application/json", "{\"status\":\"updated\"}");
+    });
+
+    // ===== Asynchronous Wi-Fi Scan Endpoint =====
+    server.on("/api/wifi/scan", HTTP_GET, [](AsyncWebServerRequest *request){
+        bool forceStart = request->hasParam("start");
+        int status = WifiManager::getScanStatus();
+        if (forceStart || status == -2) {
+            if (status >= 0) {
+                WiFi.scanDelete();
+            }
+            WifiManager::startScan();
+            request->send(200, "application/json", "{\"status\":\"scanning\"}");
+        } else if (status == -1) {
+            request->send(200, "application/json", "{\"status\":\"scanning\"}");
+        } else {
+            String results = WifiManager::getScanResultsJson();
+            String json = "{\"status\":\"complete\",\"networks\":" + results + "}";
+            request->send(200, "application/json", json);
+        }
+    });
+
+    // ===== Wi-Fi Provisioning Connect Endpoint =====
+    server.on("/api/wifi/connect", HTTP_ANY, [](AsyncWebServerRequest *request){
+        String ssid = "";
+        String password = "";
+        
+        if (request->hasParam("ssid", request->method() == HTTP_POST)) {
+            ssid = request->getParam("ssid", request->method() == HTTP_POST)->value();
+        } else if (request->hasParam("ssid")) {
+            ssid = request->getParam("ssid")->value();
+        }
+        
+        if (request->hasParam("password", request->method() == HTTP_POST)) {
+            password = request->getParam("password", request->method() == HTTP_POST)->value();
+        } else if (request->hasParam("password")) {
+            password = request->getParam("password")->value();
+        }
+        
+        if (ssid.isEmpty()) {
+            request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"SSID is required\"}");
+            return;
+        }
+        
+        ConfigManager::saveWifiCredentials(ssid, password);
+        WifiManager::connectTo(ssid.c_str(), password.c_str());
+        
+        request->send(200, "application/json", "{\"status\":\"connecting\",\"message\":\"Initiating connection\"}");
     });
     
     // ===== NAS HTTPS Pull OTA Endpoint =====

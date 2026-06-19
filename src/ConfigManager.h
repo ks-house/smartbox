@@ -9,6 +9,8 @@ public:
     static void saveConfig(const BoxConfig& config);
     static void saveLidState(bool isOpen);
     static bool loadLidState();
+    static void saveWifiCredentials(const String& ssid, const String& password);
+    static void loadWifiCredentials(String& ssid, String& password);
 };
 
 #endif // CONFIG_MANAGER_H

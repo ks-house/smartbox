@@ -88,3 +88,29 @@ bool ConfigManager::loadLidState() {
     }
     return isOpen;
 }
+
+void ConfigManager::saveWifiCredentials(const String& ssid, const String& password) {
+    Preferences prefs;
+    if (prefs.begin("smartbox", false)) {
+        prefs.putString("wifi_ssid", ssid);
+        prefs.putString("wifi_pass", password);
+        prefs.end();
+        Serial.println("[CONFIG] WiFi credentials saved persistently in Preferences.");
+    } else {
+        Serial.println("[CONFIG] Failed to open Preferences to save WiFi credentials.");
+    }
+}
+
+void ConfigManager::loadWifiCredentials(String& ssid, String& password) {
+    Preferences prefs;
+    ssid = "";
+    password = "";
+    if (prefs.begin("smartbox", true)) {
+        ssid = prefs.getString("wifi_ssid", "");
+        password = prefs.getString("wifi_pass", "");
+        prefs.end();
+        Serial.printf("[CONFIG] WiFi credentials loaded. SSID: '%s'\n", ssid.c_str());
+    } else {
+        Serial.println("[CONFIG] Failed to open Preferences to load WiFi credentials.");
+    }
+}

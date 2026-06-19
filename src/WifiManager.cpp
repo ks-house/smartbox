@@ -57,3 +57,45 @@ void WifiManager::update() {
 bool WifiManager::isConnected() {
     return connected;
 }
+
+void WifiManager::startScan() {
+    Serial.println("[WIFI] Starting asynchronous WiFi scan...");
+    // Trigger asynchronous scan
+    WiFi.scanNetworks(true, false, false, 150);
+}
+
+int WifiManager::getScanStatus() {
+    return WiFi.scanComplete();
+}
+
+String WifiManager::getScanResultsJson() {
+    int n = WiFi.scanComplete();
+    if (n < 0) {
+        return "[]";
+    }
+    
+    String json = "[";
+    for (int i = 0; i < n; ++i) {
+        if (i > 0) json += ",";
+        json += "{";
+        json += "\"ssid\":\"" + WiFi.SSID(i) + "\",";
+        json += "\"rssi\":" + String(WiFi.RSSI(i));
+        json += "}";
+    }
+    json += "]";
+    
+    // Free memory allocated for scan results
+    WiFi.scanDelete();
+    return json;
+}
+
+void WifiManager::connectTo(const char* ssid, const char* password) {
+    _staSsid = ssid;
+    _staPass = password ? password : "";
+    connected = false;
+    lastConnectRetry = millis();
+    
+    Serial.printf("[WIFI] Initiating dynamic connection to '%s'...\n", _staSsid.c_str());
+    WiFi.disconnect();
+    WiFi.begin(_staSsid.c_str(), _staPass.c_str());
+}

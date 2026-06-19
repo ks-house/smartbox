@@ -55,6 +55,11 @@
   * **뚜껑 열림 유지 시간 (Lid Hold Time):** 사람이 감지된 후 개방 상태를 유지하는 시간(ms)을 입력합니다.
   * **모터 과전류 임계값 (Stall Current):** 물체 협착이나 모터 부하 상승 시 차단할 전류 임계값(mA)을 입력합니다.
   * *모든 설정값은 저장 버튼 클릭 시 즉시 컨트롤러에 반영되고, ESP32의 비휘발성 플래시 영역(Preferences)에 영구 저장되어 재부팅 후에도 유지됩니다.*
+* **동적 Wi-Fi 프로비저닝 (Network Configuration):**
+  * 대시보드 내의 **"Network Configuration"** 카드에서 **[Scan Networks]**를 누르면 주변의 Wi-Fi 신호를 비동기 스캔합니다.
+  * 검색된 Wi-Fi 목록 중 연결할 SSID를 선택하고 비밀번호를 입력한 뒤 **[Connect]**를 누르면 기기가 외부 인터넷(STA 모드)에 연결됩니다.
+  * 입력된 Wi-Fi 정보는 ESP32 NVS(Preferences)에 안전하게 저장되어 재부팅 시에도 자동으로 Wi-Fi 망 접속을 재시도합니다.
+  * 기기가 외부 인터넷에 성공적으로 접속하면 헤더의 Wi-Fi 상태가 `Online`으로 활성화되며, NAS Pull OTA를 직접 수행할 수 있습니다.
 * **무선 펌웨어 업데이트 (Web Upload / HTTPS NAS Pull):**
   * 대시보드 하단에 **"Firmware Update (OTA)"** 및 **"Firmware Update (from NAS)"** 관리 기능이 내장되어 있습니다.
   * **웹 업로드 방식**: `[파일 선택]` 버튼을 통해 PC/모바일의 `.bin` 파일을 선택하여 장치에 직접 업로드합니다.
