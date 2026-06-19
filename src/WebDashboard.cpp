@@ -144,23 +144,6 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       <button class='btn btn-success' id='btnWifiConnect' onclick='connectWifi()'>Connect</button>
     </div>
 
-    <!-- OTA Firmware Update -->
-    <div class='card'>
-      <h3 style='font-size: 1.15rem; font-weight: 600; margin-bottom: 18px; color: var(--warning);'>🔄 Firmware Update (OTA)</h3>
-      <div class='form-group'>
-        <label>Select .bin firmware file</label>
-        <input type='file' id='fwFile' accept='.bin' class='form-control' style='padding: 10px;'>
-      </div>
-      <div id='otaProgress' style='display:none; margin-bottom: 15px;'>
-        <div style='background: rgba(255,255,255,0.05); border-radius: 12px; overflow: hidden; height: 28px; position: relative;'>
-          <div id='otaBar' style='height: 100%; width: 0%; background: linear-gradient(90deg, var(--warning), var(--success)); border-radius: 12px; transition: width 0.3s ease;'></div>
-          <span id='otaPct' style='position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 0.8rem; font-weight: 600; color: var(--text-color);'>0%</span>
-        </div>
-      </div>
-      <div id='otaStatus' style='display:none; padding: 12px; border-radius: 12px; margin-bottom: 15px; font-weight: 600; text-align: center;'></div>
-      <button class='btn btn-primary' id='btnOta' onclick='uploadFirmware()' style='background: var(--warning); box-shadow: 0 8px 20px rgba(245,158,11,0.2);'>Upload Firmware</button>
-    </div>
-
     <!-- NAS HTTPS OTA -->
     <div class='card'>
       <h3 style='font-size: 1.15rem; font-weight: 600; margin-bottom: 18px; color: var(--info);'>☁️ Firmware Update (from NAS)</h3>
@@ -315,90 +298,6 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       } catch(e) {
         alert('Server connection error.');
       }
-    }
-    
-    async function uploadFirmware() {
-      const fileInput = document.getElementById('fwFile');
-      const file = fileInput.files[0];
-      if (!file) { alert('Please select a .bin firmware file.'); return; }
-      if (!file.name.endsWith('.bin')) { alert('Only .bin files are supported.'); return; }
-      if (!confirm('⚠️ Upload firmware and reboot the device?\n\nAll relays will be safely shut down before flashing.')) return;
-      
-      const progressDiv = document.getElementById('otaProgress');
-      const bar = document.getElementById('otaBar');
-      const pct = document.getElementById('otaPct');
-      const statusDiv = document.getElementById('otaStatus');
-      const btn = document.getElementById('btnOta');
-      
-      progressDiv.style.display = 'block';
-      statusDiv.style.display = 'none';
-      btn.disabled = true;
-      btn.className = 'btn btn-disabled';
-      bar.style.width = '0%';
-      pct.innerText = '0%';
-      
-      const formData = new FormData();
-      formData.append('firmware', file);
-      
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', '/api/ota', true);
-      
-      xhr.upload.addEventListener('progress', function(e) {
-        if (e.lengthComputable) {
-          const percent = Math.round((e.loaded / e.total) * 100);
-          bar.style.width = percent + '%';
-          pct.innerText = percent + '%';
-        }
-      });
-      
-      xhr.onload = function() {
-        try {
-          const result = JSON.parse(xhr.responseText);
-          if (result.status === 'success') {
-            bar.style.width = '100%';
-            pct.innerText = '100%';
-            statusDiv.style.display = 'block';
-            statusDiv.style.background = 'rgba(16,185,129,0.15)';
-            statusDiv.style.color = 'var(--success)';
-            statusDiv.innerText = '✅ Firmware uploaded! Rebooting in 3s...';
-            let countdown = 3;
-            const timer = setInterval(() => {
-              countdown--;
-              if (countdown <= 0) {
-                clearInterval(timer);
-                statusDiv.innerText = '🔄 Rebooting... Refresh page in 5 seconds.';
-              } else {
-                statusDiv.innerText = '✅ Firmware uploaded! Rebooting in ' + countdown + 's...';
-              }
-            }, 1000);
-          } else {
-            statusDiv.style.display = 'block';
-            statusDiv.style.background = 'rgba(239,68,68,0.15)';
-            statusDiv.style.color = 'var(--danger)';
-            statusDiv.innerText = '❌ OTA Failed: ' + (result.message || 'Unknown error');
-            btn.disabled = false;
-            btn.className = 'btn btn-primary';
-            btn.style.background = 'var(--warning)';
-          }
-        } catch(e) {
-          statusDiv.style.display = 'block';
-          statusDiv.style.background = 'rgba(239,68,68,0.15)';
-          statusDiv.style.color = 'var(--danger)';
-          statusDiv.innerText = '❌ Connection lost during OTA.';
-        }
-      };
-      
-      xhr.onerror = function() {
-        statusDiv.style.display = 'block';
-        statusDiv.style.background = 'rgba(239,68,68,0.15)';
-        statusDiv.style.color = 'var(--danger)';
-        statusDiv.innerText = '❌ Upload failed. Connection error.';
-        btn.disabled = false;
-        btn.className = 'btn btn-primary';
-        btn.style.background = 'var(--warning)';
-      };
-      
-      xhr.send(formData);
     }
 
     async function updateFromNas() {
@@ -798,94 +697,6 @@ void WebDashboard::init(SmartBoxController& controller) {
             request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Failed to create OTA task\"}");
         }
     });
-
-    // ===== OTA Firmware Upload Endpoint =====
-    server.on("/api/ota", HTTP_POST,
-        // Request handler (called after upload completes)
-        [](AsyncWebServerRequest *request){
-            bool success = !Update.hasError();
-            String json = "{\"status\":\"";
-            json += success ? "success" : "error";
-            json += "\"";
-            if (!success) {
-                json += ",\"message\":\"";
-                json += Update.errorString();
-                json += "\"";
-            }
-            json += "}";
-            
-            AsyncWebServerResponse *response = request->beginResponse(
-                success ? 200 : 500, "application/json", json);
-            response->addHeader("Connection", "close");
-            request->send(response);
-            
-            if (success) {
-                Serial.println("[OTA] Firmware update successful! Rebooting in 1.5 seconds...");
-                // Schedule restart after response is sent
-                delay(1500);
-                ESP.restart();
-            } else {
-                Serial.printf("[OTA] Firmware update FAILED: %s\n", Update.errorString());
-                // Recover from OTA failure — return to IDLE state
-                if (controllerPtr != nullptr) {
-                    controllerPtr->transitionTo(STATE_IDLE);
-                }
-            }
-        },
-        // Upload handler (called for each chunk of multipart data)
-        [](AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final){
-            if (index == 0) {
-                // ===== 🚨 CRITICAL: Pre-OTA Hardware Interlock =====
-                Serial.printf("[OTA] Firmware upload started: %s\n", filename.c_str());
-                
-                // 1. Force all 12V relays OFF (GPIO 6,7,8 → INPUT high-impedance)
-                if (controllerPtr != nullptr) {
-                    controllerPtr->forceAllRelaysOff();
-                    Serial.println("[OTA] Pre-OTA Safety: All relays forced OFF.");
-                    
-                    // 2. Transition FSM to OTA mode (freezes all sensor/actuator loops)
-                    controllerPtr->transitionTo(STATE_OTA_UPDATING);
-                    Serial.println("[OTA] FSM locked in STATE_OTA_UPDATING.");
-                }
-                
-                // 3. Begin OTA flash write
-                size_t totalSize = request->contentLength();
-                if (!Update.begin(totalSize, U_FLASH)) {
-                    Serial.printf("[OTA] Update.begin() FAILED: %s\n", Update.errorString());
-                    return;
-                }
-                Serial.printf("[OTA] Flash write started. Total size: %u bytes\n", totalSize);
-            }
-            
-            // Write chunk to flash
-            if (Update.isRunning()) {
-                if (Update.write(data, len) != len) {
-                    Serial.printf("[OTA] Update.write() FAILED at offset %u: %s\n", index, Update.errorString());
-                    return;
-                }
-                
-                // Progress logging every ~10%
-                size_t totalSize = request->contentLength();
-                if (totalSize > 0) {
-                    int percent = ((index + len) * 100) / totalSize;
-                    static int lastPercent = -1;
-                    if (percent / 10 != lastPercent / 10) {
-                        lastPercent = percent;
-                        Serial.printf("[OTA] Progress: %d%% (%u / %u bytes)\n", percent, index + len, totalSize);
-                    }
-                }
-            }
-            
-            // Final chunk — finalize flash write
-            if (final) {
-                if (Update.end(true)) {
-                    Serial.printf("[OTA] Upload complete. Total: %u bytes. Firmware written successfully.\n", index + len);
-                } else {
-                    Serial.printf("[OTA] Update.end() FAILED: %s\n", Update.errorString());
-                }
-            }
-        }
-    );
     
     server.begin();
     Serial.println("[DASHBOARD] Asynchronous Web Dashboard Server active on port 80.");
