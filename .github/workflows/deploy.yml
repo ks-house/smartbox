@@ -53,6 +53,16 @@ jobs:
           echo "{\"version\": \"$VERSION\", \"build_number\": \"${{ github.run_id }}\", \"commit\": \"${{ github.sha }}\", \"date\": \"$BUILD_DATE\"}" > .pio/build/esp32-c6-devkitc-1/version.json
           cat .pio/build/esp32-c6-devkitc-1/version.json
 
+      - name: Debug SFTP Connection and Paths
+        run: |
+          sudo apt-get update && sudo apt-get install -y sshpass
+          echo "=== Checking SFTP Directory Structure ==="
+          sshpass -p "${{ secrets.NAS_PASSWORD }}" sftp -o StrictHostKeyChecking=no -P ${{ secrets.NAS_PORT }} ${{ secrets.NAS_USER }}@${{ secrets.NAS_HOST }} << 'EOF'
+            pwd
+            ls -la
+            ls -la "${{ secrets.NAS_TARGET_DIR }}"
+          EOF
+
       - name: Deploy to Synology NAS via SFTP
         uses: wlixcc/SFTP-Deploy-Action@v1.2.4
         with:
