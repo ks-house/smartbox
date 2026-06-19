@@ -68,11 +68,15 @@
    - 웹 UI 대시보드 하단에 **"Firmware Update (from NAS)"** 카드와 **"Network Configuration"** 카드 추가 및 Fetch & Update 인터랙션과 실시간 Wi-Fi 스캔/접속 시각 피드백 제공.
 5. **[platformio.ini](../platformio.ini)**:
    - 16MB 플래시 용량을 충분히 활용하기 위한 `board_build.partitions = default_16MB.csv` 파티션 설정 추가.
+   - 호스트 PC 및 CI 서버 유닛 테스트 구동을 위한 `[env:native]` 환경 추가 및 `build_src_filter` 연동.
 6. **[main.cpp](../src/main.cpp)**:
    - 부팅 초기화 루틴 시Preferences로부터 영구 저장된 자격 증명을 자동 복원하고 `WifiManager`를 통해 무중단 백그라운드 연결 실행.
    - `loop()` 내에서 `isOtaMode()`가 활성화되면 비동기 웹서버의 패킷 처리를 위해 `delay(100)`으로 양보하여 Watchdog Timer(WDT) 트리거 방지.
 7. **[test_main.cpp](../test/test_native/test_main.cpp)**:
    - `test_ota_state_isolation()` 단위 테스트 추가를 통해 릴레이 셧다운 모드 진입 무결성 검증.
+   - `NATIVE_BUILD` 매크로 지정을 감지하여 호스트 네이티브 컴파일 환경용 `int main()` 시작점과 보드용 `setup()`/`loop()` 시작점을 조건부로 분리 구현.
+8. **[.github/workflows/deploy.yml](../.github/workflows/deploy.yml) [NEW]**:
+   - `main` 브랜치 푸시 트리거 시 `pio test -e native` 검증 후 `pio run -e esp32-c6-devkitc-1` 빌드를 수행하여 `version.json` 메타데이터 파일 동적 생성 및 Synology NAS에 SFTP(SCP) 업로드 자동화 구축.
 
 ---
 
@@ -80,6 +84,9 @@
 
 ### 1. 자동화 테스트 결과 (Native 유닛 테스트)
 ```powershell
+# 호스트 로컬 또는 CI 러너 환경에서의 네이티브 테스트 검증
+pio test -e native
+# 보드 연결 타겟 환경 유닛 테스트 검증
 pio test -e esp32-c6-test
 ```
 - FSM 상태 전이, 100ms 안전 딜레이 가드, 과전류 차단, 저전압 강제 개방 셧다운, 중간값 노이즈 필터, 동적 감도 저장 설정 검증에 이어 신규 추가된 **OTA 하드웨어 격리 및 상태 동결 유닛 테스트까지 100% 통과(PASSED)**했습니다.
@@ -87,3 +94,4 @@ pio test -e esp32-c6-test
 ### 2. 타겟 보드 빌드 상태
 - **`esp32-c6-devkitc-1`**: ✅ 빌드 성공 (RAM 13.9%, Flash 19.4% 점유)
 - **`esp32-c6-test`**: ✅ 테스트 빌드 및 유닛 테스트 통과
+- **`native`**: ✅ 네이티브 유닛 테스트 환경 탑재 성공

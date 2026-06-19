@@ -169,6 +169,21 @@ ESP32-C6 보드와 각 모듈은 아래의 확정된 GPIO 번호에 정밀하게
 > **⚠️ [규칙 3] 고임피던스(High-Impedance) 릴레이 차단 기법**
 > ESP32의 3.3V Logic Level과 5V Active-Low 릴레이 간의 전압 차이로 인해, 단순히 GPIO를 `HIGH` 출력으로만 밀면 1.7V 전위차가 발생하여 포토커플러 내부 LED가 완전히 꺼지지 않고 미세 전력이 상시 소모되는 현상이 발생합니다. 릴레이를 확실히 차단할 때는 **`pinMode(PIN, INPUT)`(고임피던스)** 모드로 핀을 전환하여 물리적 전류 통로를 완전 차단함으로써 대기 전력을 0mA로 리셋하도록 제어 아키텍처를 통일하십시오.
 
+## 7. GitHub Actions CI/CD 및 Native 테스트 환경
+
+본 프로젝트는 GitHub Actions를 활용하여 지속적 통합(CI) 및 지속적 배포(CD) 파이프라인을 구축해 운영 중입니다.
+
+* **네이티브 테스트 환경 (`[env:native]`):** ESP32-C6 물리 하드웨어 기기가 없이도 호스트 C++ 컴파일러(g++)를 사용해 로컬 PC 및 CI 클라우드 서버에서 FSM의 로직 유닛 테스트를 즉시 수행할 수 있도록 지원합니다. `NATIVE_BUILD` 매크로 지정을 통해 아두이노 종속 코드를 안전하게 격리합니다.
+* **로컬 네이티브 테스트 실행:**
+  ```powershell
+  pio test -e native
+  ```
+* **CI/CD 자동 배포 흐름 (.github/workflows/deploy.yml):**
+  1. **CI - Test (네이티브 테스트):** `main` 브랜치 푸시 감지 시 Ubuntu 환경에서 `pio test -e native`를 기동하여 FSM 및 과전류 차단 안전 기능의 정합성을 검증합니다.
+  2. **CI - Build (타겟 컴파일):** 테스트 통과 시에만 `pio run -e esp32-c6-devkitc-1`을 실행하여 ESP32-C6 타겟 바이너리를 완성합니다.
+  3. **CD - Metadata (버전 관리):** `src/SmartBoxController.h`에 등록된 `FIRMWARE_VERSION` 버전 명세를 읽어 `version.json` 파일을 자동 생성합니다.
+  4. **CD - Deploy (SFTP 전송):** `firmware.bin`과 `version.json` 파일을 Synology NAS의 지정 디렉토리로 안전하게 배포(SFTP)하여 무선 OTA 수거함에 즉시 전파합니다.
+
 ---
 
 ## 🔗 관련 문서 및 소스코드

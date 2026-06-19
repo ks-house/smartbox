@@ -1,4 +1,6 @@
+#ifndef NATIVE_BUILD
 #include <Arduino.h>
+#endif
 #include <unity.h>
 #include "MockHardware.h"
 
@@ -412,6 +414,21 @@ void test_ota_state_isolation(void) {
     TEST_ASSERT_TRUE(controller.isOtaMode());
 }
 
+#ifdef NATIVE_BUILD
+int main(int argc, char **argv) {
+    UNITY_BEGIN();
+    RUN_TEST(test_relay_glitch_protection);
+    RUN_TEST(test_relay_interlock_and_guard_delay);
+    RUN_TEST(test_stall_current_detection);
+    RUN_TEST(test_low_battery_shutdown);
+    RUN_TEST(test_ultrasonic_median_filter);
+    RUN_TEST(test_config_and_callback_trigger);
+    RUN_TEST(test_hold_duration_and_retrigger);
+    RUN_TEST(test_startup_open_flow);
+    RUN_TEST(test_ota_state_isolation);
+    return UNITY_END();
+}
+#else
 void setup() {
     // Wait for serial connection on the target board
     delay(2000);
@@ -429,9 +446,7 @@ void setup() {
     UNITY_END();
 }
 
-
-
-
 void loop() {
     // Keep target responsive but idle
 }
+#endif
