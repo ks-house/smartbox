@@ -73,7 +73,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
   <div class='container'>
     <div class='header'>
       <h1>SmartBox ☀️</h1>
-      <p>Autonomous Solar Trash Collector</p>
+      <p>Autonomous Solar Trash Collector | <span id='fwVersion'>v--</span></p>
     </div>
     
     <div class='card status-card' id='statusCard'>
@@ -172,6 +172,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         document.getElementById('valCurrent').innerText = data.current.toFixed(0) + ' mA';
         document.getElementById('valDistance').innerText = data.distance.toFixed(0) + ' cm';
         document.getElementById('valTime').innerText = (data.time / 1000).toFixed(1) + ' s';
+        document.getElementById('fwVersion').innerText = 'v' + data.version;
         
         // Populate inputs once on load
         if (!configLoaded && data.config) {
@@ -381,7 +382,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       statusDiv.style.display = 'block';
       statusDiv.style.background = 'rgba(10,132,255,0.15)';
       statusDiv.style.color = 'var(--info)';
-      statusDiv.innerText = '⏳ 업데이트 중입니다. 전원을 끄지 마세요...';
+      statusDiv.innerText = '⏳ NAS로부터 업데이트를 다운로드 중입니다. 전원을 끄지 마세요...';
       btn.disabled = true;
       btn.className = 'btn btn-disabled';
       
@@ -395,7 +396,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
               const checkRes = await fetch('/api/status');
               const checkData = await checkRes.json();
               if (checkData.state === 'OTA_UPDATING') {
-                statusDiv.innerText = '⏳ 업데이트 중입니다. 전원을 끄지 마세요... (플래싱 중)';
+                statusDiv.innerText = '⏳ NAS로부터 업데이트를 다운로드 중입니다. 전원을 끄지 마세요... (플래싱 중)';
               } else if (checkData.state === 'IDLE') {
                 // If it returned to IDLE, OTA must have failed
                 clearInterval(checkInterval);
@@ -525,6 +526,7 @@ void WebDashboard::init(SmartBoxController& controller) {
         // Asynchronously craft JSON without heavy external dependencies
         String json = "{";
         json += "\"state\":\"" + stateStr + "\",";
+        json += "\"version\":\"" + String(controllerPtr->getFirmwareVersion()) + "\",";
         json += "\"battery\":" + String(controllerPtr->getBatteryVoltage(), 2) + ",";
         json += "\"current\":" + String(controllerPtr->getMotorCurrent(), 2) + ",";
         json += "\"distance\":" + String(controllerPtr->getDistance(), 1) + ",";

@@ -80,6 +80,9 @@ public:
     void forceOpen();
     void resetEmergency();
     
+    static constexpr const char* FIRMWARE_VERSION = "1.0.0";
+    const char* getFirmwareVersion() const { return FIRMWARE_VERSION; }
+    
     float getBatteryVoltage() const { return batteryVoltage; }
     float getMotorCurrent() const { return motorCurrent; }
     float getDistance() const { return currentDistance; }
