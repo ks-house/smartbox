@@ -54,12 +54,13 @@ jobs:
           cat .pio/build/esp32-c6-devkitc-1/version.json
 
       - name: Deploy to Synology NAS via SFTP
-        uses: appleboy/scp-action@v0.1.7
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
         with:
-          host: ${{ secrets.NAS_HOST }}
+          server: ${{ secrets.NAS_HOST }}
           username: ${{ secrets.NAS_USER }}
           password: ${{ secrets.NAS_PASSWORD }}
           port: ${{ secrets.NAS_PORT }}
-          source: ".pio/build/esp32-c6-devkitc-1/firmware.bin,.pio/build/esp32-c6-devkitc-1/version.json"
-          target: ${{ secrets.NAS_TARGET_DIR }}
-          strip_components: 3
+          local_path: './.pio/build/esp32-c6-devkitc-1/'
+          remote_path: ${{ secrets.NAS_TARGET_DIR }}
+          sftp_only: true
+          file_filter: 'firmware.bin,version.json'

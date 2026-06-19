@@ -76,7 +76,7 @@
    - `test_ota_state_isolation()` 단위 테스트 추가를 통해 릴레이 셧다운 모드 진입 무결성 검증.
    - `NATIVE_BUILD` 매크로 지정을 감지하여 호스트 네이티브 컴파일 환경용 `int main()` 시작점과 보드용 `setup()`/`loop()` 시작점을 조건부로 분리 구현.
 8. **[.github/workflows/deploy.yml](../.github/workflows/deploy.yml) [NEW]**:
-   - `main` 브랜치 푸시 트리거 시 `pio test -e native` 검증 후 `pio run -e esp32-c6-devkitc-1` 빌드를 수행하여 `version.json` 메타데이터 파일 동적 생성 및 Synology NAS에 SFTP(SCP) 업로드 자동화 구축.
+   - `main` 브랜치 푸시 트리거 시 `pio test -e native` 검증 후 `pio run -e esp32-c6-devkitc-1` 빌드를 수행하여 `version.json` 메타데이터 파일 동적 생성 및 Synology NAS에 SFTP(`wlixcc/SFTP-Deploy-Action`) 업로드 자동화 구축.
 
 ---
 
