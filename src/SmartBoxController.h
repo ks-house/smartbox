@@ -81,7 +81,7 @@ public:
   void forceOpen();
   void resetEmergency();
 
-  static constexpr const char *FIRMWARE_VERSION = "1.0.1";
+  static constexpr const char *FIRMWARE_VERSION = "0.0.1";
   const char *getFirmwareVersion() const { return FIRMWARE_VERSION; }
 
   float getBatteryVoltage() const { return batteryVoltage; }
