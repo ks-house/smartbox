@@ -53,70 +53,12 @@ jobs:
           echo "{\"version\": \"$VERSION\", \"build_number\": \"${{ github.run_id }}\", \"commit\": \"${{ github.sha }}\", \"date\": \"$BUILD_DATE\"}" > .pio/build/esp32-c6-devkitc-1/version.json
           cat .pio/build/esp32-c6-devkitc-1/version.json
 
-      - name: Debug SFTP Connection and Paths
-        env:
-          NAS_HOST: ${{ secrets.NAS_HOST }}
-          NAS_PORT: ${{ secrets.NAS_PORT }}
-          NAS_USER: ${{ secrets.NAS_USER }}
-          NAS_PASSWORD: ${{ secrets.NAS_PASSWORD }}
-          NAS_TARGET_DIR: ${{ secrets.NAS_TARGET_DIR }}
+      - name: Prepare deployment directory
         run: |
-          pip install paramiko
-          cat << 'EOF' > sftp_debug.py
-          import os
-          import paramiko
-          
-          host = os.environ["NAS_HOST"]
-          port = int(os.environ["NAS_PORT"])
-          username = os.environ["NAS_USER"]
-          password = os.environ["NAS_PASSWORD"]
-          target_dir = os.environ["NAS_TARGET_DIR"]
-          
-          print(f"Target dir configured length: {len(target_dir)}")
-          
-          client = paramiko.SSHClient()
-          client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-          try:
-              client.connect(host, port=port, username=username, password=password)
-              print("SSH connection successful.")
-          except Exception as e:
-              print(f"SSH connection failed: {e}")
-              exit(1)
-              
-          sftp = client.open_sftp()
-          print(f"Current SFTP working directory: {sftp.normalize('.')}")
-          
-          print("Checking target_dir path...")
-          try:
-              stat_info = sftp.stat(target_dir)
-              print(f"Stat target_dir: {stat_info}")
-              print(f"List target_dir: {sftp.listdir(target_dir)}")
-          except Exception as e:
-              print(f"Failed to stat/list target_dir: {e}")
-              
-          print("\nWalking remote directory structure:")
-          def walk(path, depth=0):
-              if depth > 4:
-                  return
-              try:
-                  for entry in sftp.listdir_attr(path):
-                      name = entry.filename
-                      full_path = (path + "/" + name).replace("//", "/")
-                      is_dir = (entry.st_mode & 0o040000) != 0
-                      prefix = "  " * depth
-                      if is_dir:
-                          print(f"{prefix}[DIR]  {full_path}")
-                          walk(full_path, depth + 1)
-                      else:
-                          print(f"{prefix}[FILE] {full_path} ({entry.st_size} bytes)")
-              except Exception as e:
-                  print(f"{'  ' * depth}Error walking {path}: {e}")
-                  
-          walk(".")
-          sftp.close()
-          client.close()
-          EOF
-          python sftp_debug.py
+          mkdir -p dist
+          cp .pio/build/esp32-c6-devkitc-1/firmware.bin dist/
+          cp .pio/build/esp32-c6-devkitc-1/version.json dist/
+          ls -la dist/
 
       - name: Deploy to Synology NAS via SFTP
         uses: wlixcc/SFTP-Deploy-Action@v1.2.4
@@ -125,7 +67,6 @@ jobs:
           username: ${{ secrets.NAS_USER }}
           password: ${{ secrets.NAS_PASSWORD }}
           port: ${{ secrets.NAS_PORT }}
-          local_path: './.pio/build/esp32-c6-devkitc-1/'
-          remote_path: ${{ secrets.NAS_TARGET_DIR }}
+          local_path: './dist/*'
+          remote_path: '.'
           sftp_only: true
-          file_filter: 'firmware.bin,version.json'
