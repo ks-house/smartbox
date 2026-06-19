@@ -54,14 +54,69 @@ jobs:
           cat .pio/build/esp32-c6-devkitc-1/version.json
 
       - name: Debug SFTP Connection and Paths
+        env:
+          NAS_HOST: ${{ secrets.NAS_HOST }}
+          NAS_PORT: ${{ secrets.NAS_PORT }}
+          NAS_USER: ${{ secrets.NAS_USER }}
+          NAS_PASSWORD: ${{ secrets.NAS_PASSWORD }}
+          NAS_TARGET_DIR: ${{ secrets.NAS_TARGET_DIR }}
         run: |
-          sudo apt-get update && sudo apt-get install -y sshpass
-          echo "=== Checking SFTP Directory Structure ==="
-          sshpass -p "${{ secrets.NAS_PASSWORD }}" sftp -o StrictHostKeyChecking=no -P ${{ secrets.NAS_PORT }} ${{ secrets.NAS_USER }}@${{ secrets.NAS_HOST }} << 'EOF'
-            pwd
-            ls -la
-            ls -la "${{ secrets.NAS_TARGET_DIR }}"
+          pip install paramiko
+          cat << 'EOF' > sftp_debug.py
+          import os
+          import paramiko
+          
+          host = os.environ["NAS_HOST"]
+          port = int(os.environ["NAS_PORT"])
+          username = os.environ["NAS_USER"]
+          password = os.environ["NAS_PASSWORD"]
+          target_dir = os.environ["NAS_TARGET_DIR"]
+          
+          print(f"Target dir configured length: {len(target_dir)}")
+          
+          client = paramiko.SSHClient()
+          client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+          try:
+              client.connect(host, port=port, username=username, password=password)
+              print("SSH connection successful.")
+          except Exception as e:
+              print(f"SSH connection failed: {e}")
+              exit(1)
+              
+          sftp = client.open_sftp()
+          print(f"Current SFTP working directory: {sftp.normalize('.')}")
+          
+          print("Checking target_dir path...")
+          try:
+              stat_info = sftp.stat(target_dir)
+              print(f"Stat target_dir: {stat_info}")
+              print(f"List target_dir: {sftp.listdir(target_dir)}")
+          except Exception as e:
+              print(f"Failed to stat/list target_dir: {e}")
+              
+          print("\nWalking remote directory structure:")
+          def walk(path, depth=0):
+              if depth > 4:
+                  return
+              try:
+                  for entry in sftp.listdir_attr(path):
+                      name = entry.filename
+                      full_path = (path + "/" + name).replace("//", "/")
+                      is_dir = (entry.st_mode & 0o040000) != 0
+                      prefix = "  " * depth
+                      if is_dir:
+                          print(f"{prefix}[DIR]  {full_path}")
+                          walk(full_path, depth + 1)
+                      else:
+                          print(f"{prefix}[FILE] {full_path} ({entry.st_size} bytes)")
+              except Exception as e:
+                  print(f"{'  ' * depth}Error walking {path}: {e}")
+                  
+          walk(".")
+          sftp.close()
+          client.close()
           EOF
+          python sftp_debug.py
 
       - name: Deploy to Synology NAS via SFTP
         uses: wlixcc/SFTP-Deploy-Action@v1.2.4
