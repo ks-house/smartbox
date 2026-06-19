@@ -68,5 +68,5 @@ jobs:
           password: ${{ secrets.NAS_PASSWORD }}
           port: ${{ secrets.NAS_PORT }}
           local_path: './dist/*'
-          remote_path: '.'
+          remote_path: ${{ secrets.NAS_TARGET_DIR }}
           sftp_only: true
