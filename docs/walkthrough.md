@@ -1,6 +1,6 @@
 # 🚀 스마트 자동 수거함 최종 구현 완료 보고서 (Walkthrough)
 
-본 문서는 스마트 자동 수거함(SmartBox)의 핵심 S/W 아키텍처(HAL + FSM + TDD) 구축, 동적 감도 및 Preferences 연동, 비동기 웹 관리자 대시보드 및 SmartThings 연동을 넘어 **Web Upload OTA** 및 **HTTPS NAS Pull 방식 OTA**와 **Pre-OTA 하드웨어 안전 셧다운** 기능까지 통합 구현 및 검증을 완료한 최종 보고서입니다.
+본 문서는 스마트 자동 수거함(SmartBox)의 핵심 S/W 아키텍처(HAL + FSM + TDD) 구축, 동적 감도 및 Preferences 연동, 비동기 웹 관리자 대시보드 및 SmartThings 연동, **Web Upload OTA** 및 **HTTPS NAS Pull 방식 OTA**의 안전 셧다운 구현을 넘어 **비동기 Wi-Fi 스캔 및 동적 웹 프로비저닝 시스템**까지 완벽히 설계, 통합 및 검증한 최종 구현 완료 보고서입니다.
 
 ---
 
@@ -20,6 +20,10 @@
 ### 4. Web OTA 및 HTTPS NAS Pull OTA (Pre-OTA Hardware Interlock)
 - **웹 브라우저 파일 업로드 방식(Multipart HTTP POST)**과 **시놀로지 NAS HTTPS Pull 방식(FreeRTOS 백그라운드 태스크 기동 및 HTTPUpdate)** 두 가지 경로를 모두 지원하도록 확장하였습니다.
 - 12V 고전류 모터 제어 환경에서의 안전성을 확보하기 위해, 펌웨어 쓰기 개시 즉시 모든 릴레이 전원을 완전 격리하고 FSM을 동결하는 Pre-OTA 안전 셧다운을 설계 및 통합하였습니다.
+
+### 5. 비동기 Wi-Fi 프로비저닝 시스템 (Network Configuration)
+- 외부 인터넷 접속 두절에 따른 OTA 실패를 영구적으로 해결하기 위해 대시보드 내부에서 주변 Wi-Fi를 직접 탐색하고 외부 인터넷망(STA 모드)에 장치를 종속시키는 동적 프로비저닝 아키텍처를 도입했습니다.
+- 모터 안전 제어 루프 보호를 위하여 비동기 스캔(`WiFi.scanNetworks(true)`) 및 NVS 기반 자격 증명 자동 로드 기능을 구현했습니다.
 
 ---
 
@@ -51,17 +55,25 @@
    - `State` 열거형에 `STATE_OTA_UPDATING` 추가.
    - `update()` 최상단에 OTA 상태 가드를 배치하여 FSM 동작 및 센서 스캔 격리.
    - `forceAllRelaysOff()`와 `transitionTo()` 메서드를 `public`으로 승격하여 OTA 콜백 및 FreeRTOS 태스크에서 즉시 호출되도록 조치.
-2. **[WebDashboard.h](../src/WebDashboard.h) & [WebDashboard.cpp](../src/WebDashboard.cpp)**:
+2. **[WifiManager.h](../src/WifiManager.h) & [WifiManager.cpp](../src/WifiManager.cpp)**:
+   - 비동기 Wi-Fi 스캔 (`startScan`, `getScanStatus`, `getScanResultsJson`) 로직 탑재.
+   - 실시간 AP 접속 변경 `connectTo(ssid, password)` 및 15초 단위의 백그라운드 자동 비동기 재접속 메커니즘 탑재.
+3. **[ConfigManager.h](../src/ConfigManager.h) & [ConfigManager.cpp](../src/ConfigManager.cpp)**:
+   - Preferences `"smartbox"` 네임스페이스에 Wi-Fi 자격 증명을 영구 보존하는 `saveWifiCredentials` / `loadWifiCredentials` 메서드 추가.
+4. **[WebDashboard.h](../src/WebDashboard.h) & [WebDashboard.cpp](../src/WebDashboard.cpp)**:
    - `POST /api/ota` 핸들러에서 로컬 웹 파일 업로드 지원 및 안전 인터락 작동.
    - `GET /api/update-from-nas` 엔드포인트 및 `nasOtaTaskFunction` FreeRTOS 태스크(Stack 16KB) 추가.
    - `WiFiClientSecure`의 `client.setInsecure()`를 적용하여 NAS HTTPS 루트 인증서 검증 바이패스.
    - `httpUpdate.update(client, URL)`을 연동해 백그라운드 펌웨어 다운로드 및 쓰기 구현.
-   - 웹 UI 대시보드 하단에 **"Firmware Update (from NAS)"** 카드 추가 및 Fetch & Update 인터랙션과 시각적 피드백 제공.
-3. **[platformio.ini](../platformio.ini)**:
+   - `/api/wifi/scan` 및 `/api/wifi/connect` 엔드포인트를 구현하여 스캔/연결 요청 지원.
+   - `/api/status`에 실시간 `wifiConnected` 상태값 연동.
+   - 웹 UI 대시보드 하단에 **"Firmware Update (from NAS)"** 카드와 **"Network Configuration"** 카드 추가 및 Fetch & Update 인터랙션과 실시간 Wi-Fi 스캔/접속 시각 피드백 제공.
+5. **[platformio.ini](../platformio.ini)**:
    - 16MB 플래시 용량을 충분히 활용하기 위한 `board_build.partitions = default_16MB.csv` 파티션 설정 추가.
-4. **[main.cpp](../src/main.cpp)**:
+6. **[main.cpp](../src/main.cpp)**:
+   - 부팅 초기화 루틴 시Preferences로부터 영구 저장된 자격 증명을 자동 복원하고 `WifiManager`를 통해 무중단 백그라운드 연결 실행.
    - `loop()` 내에서 `isOtaMode()`가 활성화되면 비동기 웹서버의 패킷 처리를 위해 `delay(100)`으로 양보하여 Watchdog Timer(WDT) 트리거 방지.
-5. **[test_main.cpp](../test/test_native/test_main.cpp)**:
+7. **[test_main.cpp](../test/test_native/test_main.cpp)**:
    - `test_ota_state_isolation()` 단위 테스트 추가를 통해 릴레이 셧다운 모드 진입 무결성 검증.
 
 ---
@@ -75,5 +87,5 @@ pio test -e esp32-c6-test
 - FSM 상태 전이, 100ms 안전 딜레이 가드, 과전류 차단, 저전압 강제 개방 셧다운, 중간값 노이즈 필터, 동적 감도 저장 설정 검증에 이어 신규 추가된 **OTA 하드웨어 격리 및 상태 동결 유닛 테스트까지 100% 통과(PASSED)**했습니다.
 
 ### 2. 타겟 보드 빌드 상태
-- **`esp32-c6-devkitc-1`**: ✅ 빌드 성공 (RAM 13.9%, Flash 19.3% 점유)
+- **`esp32-c6-devkitc-1`**: ✅ 빌드 성공 (RAM 13.9%, Flash 19.4% 점유)
 - **`esp32-c6-test`**: ✅ 테스트 빌드 및 유닛 테스트 통과
