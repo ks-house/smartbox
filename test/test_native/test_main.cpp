@@ -6,6 +6,10 @@
 
 #include "SmartBoxController.h"
 
+#ifdef NATIVE_BUILD
+MockSerial Serial;
+#endif
+
 // Pin definitions
 static const int RELAY_MAIN_PIN = 6;
 static const int RELAY_DIR_A_PIN = 7;

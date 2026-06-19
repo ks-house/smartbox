@@ -5,6 +5,18 @@
 
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
+#else
+#include <stdio.h>
+class MockSerial {
+public:
+    void print(const char* s) { printf("%s", s); }
+    void println(const char* s) { printf("%s\n", s); }
+    template<typename... Args>
+    void printf(const char* format, Args... args) {
+        ::printf(format, args...);
+    }
+};
+extern MockSerial Serial;
 #endif
 
 enum State {
