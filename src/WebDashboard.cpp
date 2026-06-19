@@ -120,6 +120,10 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         <label>⚡ Motor Stall Current (mA)</label>
         <input type='number' id='cfgStall' class='form-control' placeholder='800'>
       </div>
+      <div class='form-group'>
+        <label>⏰ Auto-OTA Hour (0-23)</label>
+        <input type='number' id='cfgOtaHour' class='form-control' placeholder='3' min='0' max='23'>
+      </div>
       <button class='btn btn-success' onclick='updateConfig()'>Save Settings</button>
     </div>
 
@@ -187,6 +191,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
           document.getElementById('cfgDistance').value = data.config.dist;
           document.getElementById('cfgWait').value = data.config.wait;
           document.getElementById('cfgStall').value = data.config.stall;
+          document.getElementById('cfgOtaHour').value = data.config.otaHour;
           configLoaded = true;
         }
         
@@ -282,9 +287,10 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       const dist = document.getElementById('cfgDistance').value;
       const wait = document.getElementById('cfgWait').value;
       const stall = document.getElementById('cfgStall').value;
+      const otaHour = document.getElementById('cfgOtaHour').value;
       
       try {
-        const res = await fetch(`/api/config?dist=${dist}&wait=${wait}&stall=${stall}`);
+        const res = await fetch(`/api/config?dist=${dist}&wait=${wait}&stall=${stall}&otaHour=${otaHour}`);
         const result = await res.json();
         if (result.status === 'updated') {
           alert('Config parameters updated and saved!');
@@ -521,7 +527,8 @@ void WebDashboard::init(SmartBoxController& controller) {
         json += "\"config\":{";
         json += "\"dist\":" + String(cfg.distThreshold, 1) + ",";
         json += "\"wait\":" + String(cfg.waitTime) + ",";
-        json += "\"stall\":" + String(cfg.currentStallLimit, 1);
+        json += "\"stall\":" + String(cfg.currentStallLimit, 1) + ",";
+        json += "\"otaHour\":" + String(cfg.otaHour);
         json += "}";
         json += "}";
         
@@ -565,6 +572,12 @@ void WebDashboard::init(SmartBoxController& controller) {
         }
         if (request->hasParam("stall")) {
             cfg.currentStallLimit = request->getParam("stall")->value().toFloat();
+        }
+        if (request->hasParam("otaHour")) {
+            cfg.otaHour = request->getParam("otaHour")->value().toInt();
+            if (cfg.otaHour < 0 || cfg.otaHour > 23) {
+                cfg.otaHour = 3;
+            }
         }
         
         // Bind to controller

@@ -42,6 +42,7 @@ struct BoxConfig {
       3000.0f; // Dual actuator: 100N/60mm/s x2 @ 12V, normal run ~2000mA
   unsigned long emergencyRecoveryTime =
       5000; // Auto-recovery from EMERGENCY_STOP (ms)
+  int otaHour = 3;
 };
 
 typedef void (*StateChangeCallback)(State prevState, State newState);

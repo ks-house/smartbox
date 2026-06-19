@@ -13,6 +13,7 @@ void ConfigManager::loadConfig(BoxConfig& config) {
         config.voltageShutdownLimit = prefs.getFloat("volt_lim", config.voltageShutdownLimit);
         config.currentStallLimit = prefs.getFloat("curr_lim", config.currentStallLimit);
         config.emergencyRecoveryTime = prefs.getULong("emrg_rec", config.emergencyRecoveryTime);
+        config.otaHour = prefs.getInt("ota_hour", config.otaHour);
         prefs.end();
         Serial.println("[CONFIG] Configuration loaded from persistent Preferences.");
     } else {
@@ -42,10 +43,13 @@ void ConfigManager::loadConfig(BoxConfig& config) {
     if (config.emergencyRecoveryTime < 1000) {
         config.emergencyRecoveryTime = 5000; // 5s default auto-recovery
     }
+    if (config.otaHour < 0 || config.otaHour > 23) {
+        config.otaHour = 3;
+    }
 
-    Serial.printf("[CONFIG] Active parameters: dist=%.1f, act=%lu, wait=%lu, volt=%.1f, stall=%.1f\n",
+    Serial.printf("[CONFIG] Active parameters: dist=%.1f, act=%lu, wait=%lu, volt=%.1f, stall=%.1f, ota_hour=%d\n",
                   config.distThreshold, config.actuatorTime, config.waitTime, 
-                  config.voltageShutdownLimit, config.currentStallLimit);
+                  config.voltageShutdownLimit, config.currentStallLimit, config.otaHour);
 }
 
 void ConfigManager::saveConfig(const BoxConfig& config) {
@@ -60,6 +64,7 @@ void ConfigManager::saveConfig(const BoxConfig& config) {
     prefs.putFloat("volt_lim", config.voltageShutdownLimit);
     prefs.putFloat("curr_lim", config.currentStallLimit);
     prefs.putULong("emrg_rec", config.emergencyRecoveryTime);
+    prefs.putInt("ota_hour", config.otaHour);
     
     prefs.end();
     Serial.println("[CONFIG] Configuration saved to persistent Preferences.");

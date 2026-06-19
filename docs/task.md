@@ -1,9 +1,8 @@
-# Tasks - Auto-OTA System Implementation
+# Tasks - Configurable Auto-OTA Scheduled Hour
 
-- [x] Exclude `AutoOtaManager.cpp` from host/native tests in `platformio.ini`
-- [x] Configure NTP (KST timezone) on WiFi IP connection event in `WifiManager.cpp`
-- [x] Create `AutoOtaManager.h` declaring the manager and URL constants
-- [x] Create `AutoOtaManager.cpp` with NTP scheduling and the background HTTPS GET version comparison & update routines
-- [x] Refactor manual update handler in `WebDashboard.cpp` to use `AutoOtaManager`
-- [x] Integrate `AutoOtaManager::init()` and `AutoOtaManager::update()` into `main.cpp`
-- [x] Compile and verify using native unit tests and target build commands
+- [x] Add `otaHour` field to `BoxConfig` in `SmartBoxController.h`
+- [x] Save and load `otaHour` in NVS Preferences in `ConfigManager.cpp`
+- [x] Read dynamic `otaHour` in the scheduler of `AutoOtaManager.cpp`
+- [x] Expose `otaHour` in Web Dashboard API endpoints (`/api/status` & `/api/config`) in `WebDashboard.cpp`
+- [x] Add UI field and event script handlers for `otaHour` in Web Dashboard HTML page in `WebDashboard.cpp`
+- [x] Compile and verify the build for the target ESP32-C6

@@ -34,11 +34,12 @@ void AutoOtaManager::update() {
         return;
     }
     
-    // Auto-OTA at 3:00 AM
-    if (timeinfo.tm_hour == 3) {
+    // Auto-OTA at configured hour
+    int scheduledHour = controllerPtr->getConfig().otaHour;
+    if (timeinfo.tm_hour == scheduledHour) {
         if (lastOtaCheckDay != timeinfo.tm_mday) {
             lastOtaCheckDay = timeinfo.tm_mday;
-            Serial.println("[AUTO-OTA] Scheduled trigger time (3:00 AM KST) reached. Launching AutoOtaTask...");
+            Serial.printf("[AUTO-OTA] Scheduled trigger time (%d:00 KST) reached. Launching AutoOtaTask...\n", scheduledHour);
             startOtaUpdate(false);
         }
     }
