@@ -41,16 +41,16 @@ jobs:
           cat <<EOF > include/secrets.h
           #ifndef SECRETS_H
           #define SECRETS_H
-          #define SECRET_WIFI_SSID "${{ secrets.WIFI_SSID }}"
-          #define SECRET_WIFI_PASS "${{ secrets.WIFI_PASS }}"
-          #define SECRET_INFLUXDB_URL "${{ secrets.INFLUXDB_URL }}"
-          #define SECRET_INFLUXDB_TOKEN "${{ secrets.INFLUXDB_TOKEN }}"
-          #define SECRET_INFLUXDB_ORG "${{ secrets.INFLUXDB_ORG }}"
-          #define SECRET_INFLUXDB_BUCKET "${{ secrets.INFLUXDB_BUCKET }}"
-          #define SECRET_VERSION_URL "${{ secrets.VERSION_URL }}"
-          #define SECRET_FIRMWARE_URL "${{ secrets.FIRMWARE_URL }}"
-          #define SECRET_DASHBOARD_USER "${{ secrets.DASHBOARD_USER }}"
-          #define SECRET_DASHBOARD_PASS "${{ secrets.DASHBOARD_PASS }}"
+          #define SECRET_WIFI_SSID "${{ secrets.SECRET_WIFI_SSID }}"
+          #define SECRET_WIFI_PASS "${{ secrets.SECRET_WIFI_PASS }}"
+          #define SECRET_INFLUXDB_URL "${{ secrets.SECRET_INFLUXDB_URL }}"
+          #define SECRET_INFLUXDB_TOKEN "${{ secrets.SECRET_INFLUXDB_TOKEN }}"
+          #define SECRET_INFLUXDB_ORG "${{ secrets.SECRET_INFLUXDB_ORG }}"
+          #define SECRET_INFLUXDB_BUCKET "${{ secrets.SECRET_INFLUXDB_BUCKET }}"
+          #define SECRET_VERSION_URL "${{ secrets.SECRET_VERSION_URL }}"
+          #define SECRET_FIRMWARE_URL "${{ secrets.SECRET_FIRMWARE_URL }}"
+          #define SECRET_DASHBOARD_USER "${{ secrets.SECRET_DASHBOARD_USER }}"
+          #define SECRET_DASHBOARD_PASS "${{ secrets.SECRET_DASHBOARD_PASS }}"
           #endif
           EOF
 
