@@ -608,6 +608,10 @@ void test_sensor_deadlock_prevention(void) {
     // Deadlock flag should be cleared
     TEST_ASSERT_FALSE(controller.getSensorDeadlockFlag());
     
+    // Advance remaining cooldown time to clear the cooldown state
+    hw.advanceMillis(2000);
+    controller.update();
+    
     // 4. Verify FSM can open again now
     hw.setDistanceCm(30.0f); // Re-approach
     for (int i = 0; i < 15; ++i) {
