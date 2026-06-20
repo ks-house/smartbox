@@ -14,6 +14,7 @@ struct TelemetryData {
 struct BatchPayload {
     TelemetryData* data;
     int count;
+    char type[16];
 };
 
 class TelemetryManager {
@@ -27,6 +28,11 @@ private:
     static int bufferCount;
     static bool wasMotorRunning;
     static unsigned long lastSampleTime;
+
+    // Buffer for periodic heartbeat telemetry
+    static TelemetryData heartbeatBuffer[60];
+    static int heartbeatCount;
+    static unsigned long lastHeartbeatSampleTime;
 
     static void telemetryTaskFunction(void* pvParameters);
 

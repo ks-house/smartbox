@@ -51,6 +51,7 @@ struct BoxConfig {
   unsigned long emergencyRecoveryTime =
       5000; // Auto-recovery from EMERGENCY_STOP (ms)
   int otaHour = 3;
+  int telemetryIntervalMin = 10; // Default: 10 minutes
 };
 
 typedef void (*StateChangeCallback)(State prevState, State newState);

@@ -527,6 +527,23 @@ void test_maintenance_mode(void) {
     TEST_ASSERT_EQUAL(STATE_CLOSING, controller.getCurrentState());
 }
 
+void test_telemetry_interval_config(void) {
+    MockHardware hw;
+    SmartBoxController controller(hw);
+    controller.init();
+    
+    // Check default
+    BoxConfig cfg = controller.getConfig();
+    TEST_ASSERT_EQUAL(10, cfg.telemetryIntervalMin);
+    
+    // Modify config
+    cfg.telemetryIntervalMin = 15;
+    controller.setConfig(cfg);
+    
+    BoxConfig updatedCfg = controller.getConfig();
+    TEST_ASSERT_EQUAL(15, updatedCfg.telemetryIntervalMin);
+}
+
 #ifdef NATIVE_BUILD
 int main(int argc, char **argv) {
     UNITY_BEGIN();
@@ -541,6 +558,7 @@ int main(int argc, char **argv) {
     RUN_TEST(test_ota_state_isolation);
     RUN_TEST(test_night_sleep_mode);
     RUN_TEST(test_maintenance_mode);
+    RUN_TEST(test_telemetry_interval_config);
     return UNITY_END();
 }
 #else
@@ -560,6 +578,7 @@ void setup() {
     RUN_TEST(test_ota_state_isolation);
     RUN_TEST(test_night_sleep_mode);
     RUN_TEST(test_maintenance_mode);
+    RUN_TEST(test_telemetry_interval_config);
     UNITY_END();
 }
 

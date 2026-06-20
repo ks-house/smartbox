@@ -127,6 +127,10 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         <label>⏰ Auto-OTA Hour (0-23)</label>
         <input type='number' id='cfgOtaHour' class='form-control' placeholder='3' min='0' max='23'>
       </div>
+      <div class='form-group'>
+        <label>⏰ Telemetry Interval (minutes)</label>
+        <input type='number' id='cfgTelInterval' class='form-control' placeholder='10' min='1' max='1440'>
+      </div>
       <button class='btn btn-success' onclick='updateConfig()'>Save Settings</button>
     </div>
 
@@ -195,6 +199,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
           document.getElementById('cfgWait').value = data.config.wait;
           document.getElementById('cfgStall').value = data.config.stall;
           document.getElementById('cfgOtaHour').value = data.config.otaHour;
+          document.getElementById('cfgTelInterval').value = data.config.telInterval;
           document.getElementById('nasUrl').value = data.firmwareUrl || '';
           configLoaded = true;
         }
@@ -325,9 +330,10 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       const wait = document.getElementById('cfgWait').value;
       const stall = document.getElementById('cfgStall').value;
       const otaHour = document.getElementById('cfgOtaHour').value;
+      const telInterval = document.getElementById('cfgTelInterval').value;
       
       try {
-        const res = await fetch(`/api/config?dist=${dist}&wait=${wait}&stall=${stall}&otaHour=${otaHour}`);
+        const res = await fetch(`/api/config?dist=${dist}&wait=${wait}&stall=${stall}&otaHour=${otaHour}&telInterval=${telInterval}`);
         const result = await res.json();
         if (result.status === 'updated') {
           alert('Config parameters updated and saved!');
@@ -579,7 +585,8 @@ void WebDashboard::init(SmartBoxController& controller) {
         json += "\"dist\":" + String(cfg.distThreshold, 1) + ",";
         json += "\"wait\":" + String(cfg.waitTime) + ",";
         json += "\"stall\":" + String(cfg.currentStallLimit, 1) + ",";
-        json += "\"otaHour\":" + String(cfg.otaHour);
+        json += "\"otaHour\":" + String(cfg.otaHour) + ",";
+        json += "\"telInterval\":" + String(cfg.telemetryIntervalMin);
         json += "}";
         json += "}";
         
@@ -654,6 +661,12 @@ void WebDashboard::init(SmartBoxController& controller) {
             cfg.otaHour = request->getParam("otaHour")->value().toInt();
             if (cfg.otaHour < 0 || cfg.otaHour > 23) {
                 cfg.otaHour = 3;
+            }
+        }
+        if (request->hasParam("telInterval")) {
+            cfg.telemetryIntervalMin = request->getParam("telInterval")->value().toInt();
+            if (cfg.telemetryIntervalMin < 1 || cfg.telemetryIntervalMin > 1440) {
+                cfg.telemetryIntervalMin = 10;
             }
         }
         
