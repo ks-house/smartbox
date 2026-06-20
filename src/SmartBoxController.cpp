@@ -144,13 +144,16 @@ void SmartBoxController::update() {
                     Serial.printf("[WARN] Stall candidate OPEN (%d/3): %.1f mA (Limit: %.1f mA)\n",
                                   openStallCount, motorCurrent, config.currentStallLimit);
                     if (openStallCount >= 3) {
-                        Serial.printf("[EMERGENCY] MOTOR STALL DETECTED DURING OPEN! Current: %.1f mA (Limit: %.1f mA)\n", motorCurrent, config.currentStallLimit);
+                        Serial.printf("[WARN] MOTOR STALL DETECTED DURING OPEN (STALL PROTECTION DISABLED)! Current: %.1f mA (Limit: %.1f mA)\n", motorCurrent, config.currentStallLimit);
                         Serial.printf("[DIAGNOSTIC] Time Elapsed: %lu ms, Batt: %.2f V, Dist: %.1f cm\n",
                                       hw.getMillis() - stateTimer, batteryVoltage, currentDistance);
+                        // Temporarily disabled as requested by the user
+                        /*
                         openStallCount = 0;
                         forceAllRelaysOff();
                         transitionTo(STATE_EMERGENCY_STOP);
                         break;
+                        */
                     }
                 } else {
                     openStallCount = 0; // Current normal — reset counter
@@ -200,13 +203,16 @@ void SmartBoxController::update() {
                     Serial.printf("[WARN] Stall candidate CLOSE (%d/3): %.1f mA (Limit: %.1f mA)\n",
                                   closeStallCount, motorCurrent, config.currentStallLimit);
                     if (closeStallCount >= 3) {
-                        Serial.printf("[EMERGENCY] MOTOR STALL DETECTED DURING CLOSE! Current: %.1f mA (Limit: %.1f mA)\n", motorCurrent, config.currentStallLimit);
+                        Serial.printf("[WARN] MOTOR STALL DETECTED DURING CLOSE (STALL PROTECTION DISABLED)! Current: %.1f mA (Limit: %.1f mA)\n", motorCurrent, config.currentStallLimit);
                         Serial.printf("[DIAGNOSTIC] Time Elapsed: %lu ms, Batt: %.2f V, Dist: %.1f cm\n",
                                       hw.getMillis() - stateTimer, batteryVoltage, currentDistance);
+                        // Temporarily disabled as requested by the user
+                        /*
                         closeStallCount = 0;
                         forceAllRelaysOff();
                         transitionTo(STATE_EMERGENCY_STOP);
                         break;
+                        */
                     }
                 } else {
                     closeStallCount = 0; // Current normal — reset counter
