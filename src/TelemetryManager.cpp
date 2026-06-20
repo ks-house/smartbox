@@ -17,6 +17,11 @@ TelemetryData TelemetryManager::heartbeatBuffer[60];
 int TelemetryManager::heartbeatCount = 0;
 unsigned long TelemetryManager::lastHeartbeatSampleTime = 0;
 
+// Diagnostic Store & Forward state
+int TelemetryManager::pendingFailedTxCount = 0;
+String TelemetryManager::lastNetworkError = "";
+std::mutex TelemetryManager::diagMutex;
+
 // Connection parameters as constants
 static const char* INFLUXDB_URL = SECRET_INFLUXDB_URL;
 static const char* INFLUXDB_TOKEN = SECRET_INFLUXDB_TOKEN;
@@ -59,6 +64,15 @@ void TelemetryManager::telemetryTaskFunction(void* pvParameters) {
     bool success = true;
     unsigned long baseTime = (payload->count > 0) ? payload->data[0].timestamp_ms : 0;
     
+    // Retrieve pending diagnostic failure info
+    int failedCount = 0;
+    String errMsg = "";
+    {
+        std::lock_guard<std::mutex> lock(diagMutex);
+        failedCount = pendingFailedTxCount;
+        errMsg = lastNetworkError;
+    }
+    
     for (int i = 0; i < payload->count; i++) {
         const TelemetryData& d = payload->data[i];
         
@@ -75,18 +89,35 @@ void TelemetryManager::telemetryTaskFunction(void* pvParameters) {
         unsigned long offset = d.timestamp_ms - baseTime;
         pointDevice.addField("offset_ms", (int)offset);
         
+        // Append diagnostic data to the first point if there are any failures cached
+        if (i == 0 && failedCount > 0) {
+            pointDevice.addField("failed_tx_count", failedCount);
+            pointDevice.addField("last_error_msg", errMsg.c_str());
+            Serial.printf("[TELEMETRY-ASYNC] Appended diagnostics: failed_tx_count=%d, last_error_msg=%s\n",
+                          failedCount, errMsg.c_str());
+        }
+        
         Serial.printf("[TELEMETRY-ASYNC] Batch point %d/%d -> offset: %d ms, batt: %.2f V, curr: %.1f mA, state: %s\n",
                       i + 1, payload->count, (int)offset, d.battery_v, d.motor_current, stateToString((State)d.state));
                       
         if (!client.writePoint(pointDevice)) {
             success = false;
+            String errorMsg = "HTTP " + String(client.getLastStatusCode()) + ": " + client.getLastErrorMessage();
             Serial.printf("[TELEMETRY-ASYNC] Batch point %d write failed! HTTP code: %d, Error: %s\n",
                           i + 1, client.getLastStatusCode(), client.getLastErrorMessage().c_str());
+            
+            std::lock_guard<std::mutex> lock(diagMutex);
+            pendingFailedTxCount++;
+            lastNetworkError = errorMsg;
         }
     }
     
     if (success) {
         Serial.printf("[TELEMETRY-ASYNC] Asynchronous batch write of %d points completed successfully.\n", payload->count);
+        
+        std::lock_guard<std::mutex> lock(diagMutex);
+        pendingFailedTxCount = 0;
+        lastNetworkError = "";
     } else {
         Serial.println("[TELEMETRY-ASYNC] Asynchronous batch write completed with some failures.");
     }
@@ -106,6 +137,10 @@ void TelemetryManager::init(SmartBoxController& controller) {
     lastSampleTime = 0;
     heartbeatCount = 0;
     lastHeartbeatSampleTime = 0;
+    
+    std::lock_guard<std::mutex> lock(diagMutex);
+    pendingFailedTxCount = 0;
+    lastNetworkError = "";
 }
 
 void TelemetryManager::update() {

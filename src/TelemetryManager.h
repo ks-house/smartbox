@@ -3,6 +3,8 @@
 
 #include "SmartBoxController.h"
 
+#include <mutex>
+
 struct TelemetryData {
     float battery_v;
     float distance_cm;
@@ -33,6 +35,11 @@ private:
     static TelemetryData heartbeatBuffer[60];
     static int heartbeatCount;
     static unsigned long lastHeartbeatSampleTime;
+
+    // Diagnostic Store & Forward state
+    static int pendingFailedTxCount;
+    static String lastNetworkError;
+    static std::mutex diagMutex;
 
     static void telemetryTaskFunction(void* pvParameters);
 
