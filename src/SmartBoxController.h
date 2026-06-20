@@ -124,7 +124,11 @@ public:
   void stopMaintenanceMode();
   unsigned long getMaintenanceRemainingSeconds() const;
 
+#ifdef FIRMWARE_VERSION_OVERRIDE
+  static constexpr const char *FIRMWARE_VERSION = FIRMWARE_VERSION_OVERRIDE;
+#else
   static constexpr const char *FIRMWARE_VERSION = "0.0.1";
+#endif
   const char *getFirmwareVersion() const { return FIRMWARE_VERSION; }
 
   float getBatteryVoltage() const {

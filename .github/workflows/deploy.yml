@@ -63,13 +63,18 @@ jobs:
           pip install platformio
 
       - name: Build firmware
-        run: pio run -e esp32-c6-devkitc-1
+        run: |
+          BASE_VERSION=$(grep "FIRMWARE_VERSION =" src/SmartBoxController.h | head -n 1 | sed -e 's/.*"\(.*\)".*/\1/')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          FULL_VERSION="${BASE_VERSION}-g${SHORT_SHA}"
+          echo "FULL_VERSION=${FULL_VERSION}" >> $GITHUB_ENV
+          echo "Building version: ${FULL_VERSION}"
+          PLATFORMIO_BUILD_FLAGS="-DFIRMWARE_VERSION_OVERRIDE=\"\\\"${FULL_VERSION}\\\"\"" pio run -e esp32-c6-devkitc-1
 
       - name: Generate version.json metadata
         run: |
-          VERSION=$(grep "FIRMWARE_VERSION =" src/SmartBoxController.h | head -n 1 | sed -e 's/.*"\(.*\)".*/\1/')
           BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          echo "{\"version\": \"$VERSION\", \"build_number\": \"${{ github.run_id }}\", \"commit\": \"${{ github.sha }}\", \"date\": \"$BUILD_DATE\"}" > .pio/build/esp32-c6-devkitc-1/version.json
+          echo "{\"version\": \"${{ env.FULL_VERSION }}\", \"build_number\": \"${{ github.run_id }}\", \"commit\": \"${{ github.sha }}\", \"date\": \"$BUILD_DATE\"}" > .pio/build/esp32-c6-devkitc-1/version.json
           cat .pio/build/esp32-c6-devkitc-1/version.json
 
       - name: Prepare deployment directory
