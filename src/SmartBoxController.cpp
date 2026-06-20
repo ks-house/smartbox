@@ -53,12 +53,22 @@ void SmartBoxController::update() {
         return;
     }
 
+    bool isSleep;
+    State state;
+    {
+        std::lock_guard<std::recursive_mutex> lock(dataMutex);
+        isSleep = nightSleepActive;
+        state = currentState;
+    }
+
     // Read ultrasonic distance every 50ms and update buffer (unless Night Sleep is active)
-    if (!nightSleepActive && currentState != STATE_OTA_UPDATING) {
+    if (!isSleep && state != STATE_OTA_UPDATING) {
         if (hw.getMillis() - sensorTimer >= 50) {
             sensorTimer = hw.getMillis();
             updateDistanceBuffer();
-            currentDistance = getFilteredDistance();
+            float filtered = getFilteredDistance();
+            std::lock_guard<std::recursive_mutex> lock(dataMutex);
+            currentDistance = filtered;
         }
     }
     
@@ -270,10 +280,14 @@ void SmartBoxController::resetEmergency() {
 }
 
 void SmartBoxController::transitionTo(State newState) {
-    State prev = currentState;
-    currentState = newState;
-    stateTimer = hw.getMillis();
-    lastDetectStartTime = 0;
+    State prev;
+    {
+        std::lock_guard<std::recursive_mutex> lock(dataMutex);
+        prev = currentState;
+        currentState = newState;
+        stateTimer = hw.getMillis();
+        lastDetectStartTime = 0;
+    }
     
     if (stateCallback != nullptr) {
         stateCallback(prev, newState);
@@ -284,14 +298,18 @@ void SmartBoxController::transitionTo(State newState) {
 
 void SmartBoxController::updateDistanceBuffer() {
     float raw = hw.getDistanceCm();
+    std::lock_guard<std::recursive_mutex> lock(dataMutex);
     distanceHistory[distanceHistoryIdx] = raw;
     distanceHistoryIdx = (distanceHistoryIdx + 1) % 5;
 }
 
 float SmartBoxController::getFilteredDistance() {
     float sorted[5];
-    for (int i = 0; i < 5; i++) {
-        sorted[i] = distanceHistory[i];
+    {
+        std::lock_guard<std::recursive_mutex> lock(dataMutex);
+        for (int i = 0; i < 5; i++) {
+            sorted[i] = distanceHistory[i];
+        }
     }
     // Bubble sort
     for (int i = 0; i < 4; i++) {
@@ -307,8 +325,11 @@ float SmartBoxController::getFilteredDistance() {
 }
 
 void SmartBoxController::readSensors() {
-    batteryVoltage = hw.getBatteryVoltage();
-    motorCurrent = hw.getMotorCurrent();
+    float v = hw.getBatteryVoltage();
+    float c = hw.getMotorCurrent();
+    std::lock_guard<std::recursive_mutex> lock(dataMutex);
+    batteryVoltage = v;
+    motorCurrent = c;
 }
 
 void SmartBoxController::setRelayStates(bool mainOn, bool dirOpen, bool dirClose) {
@@ -372,6 +393,7 @@ void SmartBoxController::forceAllRelaysOff() {
 }
 
 bool SmartBoxController::isMotorRunning() const {
+    std::lock_guard<std::recursive_mutex> lock(dataMutex);
     if (currentState == STATE_OPEN_START || currentState == STATE_OPENING ||
         currentState == STATE_CLOSE_START || currentState == STATE_CLOSING) {
         return true;

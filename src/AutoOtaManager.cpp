@@ -9,11 +9,15 @@
 SmartBoxController* AutoOtaManager::controllerPtr = nullptr;
 unsigned long AutoOtaManager::lastScheduleCheck = 0;
 int AutoOtaManager::lastOtaCheckDay = -1;
+volatile bool AutoOtaManager::otaForceRequested = false;
+volatile bool AutoOtaManager::otaInProgress = false;
 
 void AutoOtaManager::init(SmartBoxController& controller) {
     controllerPtr = &controller;
     lastScheduleCheck = 0;
     lastOtaCheckDay = -1;
+    otaForceRequested = false;
+    otaInProgress = false;
 }
 
 void AutoOtaManager::update() {
@@ -24,6 +28,13 @@ void AutoOtaManager::update() {
         return;
     }
     if (!WifiManager::isConnected()) {
+        return;
+    }
+    
+    // Check if dynamic force update requested
+    if (otaForceRequested) {
+        otaForceRequested = false;
+        runOtaProcess(true);
         return;
     }
     
@@ -45,8 +56,8 @@ void AutoOtaManager::update() {
     if (timeinfo.tm_hour == scheduledHour) {
         if (lastOtaCheckDay != timeinfo.tm_mday) {
             lastOtaCheckDay = timeinfo.tm_mday;
-            Serial.printf("[AUTO-OTA] Scheduled trigger time (%d:00 KST) reached. Launching AutoOtaTask...\n", scheduledHour);
-            startOtaUpdate(false);
+            Serial.printf("[AUTO-OTA] Scheduled trigger time (%d:00 KST) reached. Running AutoOta...\n", scheduledHour);
+            runOtaProcess(false);
         }
     }
 }
@@ -57,27 +68,17 @@ bool AutoOtaManager::startOtaUpdate(bool force) {
         return false;
     }
     
-    BaseType_t result = xTaskCreate(
-        otaTaskFunction,
-        "auto_ota_task",
-        16384, // 16KB stack size for TLS handshake
-        (void*)force,
-        1, // Low priority
-        NULL
-    );
-    
-    if (result == pdPASS) {
-        Serial.println("[OTA] Background task created successfully.");
+    if (force) {
+        otaForceRequested = true;
+        Serial.println("[OTA] Force OTA update requested via flag.");
         return true;
-    } else {
-        Serial.println("[OTA] Failed to create background task.");
-        return false;
     }
+    return false;
 }
 
-void AutoOtaManager::otaTaskFunction(void *pvParameters) {
-    bool force = (bool)pvParameters;
-    Serial.printf("[OTA] Background update task started (force=%s).\n", force ? "true" : "false");
+void AutoOtaManager::runOtaProcess(bool force) {
+    Serial.printf("[OTA] Background update process started (force=%s).\n", force ? "true" : "false");
+    otaInProgress = true;
     
     bool needsUpdate = false;
     
@@ -128,8 +129,12 @@ void AutoOtaManager::otaTaskFunction(void *pvParameters) {
         controllerPtr->transitionTo(STATE_OTA_UPDATING);
         Serial.println("[OTA] FSM transitioned to STATE_OTA_UPDATING.");
         
-        // Allow physical contacts to fully separate
-        delay(500);
+        // Wait until motor is fully stopped and contacts separated
+        unsigned long startWait = millis();
+        while (controllerPtr->getMotorCurrent() > 50.0f && (millis() - startWait < 1000)) {
+            delay(50);
+        }
+        delay(500); // Allow physical contacts to fully separate
         
         Serial.printf("[OTA] Step 3: Fetching firmware binary from %s...\n", FIRMWARE_URL);
         
@@ -156,8 +161,8 @@ void AutoOtaManager::otaTaskFunction(void *pvParameters) {
         }
     }
     
-    Serial.println("[OTA] Background update task completed and deleting itself.");
-    vTaskDelete(NULL);
+    otaInProgress = false;
+    Serial.println("[OTA] Update process completed.");
 }
 
 String AutoOtaManager::parseJsonField(const String& json, const String& key) {

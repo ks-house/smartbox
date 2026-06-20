@@ -32,6 +32,22 @@ static void onStateChanged(State prevState, State newState) {
     }
 }
 
+#ifndef NATIVE_BUILD
+static void NetworkTask(void* pvParameters) {
+    Serial.println("[SYSTEM] Background NetworkTask loop started.");
+    for (;;) {
+        // Run Auto-OTA scheduler
+        AutoOtaManager::update();
+        
+        // Run InfluxDB Telemetry updates
+        TelemetryManager::update();
+        
+        // Yield CPU
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
+#endif
+
 void setup() {
     Serial.begin(115200);
     delay(500); // Small delay for serial stability
@@ -78,6 +94,19 @@ void setup() {
     // 10. Initialize time-based power management
     PowerManager::init(controller);
 
+#ifndef NATIVE_BUILD
+    // Spawn network task with 16KB stack size for TLS handshake/InfluxDB/HTTPUpdate
+    xTaskCreate(
+        NetworkTask,
+        "NetworkTask",
+        16384,
+        NULL,
+        1, // Low priority background task
+        NULL
+    );
+    Serial.println("[SYSTEM] Background NetworkTask created successfully.");
+#endif
+
     Serial.println("[SYSTEM] Initialization finished. FSM Loop running.");
 }
 
@@ -96,12 +125,6 @@ void loop() {
 
     // Run Web Dashboard updates
     WebDashboard::update();
-
-    // Run Auto-OTA scheduler
-    AutoOtaManager::update();
-
-    // Run InfluxDB Telemetry updates
-    TelemetryManager::update();
 
     // Run Power Manager updates
     PowerManager::update();

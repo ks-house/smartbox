@@ -7,7 +7,6 @@
 
 SmartBoxController* TelemetryManager::controllerPtr = nullptr;
 unsigned long TelemetryManager::lastSendTime = 0;
-volatile bool TelemetryManager::isSending = false;
 
 // Connection parameters as constants
 static const char* INFLUXDB_URL = SECRET_INFLUXDB_URL;
@@ -39,7 +38,6 @@ void TelemetryManager::init(SmartBoxController& controller) {
     controllerPtr = &controller;
     // Set to 0 to trigger telemetry as soon as WiFi connects and system is stable
     lastSendTime = 0;
-    isSending = false;
 }
 
 void TelemetryManager::update() {
@@ -73,61 +71,15 @@ void TelemetryManager::update() {
         return;
     }
 
-    // Prevent duplicate background tasks
-    if (isSending) {
-        Serial.println("[TELEMETRY] Skip transmission: previous telemetry task still in progress.");
-        lastSendTime = now; // retry in 30s
-        return;
-    }
-
     // Log start of transmission attempt
     Serial.println("[TELEMETRY] InfluxDB 전송 시도 중...");
-
-    // Capture telemetry snapshot safely
-    TelemetryData* data = new TelemetryData();
-    data->battery_v = controllerPtr->getBatteryVoltage();
-    data->distance_cm = controllerPtr->getDistance();
-    data->state = (int)controllerPtr->getCurrentState();
-    data->wifi_rssi = WiFi.RSSI();
-
-    isSending = true;
     lastSendTime = now;
 
-    // Spawn low priority background FreeRTOS task
-    BaseType_t result = xTaskCreate(
-        telemetryTaskFunction,
-        "telemetry_task",
-        12288, // 12KB stack depth is safe for TLS handshake
-        (void*)data,
-        1, // Low priority
-        NULL
-    );
-
-    if (result != pdPASS) {
-        Serial.println("[TELEMETRY] Failed to create background telemetry task.");
-        delete data;
-        isSending = false;
-    } else {
-        Serial.println("[TELEMETRY] Background telemetry task spawned successfully.");
-    }
-}
-
-void TelemetryManager::telemetryTaskFunction(void* pvParameters) {
-    TelemetryData* data = (TelemetryData*)pvParameters;
-    if (data == nullptr) {
-        isSending = false;
-        vTaskDelete(NULL);
-        return;
-    }
-
-    // Double check connection status
-    if (WiFi.status() != WL_CONNECTED) {
-        Serial.println("[TELEMETRY] Cancelled: WiFi disconnected before transmission.");
-        delete data;
-        isSending = false;
-        vTaskDelete(NULL);
-        return;
-    }
+    // Capture telemetry snapshot safely
+    float battery_v = controllerPtr->getBatteryVoltage();
+    float distance_cm = controllerPtr->getDistance();
+    int state = (int)controllerPtr->getCurrentState();
+    int wifi_rssi = WiFi.RSSI();
 
     Serial.printf("[TELEMETRY] Initializing InfluxDB connection to: %s\n", INFLUXDB_URL);
 
@@ -141,14 +93,14 @@ void TelemetryManager::telemetryTaskFunction(void* pvParameters) {
     Point pointDevice(MEASUREMENT_NAME);
     pointDevice.addTag("device", DEVICE_TAG);
 
-    pointDevice.addField("battery_v", data->battery_v);
-    pointDevice.addField("distance_cm", data->distance_cm);
-    pointDevice.addField("state", data->state);
-    pointDevice.addField("state_str", stateToString((State)data->state));
-    pointDevice.addField("wifi_rssi", data->wifi_rssi);
+    pointDevice.addField("battery_v", battery_v);
+    pointDevice.addField("distance_cm", distance_cm);
+    pointDevice.addField("state", state);
+    pointDevice.addField("state_str", stateToString((State)state));
+    pointDevice.addField("wifi_rssi", wifi_rssi);
 
     Serial.printf("[TELEMETRY] Transmitting fields -> battery_v: %.2f V, distance_cm: %.1f cm, state: %d (%s), wifi_rssi: %d dBm\n",
-                  data->battery_v, data->distance_cm, data->state, stateToString((State)data->state), data->wifi_rssi);
+                  battery_v, distance_cm, state, stateToString((State)state), wifi_rssi);
 
     // Submit telemetry
     if (client.writePoint(pointDevice)) {
@@ -157,11 +109,4 @@ void TelemetryManager::telemetryTaskFunction(void* pvParameters) {
         Serial.printf("[TELEMETRY] 전송 실패! Error Code: %d, Message: %s\n", 
                       client.getLastStatusCode(), client.getLastErrorMessage().c_str());
     }
-
-    // Clean up heap allocated structure
-    delete data;
-    isSending = false;
-
-    Serial.println("[TELEMETRY] Background task terminated.");
-    vTaskDelete(NULL);
 }

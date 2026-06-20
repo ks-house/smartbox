@@ -2,6 +2,7 @@
 #define SMART_BOX_CONTROLLER_H
 
 #include "HardwareInterface.h"
+#include <mutex>
 
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
@@ -76,6 +77,7 @@ private:
   float currentDistance;
   bool relaysIsolated;
   bool nightSleepActive;
+  mutable std::recursive_mutex dataMutex;
 
   void updateDistanceBuffer();
   float getFilteredDistance();
@@ -85,16 +87,28 @@ private:
 public:
   void transitionTo(State newState);
   void forceAllRelaysOff();
-  bool isOtaMode() const { return currentState == STATE_OTA_UPDATING; }
-  bool isNightSleepActive() const { return nightSleepActive; }
-  void setNightSleepMode(bool active) { nightSleepActive = active; }
+  bool isOtaMode() const {
+      std::lock_guard<std::recursive_mutex> lock(dataMutex);
+      return currentState == STATE_OTA_UPDATING;
+  }
+  bool isNightSleepActive() const {
+      std::lock_guard<std::recursive_mutex> lock(dataMutex);
+      return nightSleepActive;
+  }
+  void setNightSleepMode(bool active) {
+      std::lock_guard<std::recursive_mutex> lock(dataMutex);
+      nightSleepActive = active;
+  }
   SmartBoxController(HardwareInterface &hardware);
   ~SmartBoxController() {}
 
   void init();
   void update();
 
-  State getCurrentState() const { return currentState; }
+  State getCurrentState() const {
+      std::lock_guard<std::recursive_mutex> lock(dataMutex);
+      return currentState;
+  }
   void setConfig(const BoxConfig &newConfig) { config = newConfig; }
   BoxConfig getConfig() const { return config; }
   void registerStateCallback(StateChangeCallback cb) { stateCallback = cb; }
@@ -106,9 +120,18 @@ public:
   static constexpr const char *FIRMWARE_VERSION = "0.0.1";
   const char *getFirmwareVersion() const { return FIRMWARE_VERSION; }
 
-  float getBatteryVoltage() const { return batteryVoltage; }
-  float getMotorCurrent() const { return motorCurrent; }
-  float getDistance() const { return currentDistance; }
+  float getBatteryVoltage() const {
+      std::lock_guard<std::recursive_mutex> lock(dataMutex);
+      return batteryVoltage;
+  }
+  float getMotorCurrent() const {
+      std::lock_guard<std::recursive_mutex> lock(dataMutex);
+      return motorCurrent;
+  }
+  float getDistance() const {
+      std::lock_guard<std::recursive_mutex> lock(dataMutex);
+      return currentDistance;
+  }
   bool isMotorRunning() const;
   bool canSendTelemetry() const;
 };
