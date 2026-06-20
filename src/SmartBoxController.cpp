@@ -244,8 +244,8 @@ void SmartBoxController::update() {
             } else {
                 closeStallCount = 0; // Reset on re-entry
             }
-            // Safety reopen if human is detected during close
-            if (currentDistance > 0 && currentDistance < config.distThreshold) {
+            // Safety reopen if human is detected during close (bypassed if sensor is deadlocked)
+            if (currentDistance > 0 && currentDistance < config.distThreshold && !sensorDeadlockFlag) {
                 Serial.printf("[SAFETY] Human re-approach during closing: %.1f cm! Reopening.\n", currentDistance);
                 closeStallCount = 0;
                 setRelayStates(false, false, false);
@@ -273,7 +273,7 @@ void SmartBoxController::update() {
                 relaysIsolated = false;
                 isCooldown = true;
                 cooldownTimer = hw.getMillis();
-                if (currentDistance > 0.0f && currentDistance < config.distThreshold) {
+                if (currentDistance > 0.0f && currentDistance < config.distThreshold && !sensorDeadlockFlag) {
                     Serial.printf("[RECOVERY] Human detected (%.1f cm) → Auto-opening lid.\n", currentDistance);
                     transitionTo(STATE_OPEN_START);
                 } else {
