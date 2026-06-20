@@ -520,16 +520,26 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
 
 
+static bool checkAuth(AsyncWebServerRequest *request) {
+    if (!request->authenticate(SECRET_DASHBOARD_USER, SECRET_DASHBOARD_PASS)) {
+        request->requestAuthentication();
+        return false;
+    }
+    return true;
+}
+
 void WebDashboard::init(SmartBoxController& controller) {
     controllerPtr = &controller;
     
     // Serve HTML Dashboard
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+        if (!checkAuth(request)) return;
         request->send_P(200, "text/html", INDEX_HTML);
     });
     
     // Serve Telemetry State JSON API
     server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest *request){
+        if (!checkAuth(request)) return;
         if (controllerPtr == nullptr) {
             request->send(500, "application/json", "{\"error\":\"Controller uninitialized\"}");
             return;
@@ -578,6 +588,7 @@ void WebDashboard::init(SmartBoxController& controller) {
     
     // Release Emergency Lock endpoint
     server.on("/api/release", HTTP_GET, [](AsyncWebServerRequest *request){
+        if (!checkAuth(request)) return;
         if (controllerPtr != nullptr) {
             controllerPtr->resetEmergency();
             request->send(200, "application/json", "{\"status\":\"released\"}");
@@ -588,6 +599,7 @@ void WebDashboard::init(SmartBoxController& controller) {
     
     // Remote Force Open endpoint
     server.on("/api/open", HTTP_GET, [](AsyncWebServerRequest *request){
+        if (!checkAuth(request)) return;
         if (controllerPtr != nullptr) {
             controllerPtr->forceOpen();
             request->send(200, "application/json", "{\"status\":\"opening\"}");
@@ -598,6 +610,7 @@ void WebDashboard::init(SmartBoxController& controller) {
     
     // Manual Maintenance Mode endpoint
     server.on("/api/maintenance", HTTP_ANY, [](AsyncWebServerRequest *request){
+        if (!checkAuth(request)) return;
         if (controllerPtr == nullptr) {
             request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Controller null\"}");
             return;
@@ -620,6 +633,7 @@ void WebDashboard::init(SmartBoxController& controller) {
     
     // Dynamic sensitivity calibration endpoint
     server.on("/api/config", HTTP_GET, [](AsyncWebServerRequest *request){
+        if (!checkAuth(request)) return;
         if (controllerPtr == nullptr) {
             request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Controller null\"}");
             return;
@@ -654,6 +668,7 @@ void WebDashboard::init(SmartBoxController& controller) {
 
     // ===== Asynchronous Wi-Fi Scan Endpoint =====
     server.on("/api/wifi/scan", HTTP_GET, [](AsyncWebServerRequest *request){
+        if (!checkAuth(request)) return;
         bool forceStart = request->hasParam("start");
         int status = WifiManager::getScanStatus();
         if (forceStart || status == -2) {
@@ -673,6 +688,7 @@ void WebDashboard::init(SmartBoxController& controller) {
 
     // ===== Wi-Fi Provisioning Connect Endpoint =====
     server.on("/api/wifi/connect", HTTP_ANY, [](AsyncWebServerRequest *request){
+        if (!checkAuth(request)) return;
         String ssid = "";
         String password = "";
         
@@ -701,6 +717,7 @@ void WebDashboard::init(SmartBoxController& controller) {
     
     // ===== NAS HTTPS Pull OTA Endpoint =====
     server.on("/api/update-from-nas", HTTP_GET, [](AsyncWebServerRequest *request){
+        if (!checkAuth(request)) return;
         if (controllerPtr == nullptr) {
             request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Controller uninitialized\"}");
             return;
