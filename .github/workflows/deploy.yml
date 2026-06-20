@@ -49,6 +49,8 @@ jobs:
           #define SECRET_INFLUXDB_BUCKET "${{ secrets.INFLUXDB_BUCKET }}"
           #define SECRET_VERSION_URL "${{ secrets.VERSION_URL }}"
           #define SECRET_FIRMWARE_URL "${{ secrets.FIRMWARE_URL }}"
+          #define SECRET_DASHBOARD_USER "${{ secrets.DASHBOARD_USER }}"
+          #define SECRET_DASHBOARD_PASS "${{ secrets.DASHBOARD_PASS }}"
           #endif
           EOF
 
