@@ -599,9 +599,11 @@ void test_sensor_deadlock_prevention(void) {
     
     // 3. Self-healing: clear path (sensor at 80cm)
     hw.setDistanceCm(80.0f);
-    // Standard update to run the check
-    hw.advanceMillis(50);
-    controller.update();
+    // Need at least 3 updates for the 5-sample median filter to register the new distance
+    for (int i = 0; i < 3; ++i) {
+        hw.advanceMillis(50);
+        controller.update();
+    }
     
     // Deadlock flag should be cleared
     TEST_ASSERT_FALSE(controller.getSensorDeadlockFlag());
