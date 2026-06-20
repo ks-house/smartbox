@@ -65,10 +65,18 @@ void PowerManager::update() {
             Serial.println("[POWER] 진입: 야간 절전 모드 활성화. Wi-Fi OFF.");
             controllerPtr->setNightSleepMode(true);
             WifiManager::stopWiFi();
+#ifndef NATIVE_BUILD
+            setCpuFrequencyMhz(80);
+            Serial.println("[POWER] CPU Frequency scaled to 80 MHz");
+#endif
         }
     } else {
         if (controllerPtr->isNightSleepActive()) {
             Serial.println("[POWER] 해제: 주간 모드 전환. Wi-Fi 재연결 시도 중...");
+#ifndef NATIVE_BUILD
+            setCpuFrequencyMhz(160);
+            Serial.println("[POWER] CPU Frequency scaled to 160 MHz");
+#endif
             controllerPtr->setNightSleepMode(false);
             
             // Re-load saved credentials to connect

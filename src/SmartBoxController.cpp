@@ -65,9 +65,10 @@ void SmartBoxController::update() {
         state = currentState;
     }
 
-    // Read ultrasonic distance every 50ms and update buffer (unless Night Sleep is active)
-    if (!isSleep && state != STATE_OTA_UPDATING) {
-        if (hw.getMillis() - sensorTimer >= 50) {
+    // Adaptive sensor polling: 50ms (daytime) / 250ms (night sleep) for power savings
+    if (state != STATE_OTA_UPDATING) {
+        unsigned long pollInterval = isSleep ? 250 : 50;
+        if (hw.getMillis() - sensorTimer >= pollInterval) {
             sensorTimer = hw.getMillis();
             updateDistanceBuffer();
             float filtered = getFilteredDistance();

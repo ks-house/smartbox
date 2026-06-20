@@ -10,6 +10,13 @@
   - [x] Handle WDT deregistration and re-registration during OTA in `AutoOtaManager.cpp`
 - [x] Proactive Daily Reboot Scheduling
   - [x] Implement 04:00 AM daily reboot in `PowerManager.cpp` using `Preferences` for day-of-year tracking
+- [x] Deep Power Diet — Dynamic CPU Frequency Scaling & Adaptive Sensor Polling
+  - [x] Add `setCpuFrequencyMhz(80)` on night sleep entry in `PowerManager.cpp`
+  - [x] Add `setCpuFrequencyMhz(160)` on daytime resume in `PowerManager.cpp`
+  - [x] Wrap CPU frequency calls in `#ifndef NATIVE_BUILD` guard
+  - [x] Change sensor polling from fixed 50ms to adaptive 50ms/250ms in `SmartBoxController.cpp`
+  - [x] Update `test_night_sleep_mode` in `test_main.cpp` for adaptive polling verification
 - [x] Verification and Testing
   - [x] Run native build tests (`pio test -e native` skipped due to missing host g++ toolchain)
   - [x] Run ESP32-C6 firmware build (`pio run -e esp32-c6-devkitc-1` compiled and linked successfully)
+  - [ ] CI pipeline verification (pending push)
