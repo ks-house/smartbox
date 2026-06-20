@@ -440,7 +440,7 @@ void test_night_sleep_mode(void) {
         hw.advanceMillis(50);
         controller.update();
     }
-    TEST_ASSERT_EQUAL(STATE_OPEN_START, controller.getCurrentState());
+    TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
 }
 
 #ifdef NATIVE_BUILD
