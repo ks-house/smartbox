@@ -7,6 +7,10 @@
 
 SmartBoxController* TelemetryManager::controllerPtr = nullptr;
 unsigned long TelemetryManager::lastSendTime = 0;
+TelemetryData TelemetryManager::eventBuffer[MAX_BATCH_SIZE];
+int TelemetryManager::bufferCount = 0;
+bool TelemetryManager::wasMotorRunning = false;
+unsigned long TelemetryManager::lastSampleTime = 0;
 
 // Connection parameters as constants
 static const char* INFLUXDB_URL = SECRET_INFLUXDB_URL;
@@ -35,10 +39,66 @@ static const char* stateToString(State state) {
     }
 }
 
+void TelemetryManager::telemetryTaskFunction(void* pvParameters) {
+    BatchPayload* payload = (BatchPayload*)pvParameters;
+    if (payload == nullptr) {
+        vTaskDelete(NULL);
+        return;
+    }
+    
+    Serial.printf("[TELEMETRY-ASYNC] Initializing batch transmission to InfluxDB, size: %d\n", payload->count);
+    
+    InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
+    client.setInsecure();
+    
+    bool success = true;
+    unsigned long baseTime = (payload->count > 0) ? payload->data[0].timestamp_ms : 0;
+    
+    for (int i = 0; i < payload->count; i++) {
+        const TelemetryData& d = payload->data[i];
+        
+        Point pointDevice(MEASUREMENT_NAME);
+        pointDevice.addTag("device", DEVICE_TAG);
+        pointDevice.addTag("type", "batch");
+        
+        pointDevice.addField("battery_v", d.battery_v);
+        pointDevice.addField("distance_cm", d.distance_cm);
+        pointDevice.addField("motor_current", d.motor_current);
+        pointDevice.addField("state", d.state);
+        pointDevice.addField("state_str", stateToString((State)d.state));
+        
+        unsigned long offset = d.timestamp_ms - baseTime;
+        pointDevice.addField("offset_ms", (int)offset);
+        
+        Serial.printf("[TELEMETRY-ASYNC] Batch point %d/%d -> offset: %d ms, batt: %.2f V, curr: %.1f mA, state: %s\n",
+                      i + 1, payload->count, (int)offset, d.battery_v, d.motor_current, stateToString((State)d.state));
+                      
+        if (!client.writePoint(pointDevice)) {
+            success = false;
+            Serial.printf("[TELEMETRY-ASYNC] Batch point %d write failed! HTTP code: %d, Error: %s\n",
+                          i + 1, client.getLastStatusCode(), client.getLastErrorMessage().c_str());
+        }
+    }
+    
+    if (success) {
+        Serial.printf("[TELEMETRY-ASYNC] Asynchronous batch write of %d points completed successfully.\n", payload->count);
+    } else {
+        Serial.println("[TELEMETRY-ASYNC] Asynchronous batch write completed with some failures.");
+    }
+    
+    // Safely reclaim allocated memory
+    delete[] payload->data;
+    delete payload;
+    
+    vTaskDelete(NULL);
+}
+
 void TelemetryManager::init(SmartBoxController& controller) {
     controllerPtr = &controller;
-    // Set to 0 to trigger telemetry as soon as WiFi connects and system is stable
     lastSendTime = 0;
+    bufferCount = 0;
+    wasMotorRunning = false;
+    lastSampleTime = 0;
 }
 
 void TelemetryManager::update() {
@@ -50,7 +110,74 @@ void TelemetryManager::update() {
         return;
     }
 
-    // Check if 30 seconds (30,000ms) have passed
+    bool isMotor = controllerPtr->isMotorRunning();
+
+    if (isMotor) {
+        wasMotorRunning = true;
+        unsigned long now = millis();
+        if (now - lastSampleTime >= 500) {
+            lastSampleTime = now;
+            
+            TelemetryData data;
+            data.battery_v = controllerPtr->getBatteryVoltage();
+            data.distance_cm = controllerPtr->getDistance();
+            data.motor_current = controllerPtr->getMotorCurrent();
+            data.state = (int)controllerPtr->getCurrentState();
+            data.timestamp_ms = now;
+            
+            if (bufferCount < MAX_BATCH_SIZE) {
+                eventBuffer[bufferCount++] = data;
+            } else {
+                // Ring Buffer: shift left to discard the oldest and keep the newest chronologically
+                for (int i = 1; i < MAX_BATCH_SIZE; i++) {
+                    eventBuffer[i - 1] = eventBuffer[i];
+                }
+                eventBuffer[MAX_BATCH_SIZE - 1] = data;
+            }
+            Serial.printf("[TELEMETRY] High-frequency sample saved. Buffer count: %d, State: %d, Current: %.1f mA\n",
+                          bufferCount, data.state, data.motor_current);
+        }
+    } else {
+        // Motor is NOT running. Check if it was running previously
+        if (wasMotorRunning) {
+            wasMotorRunning = false;
+            if (bufferCount > 0) {
+                if (controllerPtr->canSendTelemetry() && WifiManager::isConnected()) {
+                    Serial.printf("[TELEMETRY] Motor stopped. Spawning async batch transmission of %d points...\n", bufferCount);
+                    
+                    BatchPayload* payload = new BatchPayload();
+                    payload->count = bufferCount;
+                    payload->data = new TelemetryData[bufferCount];
+                    for (int i = 0; i < bufferCount; i++) {
+                        payload->data[i] = eventBuffer[i];
+                    }
+                    
+                    // Reset buffer count immediately
+                    bufferCount = 0;
+                    
+                    BaseType_t res = xTaskCreate(
+                        telemetryTaskFunction,
+                        "BatchTelemetry",
+                        8192,
+                        payload,
+                        1, // Low priority background task
+                        NULL
+                    );
+                    
+                    if (res != pdPASS) {
+                        Serial.println("[TELEMETRY] Failed to create BatchTelemetry task. Reclaiming memory.");
+                        delete[] payload->data;
+                        delete payload;
+                    }
+                } else {
+                    Serial.println("[TELEMETRY] Motor stopped, but cannot send telemetry (WiFi offline or sleep/unsafe state). Clearing buffer.");
+                    bufferCount = 0;
+                }
+            }
+        }
+    }
+
+    // Normal heartbeat telemetry every 30 seconds
     unsigned long now = millis();
     if (now - lastSendTime < 30000) {
         return;
@@ -93,6 +220,7 @@ void TelemetryManager::update() {
     // Construct the measurement point
     Point pointDevice(MEASUREMENT_NAME);
     pointDevice.addTag("device", DEVICE_TAG);
+    pointDevice.addTag("type", "heartbeat");
 
     pointDevice.addField("battery_v", battery_v);
     pointDevice.addField("distance_cm", distance_cm);
