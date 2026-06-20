@@ -1,5 +1,6 @@
 #include "TelemetryManager.h"
 #include "WifiManager.h"
+#include "secrets.h"
 #include <Arduino.h>
 #include <WiFi.h>
 #include <InfluxDbClient.h>
@@ -9,12 +10,13 @@ unsigned long TelemetryManager::lastSendTime = 0;
 volatile bool TelemetryManager::isSending = false;
 
 // Connection parameters as constants
-static const char* INFLUXDB_URL = "***REMOVED***";
-static const char* INFLUXDB_TOKEN = "***REMOVED***";
-static const char* INFLUXDB_ORG = "smartbox_org";
-static const char* INFLUXDB_BUCKET = "telemetry";
+static const char* INFLUXDB_URL = SECRET_INFLUXDB_URL;
+static const char* INFLUXDB_TOKEN = SECRET_INFLUXDB_TOKEN;
+static const char* INFLUXDB_ORG = SECRET_INFLUXDB_ORG;
+static const char* INFLUXDB_BUCKET = SECRET_INFLUXDB_BUCKET;
 static const char* DEVICE_TAG = "smartbox_01";
 static const char* MEASUREMENT_NAME = "smartbox_status";
+
 
 // Helper function to map states to strings for telemetry
 static const char* stateToString(State state) {

@@ -21,3 +21,7 @@ sdkconfig.old
 
 # Script-generated log files (local only, may contain machine-specific paths)
 scripts/*.log
+
+# Hardcoded credentials configuration
+include/secrets.h
+

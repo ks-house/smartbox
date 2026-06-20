@@ -62,7 +62,7 @@
   * 기기가 외부 인터넷에 성공적으로 접속하면 헤더의 Wi-Fi 상태가 `Online`으로 활성화되며, NAS Pull OTA를 직접 수행할 수 있습니다.
 * **무선 펌웨어 업데이트 (HTTPS NAS Pull):**
   * 대시보드 하단에 **"Firmware Update (from NAS)"** 관리 기능이 내장되어 있습니다.
-  * **NAS Pull 방식**: 기기에 고정된 Synology HTTPS NAS 경로(`***REMOVED***`)로부터 최신 펌웨어를 장치가 직접 받아와 설치하는 **Fetch & Update** 방식입니다.
+  * **NAS Pull 방식**: 기기에 고정된 Synology HTTPS NAS 경로(`[YOUR_NAS_URL]`)로부터 최신 펌웨어를 장치가 직접 받아와 설치하는 **Fetch & Update** 방식입니다.
   * **안전 인터락 작동**: 펌웨어 쓰기가 개시되는 즉시, 리니어 액추에이터의 오작동 및 쇼트 화재 방지를 위해 **모든 릴레이 전원이 차단**되며 센서 측정 및 뚜껑 개폐가 일시적으로 완전 정지(FSM 동결)됩니다.
 
 ---

@@ -2,6 +2,7 @@
 #include "ConfigManager.h"
 #include "WifiManager.h"
 #include "AutoOtaManager.h"
+#include "secrets.h"
 #include <Arduino.h>
 
 AsyncWebServer WebDashboard::server(80);
@@ -150,7 +151,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       <h3 style='font-size: 1.15rem; font-weight: 600; margin-bottom: 18px; color: var(--info);'>☁️ Firmware Update (from NAS)</h3>
       <div class='form-group'>
         <label>HTTPS Target URL</label>
-        <input type='text' id='nasUrl' class='form-control' value='***REMOVED***' readonly style='background: rgba(255,255,255,0.01); color: var(--text-muted);'>
+        <input type='text' id='nasUrl' class='form-control' value='Loading...' readonly style='background: rgba(255,255,255,0.01); color: var(--text-muted);'>
       </div>
       <div id='nasOtaStatus' style='display:none; padding: 12px; border-radius: 12px; margin-bottom: 15px; font-weight: 600; text-align: center;'></div>
       <button class='btn btn-primary' id='btnNasOta' onclick='updateFromNas()' style='background: var(--info); box-shadow: 0 8px 20px rgba(10,132,255,0.2);'>Fetch & Update</button>
@@ -192,6 +193,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
           document.getElementById('cfgWait').value = data.config.wait;
           document.getElementById('cfgStall').value = data.config.stall;
           document.getElementById('cfgOtaHour').value = data.config.otaHour;
+          document.getElementById('nasUrl').value = data.firmwareUrl || '';
           configLoaded = true;
         }
         
@@ -524,6 +526,7 @@ void WebDashboard::init(SmartBoxController& controller) {
         json += "\"current\":" + String(controllerPtr->getMotorCurrent(), 2) + ",";
         json += "\"distance\":" + String(controllerPtr->getDistance(), 1) + ",";
         json += "\"time\":" + String(millis()) + ","; // Time placeholder
+        json += "\"firmwareUrl\":\"" + String(SECRET_FIRMWARE_URL) + "\",";
         json += "\"config\":{";
         json += "\"dist\":" + String(cfg.distThreshold, 1) + ",";
         json += "\"wait\":" + String(cfg.waitTime) + ",";

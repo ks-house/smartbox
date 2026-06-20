@@ -2,6 +2,7 @@
 #define AUTO_OTA_MANAGER_H
 
 #include "SmartBoxController.h"
+#include "secrets.h"
 
 class AutoOtaManager {
 private:
@@ -17,8 +18,9 @@ public:
     static void update();
     static bool startOtaUpdate(bool force = false);
     
-    static constexpr const char* VERSION_URL = "***REMOVED***";
-    static constexpr const char* FIRMWARE_URL = "***REMOVED***";
+    static constexpr const char* VERSION_URL = SECRET_VERSION_URL;
+    static constexpr const char* FIRMWARE_URL = SECRET_FIRMWARE_URL;
 };
 
 #endif // AUTO_OTA_MANAGER_H
+

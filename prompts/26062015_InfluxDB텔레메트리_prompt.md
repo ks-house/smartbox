@@ -19,8 +19,8 @@
 > 1. 라이브러리 및 설정
 >    - `platformio.ini`에 InfluxDB 클라이언트 라이브러리(예: `tobiasschuerg/ESP8266 Influxdb@^3.13.0` 등 ESP32 호환 최신 버전)를 추가하십시오.
 >    - 코드 내부에 아래 접속 정보를 상수로 정의하십시오.
->      * URL: "***REMOVED***"
->      * Token: "***REMOVED***"
+>      * URL: "[YOUR_NAS_URL]"
+>      * Token: "[YOUR_INFLUX_TOKEN]"
 >      * Org: "smartbox_org"
 >      * Bucket: "telemetry"
 > 
@@ -65,8 +65,8 @@
 > 1. 라이브러리 및 설정
 >    - `platformio.ini`에 InfluxDB 클라이언트 라이브러리(예: `tobiasschuerg/ESP8266 Influxdb@^3.13.0` 등 ESP32 호환 최신 버전)를 추가하십시오.
 >    - 코드 내부에 아래 접속 정보를 상수로 정의하십시오.
->      * URL: "***REMOVED***"
->      * Token: "***REMOVED***"
+>      * URL: "[YOUR_NAS_URL]"
+>      * Token: "[YOUR_INFLUX_TOKEN]"
 >      * Org: "smartbox_org"
 >      * Bucket: "telemetry"
 > 
