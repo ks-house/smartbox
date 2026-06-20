@@ -64,7 +64,7 @@ void WifiManager::update() {
 }
 
 bool WifiManager::isConnected() {
-    return connected;
+    return connected && (WiFi.status() == WL_CONNECTED);
 }
 
 void WifiManager::startScan() {
