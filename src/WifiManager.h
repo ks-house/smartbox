@@ -2,11 +2,13 @@
 #define WIFI_MANAGER_H
 
 #include <WiFi.h>
+#include <DNSServer.h>
 
 class WifiManager {
 private:
     static unsigned long lastConnectRetry;
     static bool connected;
+    static DNSServer dnsServer;
     static void onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info);
 
 public:

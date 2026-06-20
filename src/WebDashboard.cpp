@@ -4,6 +4,7 @@
 #include "AutoOtaManager.h"
 #include "secrets.h"
 #include <Arduino.h>
+#include <WiFi.h>
 
 AsyncWebServer WebDashboard::server(80);
 SmartBoxController* WebDashboard::controllerPtr = nullptr;
@@ -711,6 +712,18 @@ void WebDashboard::init(SmartBoxController& controller) {
         } else {
             Serial.println("[OTA-NAS] Failed to trigger HTTPS OTA.");
             request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Failed to start OTA task\"}");
+        }
+    });
+    
+    // ===== Captive Portal Redirection onNotFound Handler =====
+    server.onNotFound([](AsyncWebServerRequest *request){
+        String host = request->host();
+        String apIP = WiFi.softAPIP().toString();
+        if (host != apIP) {
+            Serial.printf("[DASHBOARD] Redirecting captive request (Host: %s) to: http://%s/\n", host.c_str(), apIP.c_str());
+            request->redirect("http://" + apIP + "/");
+        } else {
+            request->send(404, "text/plain", "Not Found");
         }
     });
     

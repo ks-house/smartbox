@@ -4,6 +4,7 @@
 
 unsigned long WifiManager::lastConnectRetry = 0;
 bool WifiManager::connected = false;
+DNSServer WifiManager::dnsServer;
 static String _staSsid = "";
 static String _staPass = "";
 
@@ -38,6 +39,9 @@ void WifiManager::init(const char* apSsid, const char* apPass, const char* staSs
     WiFi.softAP(apSsid, apPass);
     Serial.printf("[WIFI] SoftAP '%s' active. IP: %s\n", apSsid, WiFi.softAPIP().toString().c_str());
     
+    dnsServer.start(53, "*", WiFi.softAPIP());
+    Serial.println("[WIFI] Captive Portal DNS server started on port 53.");
+    
     if (staSsid != nullptr && strlen(staSsid) > 0) {
         _staSsid = staSsid;
         _staPass = staPass ? staPass : "";
@@ -48,6 +52,8 @@ void WifiManager::init(const char* apSsid, const char* apPass, const char* staSs
 }
 
 void WifiManager::update() {
+    dnsServer.processNextRequest();
+    
     // Non-blocking auto-reconnect polling every 15 seconds
     if (!_staSsid.isEmpty() && !connected && (millis() - lastConnectRetry >= 15000)) {
         lastConnectRetry = millis();
@@ -105,12 +111,14 @@ void WifiManager::connectTo(const char* ssid, const char* password) {
 
 void WifiManager::stopWiFi() {
     connected = false;
+    dnsServer.stop();
     WiFi.disconnect();
     WiFi.mode(WIFI_OFF);
     Serial.println("[WIFI] Wi-Fi module disabled (WIFI_OFF).");
 }
 
 void WifiManager::startWiFi(const char* ssid, const char* password) {
+    dnsServer.stop();
     WiFi.mode(WIFI_STA);
     if (ssid != nullptr && strlen(ssid) > 0) {
         _staSsid = ssid;
