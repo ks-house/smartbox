@@ -5,12 +5,25 @@
 #include "secrets.h"
 
 class AutoOtaManager {
+public:
+    enum OtaState {
+        OTA_STATE_IDLE,
+        OTA_STATE_CHECKING,
+        OTA_STATE_UP_TO_DATE,
+        OTA_STATE_UPDATING,
+        OTA_STATE_FAILED,
+        OTA_STATE_SUCCESS
+    };
+
 private:
     static SmartBoxController* controllerPtr;
     static unsigned long lastScheduleCheck;
     static int lastOtaCheckDay;
     static volatile bool otaForceRequested;
     static volatile bool otaInProgress;
+    
+    static volatile OtaState otaState;
+    static char otaErrorMessage[128];
     
     static void runOtaProcess(bool force);
     static String parseJsonField(const String& json, const String& key);
@@ -20,6 +33,10 @@ public:
     static void update();
     static bool startOtaUpdate(bool force = false);
     static bool isOtaInProgress() { return otaInProgress; }
+    
+    static OtaState getOtaState() { return otaState; }
+    static String getOtaStateString();
+    static String getOtaErrorMessage() { return String(otaErrorMessage); }
     
     static constexpr const char* VERSION_URL = SECRET_VERSION_URL;
     static constexpr const char* FIRMWARE_URL = SECRET_FIRMWARE_URL;

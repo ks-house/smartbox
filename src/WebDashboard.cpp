@@ -355,7 +355,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       statusDiv.style.display = 'block';
       statusDiv.style.background = 'rgba(10,132,255,0.15)';
       statusDiv.style.color = 'var(--info)';
-      statusDiv.innerText = '⏳ NAS로부터 업데이트를 다운로드 중입니다. 전원을 끄지 마세요...';
+      statusDiv.innerText = '⏳ NAS 연결 및 버전 확인 중...';
       btn.disabled = true;
       btn.className = 'btn btn-disabled';
       
@@ -363,19 +363,28 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         const res = await fetch('/api/update-from-nas');
         const result = await res.json();
         if (result.status === 'started') {
-          // Poll /api/status to see if it changes to OTA_UPDATING, and wait for disconnect or reboot
           let checkInterval = setInterval(async () => {
             try {
               const checkRes = await fetch('/api/status');
               const checkData = await checkRes.json();
-              if (checkData.state === 'OTA_UPDATING') {
-                statusDiv.innerText = '⏳ NAS로부터 업데이트를 다운로드 중입니다. 전원을 끄지 마세요... (플래싱 중)';
-              } else if (checkData.state === 'IDLE') {
-                // If it returned to IDLE, OTA must have failed
+              
+              if (checkData.otaState === 'CHECKING') {
+                statusDiv.innerText = '⏳ NAS 연결 및 버전 확인 중...';
+              } else if (checkData.otaState === 'UP_TO_DATE') {
+                clearInterval(checkInterval);
+                statusDiv.style.background = 'rgba(16,185,129,0.15)';
+                statusDiv.style.color = 'var(--success)';
+                statusDiv.innerText = '✅ 최신 버전입니다. 업데이트가 필요 없습니다.';
+                btn.disabled = false;
+                btn.className = 'btn btn-primary';
+                btn.style.background = 'var(--info)';
+              } else if (checkData.otaState === 'UPDATING') {
+                statusDiv.innerText = '⏳ 펌웨어 다운로드 및 플래싱 중... 전원을 끄지 마세요.';
+              } else if (checkData.otaState === 'FAILED') {
                 clearInterval(checkInterval);
                 statusDiv.style.background = 'rgba(239,68,68,0.15)';
                 statusDiv.style.color = 'var(--danger)';
-                statusDiv.innerText = '❌ NAS OTA 실패: 플래시 쓰기 오류 또는 네트워크 연결 실패';
+                statusDiv.innerText = '❌ 업데이트 실패: ' + (checkData.otaError || '알 수 없는 오류');
                 btn.disabled = false;
                 btn.className = 'btn btn-primary';
                 btn.style.background = 'var(--info)';
@@ -399,10 +408,10 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
           btn.className = 'btn btn-primary';
           btn.style.background = 'var(--info)';
         }
-      } catch (e) {
+      } catch(e) {
         statusDiv.style.background = 'rgba(239,68,68,0.15)';
         statusDiv.style.color = 'var(--danger)';
-        statusDiv.innerText = '❌ 서버와 통신 실패.';
+        statusDiv.innerText = '❌ 서버 통신 오류';
         btn.disabled = false;
         btn.className = 'btn btn-primary';
         btn.style.background = 'var(--info)';
@@ -581,6 +590,8 @@ void WebDashboard::init(SmartBoxController& controller) {
         json += "\"firmwareUrl\":\"" + String(SECRET_FIRMWARE_URL) + "\",";
         json += "\"maintenance\":" + String(controllerPtr->getCurrentState() == STATE_MAINTENANCE ? "true" : "false") + ",";
         json += "\"maintenanceTime\":" + String(controllerPtr->getMaintenanceRemainingSeconds()) + ",";
+        json += "\"otaState\":\"" + AutoOtaManager::getOtaStateString() + "\",";
+        json += "\"otaError\":\"" + AutoOtaManager::getOtaErrorMessage() + "\",";
         json += "\"config\":{";
         json += "\"dist\":" + String(cfg.distThreshold, 1) + ",";
         json += "\"wait\":" + String(cfg.waitTime) + ",";

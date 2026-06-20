@@ -12,12 +12,29 @@ int AutoOtaManager::lastOtaCheckDay = -1;
 volatile bool AutoOtaManager::otaForceRequested = false;
 volatile bool AutoOtaManager::otaInProgress = false;
 
+volatile AutoOtaManager::OtaState AutoOtaManager::otaState = AutoOtaManager::OTA_STATE_IDLE;
+char AutoOtaManager::otaErrorMessage[128] = "";
+
 void AutoOtaManager::init(SmartBoxController& controller) {
     controllerPtr = &controller;
     lastScheduleCheck = 0;
     lastOtaCheckDay = -1;
     otaForceRequested = false;
     otaInProgress = false;
+    otaState = OTA_STATE_IDLE;
+    memset(otaErrorMessage, 0, sizeof(otaErrorMessage));
+}
+
+String AutoOtaManager::getOtaStateString() {
+    switch (otaState) {
+        case OTA_STATE_IDLE: return "IDLE";
+        case OTA_STATE_CHECKING: return "CHECKING";
+        case OTA_STATE_UP_TO_DATE: return "UP_TO_DATE";
+        case OTA_STATE_UPDATING: return "UPDATING";
+        case OTA_STATE_FAILED: return "FAILED";
+        case OTA_STATE_SUCCESS: return "SUCCESS";
+        default: return "UNKNOWN";
+    }
 }
 
 void AutoOtaManager::update() {
@@ -70,6 +87,8 @@ bool AutoOtaManager::startOtaUpdate(bool force) {
     
     if (force) {
         otaForceRequested = true;
+        otaState = OTA_STATE_CHECKING;
+        memset(otaErrorMessage, 0, sizeof(otaErrorMessage));
         Serial.println("[OTA] Force OTA update requested via flag.");
         return true;
     }
@@ -79,45 +98,49 @@ bool AutoOtaManager::startOtaUpdate(bool force) {
 void AutoOtaManager::runOtaProcess(bool force) {
     Serial.printf("[OTA] Background update process started (force=%s).\n", force ? "true" : "false");
     otaInProgress = true;
+    otaState = OTA_STATE_CHECKING;
+    memset(otaErrorMessage, 0, sizeof(otaErrorMessage));
     
     bool needsUpdate = false;
     
-    if (!force) {
-        Serial.println("[OTA] Step 1: Checking remote firmware version...");
-        WiFiClientSecure client;
-        client.setInsecure(); // Bypass ROOT CA validation
+    Serial.println("[OTA] Step 1: Checking remote firmware version...");
+    WiFiClientSecure client;
+    client.setInsecure(); // Bypass ROOT CA validation
+    
+    HTTPClient http;
+    http.begin(client, VERSION_URL);
+    int httpCode = http.GET();
+    
+    if (httpCode == HTTP_CODE_OK) {
+        String payload = http.getString();
+        Serial.printf("[OTA] version.json fetched successfully. Payload: %s\n", payload.c_str());
         
-        HTTPClient http;
-        http.begin(client, VERSION_URL);
-        int httpCode = http.GET();
+        String remoteVersion = parseJsonField(payload, "version");
         
-        if (httpCode == HTTP_CODE_OK) {
-            String payload = http.getString();
-            Serial.printf("[OTA] version.json fetched successfully. Payload: %s\n", payload.c_str());
-            
-            String remoteVersion = parseJsonField(payload, "version");
-            
-            if (remoteVersion.isEmpty()) {
-                Serial.println("[OTA] Error: Could not parse remote version from JSON.");
-            } else {
-                String currentVersion = controllerPtr->getFirmwareVersion();
-                Serial.printf("[OTA] Current Version: %s, Remote Version: %s\n", currentVersion.c_str(), remoteVersion.c_str());
-                if (remoteVersion != currentVersion) {
-                    Serial.println("[OTA] Version mismatch detected. Update is required.");
-                    needsUpdate = true;
-                } else {
-                    Serial.println("[OTA] System is up-to-date. No update needed.");
-                }
-            }
+        if (remoteVersion.isEmpty()) {
+            Serial.println("[OTA] Error: Could not parse remote version from JSON.");
+            otaState = OTA_STATE_FAILED;
+            strncpy(otaErrorMessage, "Could not parse remote version from JSON", sizeof(otaErrorMessage) - 1);
         } else {
-            Serial.printf("[OTA] Failed to fetch version.json. HTTP Code: %d, Error: %s\n", 
-                          httpCode, http.errorToString(httpCode).c_str());
+            String currentVersion = controllerPtr->getFirmwareVersion();
+            Serial.printf("[OTA] Current Version: %s, Remote Version: %s\n", currentVersion.c_str(), remoteVersion.c_str());
+            if (remoteVersion != currentVersion) {
+                Serial.println("[OTA] Version mismatch detected. Update is required.");
+                needsUpdate = true;
+                otaState = OTA_STATE_UPDATING;
+            } else {
+                Serial.println("[OTA] System is up-to-date. No update needed.");
+                otaState = OTA_STATE_UP_TO_DATE;
+            }
         }
-        http.end();
     } else {
-        // Forced update (triggered manually via Web Dashboard)
-        needsUpdate = true;
+        Serial.printf("[OTA] Failed to fetch version.json. HTTP Code: %d, Error: %s\n", 
+                      httpCode, http.errorToString(httpCode).c_str());
+        otaState = OTA_STATE_FAILED;
+        String errStr = "Fetch version failed: HTTP " + String(httpCode);
+        strncpy(otaErrorMessage, errStr.c_str(), sizeof(otaErrorMessage) - 1);
     }
+    http.end();
     
     if (needsUpdate) {
         Serial.println("[OTA] Step 2: Preparing hardware for flashing...");
@@ -138,24 +161,30 @@ void AutoOtaManager::runOtaProcess(bool force) {
         
         Serial.printf("[OTA] Step 3: Fetching firmware binary from %s...\n", FIRMWARE_URL);
         
-        WiFiClientSecure client;
-        client.setInsecure();
+        WiFiClientSecure client2;
+        client2.setInsecure();
         
-        t_httpUpdate_return ret = httpUpdate.update(client, FIRMWARE_URL);
+        t_httpUpdate_return ret = httpUpdate.update(client2, FIRMWARE_URL);
         
         if (ret == HTTP_UPDATE_FAILED) {
             Serial.printf("[OTA] HTTPS update FAILED! Error (%d): %s\n", 
                           httpUpdate.getLastError(), 
                           httpUpdate.getLastErrorString().c_str());
             
+            otaState = OTA_STATE_FAILED;
+            String errStr = "Update failed: " + httpUpdate.getLastErrorString();
+            strncpy(otaErrorMessage, errStr.c_str(), sizeof(otaErrorMessage) - 1);
+            
             // Failure recovery: restore FSM to STATE_IDLE
             controllerPtr->transitionTo(STATE_IDLE);
             Serial.println("[OTA] Recovered state to STATE_IDLE after update failure.");
         } else if (ret == HTTP_UPDATE_NO_UPDATES) {
             Serial.println("[OTA] HTTP update response: No updates available.");
+            otaState = OTA_STATE_UP_TO_DATE;
             controllerPtr->transitionTo(STATE_IDLE);
         } else if (ret == HTTP_UPDATE_OK) {
             Serial.println("[OTA] HTTPS update SUCCESS! Rebooting device in 1.5 seconds...");
+            otaState = OTA_STATE_SUCCESS;
             delay(1500);
             ESP.restart();
         }
