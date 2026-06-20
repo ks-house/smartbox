@@ -105,6 +105,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     <!-- Remote Commands -->
     <button class='btn btn-disabled' id='btnRelease' disabled onclick='releaseEmergency()'>Release Emergency Lock</button>
     <button class='btn btn-primary' id='btnOpen' onclick='forceOpen()'>Remote Force Open</button>
+    <button class='btn' id='btnMaintenance' onclick='toggleMaintenance()' style='background: var(--warning); box-shadow: 0 8px 20px rgba(245,158,11,0.2); color: white;'>🧹 수동 청소 모드 (5분 열림)</button>
 
     <!-- Sensitivity Settings -->
     <div class='card'>
@@ -201,6 +202,19 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         btnRelease.className = 'btn btn-disabled';
         btnRelease.disabled = true;
         
+        const btnMaint = document.getElementById('btnMaintenance');
+        if (data.maintenance) {
+          btnMaint.innerText = `🧹 청소 모드 진행 중... (${data.maintenanceTime}초 남음)`;
+          btnMaint.setAttribute('data-active', 'true');
+          btnMaint.style.background = 'var(--danger)';
+          btnMaint.style.boxShadow = '0 8px 20px rgba(239,68,68,0.2)';
+        } else {
+          btnMaint.innerText = '🧹 수동 청소 모드 (5분 열림)';
+          btnMaint.setAttribute('data-active', 'false');
+          btnMaint.style.background = 'var(--warning)';
+          btnMaint.style.boxShadow = '0 8px 20px rgba(245,158,11,0.2)';
+        }
+        
         switch(data.state) {
           case 'IDLE':
             badge.className = 'status-badge idle';
@@ -262,6 +276,13 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
             desc.innerText = 'OTA flash in progress. All relays safely shut down. Do not power off!';
             card.classList.add('state-battery');
             break;
+          case 'MAINTENANCE':
+            badge.className = 'status-badge battery';
+            badge.innerText = '🧹 청소 모드';
+            title.innerText = '수동 청소 모드 작동 중';
+            desc.innerText = '작업을 위해 뚜껑이 열려 있습니다. 5분 후 자동 종료됩니다.';
+            card.classList.add('state-battery');
+            break;
         }
       } catch(e) {
         console.error(e);
@@ -283,6 +304,19 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         await fetch('/api/open');
         updateStatus();
       }
+    }
+    
+    async function toggleMaintenance() {
+      const btn = document.getElementById('btnMaintenance');
+      const active = btn.getAttribute('data-active') === 'true';
+      const action = active ? 'stop' : 'start';
+      if (active) {
+        if (!confirm('청소 모드를 종료하고 뚜껑을 닫으시겠습니까?')) return;
+      } else {
+        if (!confirm('수동 청소 모드를 시작하겠습니까? 5분 동안 뚜껑이 열려 있습니다.')) return;
+      }
+      await fetch(`/api/maintenance?action=${action}`);
+      updateStatus();
     }
     
     async function updateConfig() {
@@ -512,6 +546,7 @@ void WebDashboard::init(SmartBoxController& controller) {
             case STATE_BATTERY_LOW_SHUTDOWN: stateStr = "BATTERY_LOW_SHUTDOWN"; break;
             case STATE_STARTUP_OPEN: stateStr = "STARTUP_OPEN"; break;
             case STATE_OTA_UPDATING: stateStr = "OTA_UPDATING"; break;
+            case STATE_MAINTENANCE: stateStr = "MAINTENANCE"; break;
             default: stateStr = "UNKNOWN"; break;
         }
         
@@ -527,6 +562,8 @@ void WebDashboard::init(SmartBoxController& controller) {
         json += "\"distance\":" + String(controllerPtr->getDistance(), 1) + ",";
         json += "\"time\":" + String(millis()) + ","; // Time placeholder
         json += "\"firmwareUrl\":\"" + String(SECRET_FIRMWARE_URL) + "\",";
+        json += "\"maintenance\":" + String(controllerPtr->getCurrentState() == STATE_MAINTENANCE ? "true" : "false") + ",";
+        json += "\"maintenanceTime\":" + String(controllerPtr->getMaintenanceRemainingSeconds()) + ",";
         json += "\"config\":{";
         json += "\"dist\":" + String(cfg.distThreshold, 1) + ",";
         json += "\"wait\":" + String(cfg.waitTime) + ",";
@@ -555,6 +592,28 @@ void WebDashboard::init(SmartBoxController& controller) {
             request->send(200, "application/json", "{\"status\":\"opening\"}");
         } else {
             request->send(500, "application/json", "{\"status\":\"error\"}");
+        }
+    });
+    
+    // Manual Maintenance Mode endpoint
+    server.on("/api/maintenance", HTTP_ANY, [](AsyncWebServerRequest *request){
+        if (controllerPtr == nullptr) {
+            request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Controller null\"}");
+            return;
+        }
+        if (request->hasParam("action")) {
+            String action = request->getParam("action")->value();
+            if (action == "start") {
+                controllerPtr->startMaintenanceMode();
+                request->send(200, "application/json", "{\"status\":\"started\"}");
+            } else if (action == "stop") {
+                controllerPtr->stopMaintenanceMode();
+                request->send(200, "application/json", "{\"status\":\"stopped\"}");
+            } else {
+                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid action\"}");
+            }
+        } else {
+            request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing action param\"}");
         }
     });
     

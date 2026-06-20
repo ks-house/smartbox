@@ -11,7 +11,7 @@ SmartBoxController::SmartBoxController(HardwareInterface& hardware)
     : hw(hardware), currentState(STATE_IDLE), stateTimer(0), sensorTimer(0), 
       cooldownTimer(0), isCooldown(false), distanceHistoryIdx(0), lastDetectStartTime(0), stateCallback(nullptr),
       batteryVoltage(12.0f), motorCurrent(0.0f), currentDistance(999.0f), relaysIsolated(false),
-      initialState(STATE_IDLE), nightSleepActive(false) {
+      initialState(STATE_IDLE), nightSleepActive(false), maintenanceRequested(false) {
     for (int i = 0; i < 5; i++) {
         distanceHistory[i] = 999.0f;
     }
@@ -39,6 +39,7 @@ void SmartBoxController::init() {
     relaysIsolated = false;
     distanceHistoryIdx = 0;
     lastDetectStartTime = 0;
+    maintenanceRequested = false;
     
     // Fill median filter buffer
     for (int i = 0; i < 5; i++) {
@@ -158,10 +159,14 @@ void SmartBoxController::update() {
                 openStallCount = 0; // Reset on re-entry
             }
             if (hw.getMillis() - stateTimer >= config.actuatorTime) {
-                Serial.println("[STATE] Opening completed. Entering hold.");
+                Serial.println("[STATE] Opening completed.");
                 openStallCount = 0;
                 setRelayStates(false, false, false);
-                transitionTo(STATE_HOLD);
+                if (maintenanceRequested) {
+                    transitionTo(STATE_MAINTENANCE);
+                } else {
+                    transitionTo(STATE_HOLD);
+                }
             }
             break;
         }
@@ -245,6 +250,15 @@ void SmartBoxController::update() {
                     Serial.println("[RECOVERY] No human detected → Returning to IDLE.");
                     transitionTo(STATE_IDLE);
                 }
+            }
+            break;
+            
+        case STATE_MAINTENANCE:
+            setRelayStates(false, false, false);
+            if (hw.getMillis() - stateTimer >= MAINTENANCE_TIMEOUT_MS) {
+                Serial.println("[STATE] Maintenance mode timeout reached. Starting closing.");
+                maintenanceRequested = false;
+                transitionTo(STATE_CLOSE_START);
             }
             break;
             
@@ -405,6 +419,7 @@ bool SmartBoxController::isMotorRunning() const {
 }
 
 bool SmartBoxController::canSendTelemetry() const {
+    std::lock_guard<std::recursive_mutex> lock(dataMutex);
     if (nightSleepActive) {
         return false;
     }
@@ -418,7 +433,41 @@ bool SmartBoxController::canSendTelemetry() const {
             currentState == STATE_HOLD || 
             currentState == STATE_EMERGENCY_STOP || 
             currentState == STATE_STARTUP_OPEN || 
+            currentState == STATE_MAINTENANCE ||
             (currentState == STATE_BATTERY_LOW_SHUTDOWN && !isMotorRunning()));
+}
+
+void SmartBoxController::startMaintenanceMode() {
+    std::lock_guard<std::recursive_mutex> lock(dataMutex);
+    if (currentState == STATE_BATTERY_LOW_SHUTDOWN || currentState == STATE_EMERGENCY_STOP || currentState == STATE_OTA_UPDATING) {
+        return;
+    }
+    maintenanceRequested = true;
+    if (currentState == STATE_HOLD || currentState == STATE_STARTUP_OPEN) {
+        transitionTo(STATE_MAINTENANCE);
+    } else if (currentState != STATE_MAINTENANCE && currentState != STATE_OPENING && currentState != STATE_OPEN_START) {
+        transitionTo(STATE_OPEN_START);
+    }
+}
+
+void SmartBoxController::stopMaintenanceMode() {
+    std::lock_guard<std::recursive_mutex> lock(dataMutex);
+    maintenanceRequested = false;
+    if (currentState == STATE_MAINTENANCE) {
+        transitionTo(STATE_CLOSE_START);
+    }
+}
+
+unsigned long SmartBoxController::getMaintenanceRemainingSeconds() const {
+    std::lock_guard<std::recursive_mutex> lock(dataMutex);
+    if (currentState != STATE_MAINTENANCE) {
+        return 0;
+    }
+    unsigned long elapsed = hw.getMillis() - stateTimer;
+    if (elapsed >= MAINTENANCE_TIMEOUT_MS) {
+        return 0;
+    }
+    return (MAINTENANCE_TIMEOUT_MS - elapsed) / 1000;
 }
 
 

@@ -454,6 +454,79 @@ void test_night_sleep_mode(void) {
     TEST_ASSERT_EQUAL(STATE_IDLE, controller.getCurrentState());
 }
 
+void test_maintenance_mode(void) {
+    MockHardware hw;
+    SmartBoxController controller(hw);
+    controller.init();
+    
+    // 1. Trigger maintenance mode from IDLE
+    controller.startMaintenanceMode();
+    
+    // FSM should immediately transition to STATE_OPEN_START
+    TEST_ASSERT_EQUAL(STATE_OPEN_START, controller.getCurrentState());
+    
+    // Running update should transition to STATE_OPENING
+    controller.update();
+    TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
+    
+    // Verify that while opening, if we receive close range sensor triggers, it does NOT abort or change behavior
+    hw.setDistanceCm(10.0f);
+    hw.advanceMillis(500); // Past startup current inrush bypass (500ms)
+    controller.update();
+    TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
+    
+    // Advance remaining actuator time to complete opening
+    // config.actuatorTime defaults to 3800. We already advanced 500ms, so let's advance 3300ms more.
+    hw.advanceMillis(3300);
+    controller.update();
+    
+    // Once opening completes, FSM must transition to STATE_MAINTENANCE (since maintenanceRequested is true)
+    TEST_ASSERT_EQUAL(STATE_MAINTENANCE, controller.getCurrentState());
+    
+    // Relays should be fully isolated/standby (Main = INPUT)
+    TEST_ASSERT_EQUAL(INPUT, hw.getPinMode(RELAY_MAIN_PIN));
+    
+    // 2. Verify that distance sensors are ignored while in maintenance state
+    for (int i = 0; i < 20; ++i) {
+        hw.setDistanceCm(10.0f); // Close
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    TEST_ASSERT_EQUAL(STATE_MAINTENANCE, controller.getCurrentState());
+    
+    // 3. Verify that 300,000ms (5 minutes) timeout triggers auto-close
+    // In step 2, we advanced 20 * 50 = 1000ms.
+    // Let's advance another 299,000ms (total 300,000ms elapsed since entering STATE_MAINTENANCE)
+    hw.advanceMillis(299000);
+    controller.update();
+    
+    // At exactly 300,000ms, it should transition to STATE_CLOSE_START
+    TEST_ASSERT_EQUAL(STATE_CLOSE_START, controller.getCurrentState());
+    
+    // Run update to transition to STATE_CLOSING
+    controller.update();
+    TEST_ASSERT_EQUAL(STATE_CLOSING, controller.getCurrentState());
+    
+    // 4. Test manual stop / override
+    // Reset controller and go to maintenance state again
+    controller.init();
+    controller.startMaintenanceMode();
+    controller.update(); // IDLE -> OPEN_START -> OPENING
+    hw.advanceMillis(3800);
+    controller.update(); // OPENING -> MAINTENANCE
+    TEST_ASSERT_EQUAL(STATE_MAINTENANCE, controller.getCurrentState());
+    
+    // Now stop maintenance mode manually
+    controller.stopMaintenanceMode();
+    
+    // FSM must transition directly to STATE_CLOSE_START
+    TEST_ASSERT_EQUAL(STATE_CLOSE_START, controller.getCurrentState());
+    
+    // Transition to STATE_CLOSING
+    controller.update();
+    TEST_ASSERT_EQUAL(STATE_CLOSING, controller.getCurrentState());
+}
+
 #ifdef NATIVE_BUILD
 int main(int argc, char **argv) {
     UNITY_BEGIN();
@@ -467,6 +540,7 @@ int main(int argc, char **argv) {
     RUN_TEST(test_startup_open_flow);
     RUN_TEST(test_ota_state_isolation);
     RUN_TEST(test_night_sleep_mode);
+    RUN_TEST(test_maintenance_mode);
     return UNITY_END();
 }
 #else
@@ -485,6 +559,7 @@ void setup() {
     RUN_TEST(test_startup_open_flow);
     RUN_TEST(test_ota_state_isolation);
     RUN_TEST(test_night_sleep_mode);
+    RUN_TEST(test_maintenance_mode);
     UNITY_END();
 }
 

@@ -30,12 +30,14 @@ enum State {
   STATE_EMERGENCY_STOP,
   STATE_BATTERY_LOW_SHUTDOWN,
   STATE_STARTUP_OPEN,
-  STATE_OTA_UPDATING
+  STATE_OTA_UPDATING,
+  STATE_MAINTENANCE
 };
 
 // Tuning Constants
 static constexpr float OPEN_THRESHOLD_CM = 50.0f;
 static constexpr unsigned long DEBOUNCE_DELAY_MS = 300;
+static constexpr unsigned long MAINTENANCE_TIMEOUT_MS = 300000; // 5 minutes
 
 struct BoxConfig {
   float distThreshold = OPEN_THRESHOLD_CM;
@@ -77,6 +79,7 @@ private:
   float currentDistance;
   bool relaysIsolated;
   bool nightSleepActive;
+  bool maintenanceRequested;
   mutable std::recursive_mutex dataMutex;
 
   void updateDistanceBuffer();
@@ -116,6 +119,9 @@ public:
 
   void forceOpen();
   void resetEmergency();
+  void startMaintenanceMode();
+  void stopMaintenanceMode();
+  unsigned long getMaintenanceRemainingSeconds() const;
 
   static constexpr const char *FIRMWARE_VERSION = "0.0.1";
   const char *getFirmwareVersion() const { return FIRMWARE_VERSION; }

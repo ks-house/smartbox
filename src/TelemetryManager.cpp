@@ -30,6 +30,7 @@ static const char* stateToString(State state) {
         case STATE_BATTERY_LOW_SHUTDOWN: return "BATTERY_LOW_SHUTDOWN";
         case STATE_STARTUP_OPEN: return "STARTUP_OPEN";
         case STATE_OTA_UPDATING: return "OTA_UPDATING";
+        case STATE_MAINTENANCE: return "MAINTENANCE";
         default: return "UNKNOWN";
     }
 }
