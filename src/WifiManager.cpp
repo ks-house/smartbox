@@ -83,7 +83,9 @@ String WifiManager::getScanResultsJson() {
         return "[]";
     }
     
-    String json = "[";
+    String json;
+    json.reserve(32 + n * 64);
+    json = "[";
     for (int i = 0; i < n; ++i) {
         if (i > 0) json += ",";
         json += "{";

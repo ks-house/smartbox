@@ -579,7 +579,9 @@ void WebDashboard::init(SmartBoxController& controller) {
         BoxConfig cfg = controllerPtr->getConfig();
         
         // Asynchronously craft JSON without heavy external dependencies
-        String json = "{";
+        String json;
+        json.reserve(512);
+        json = "{";
         json += "\"state\":\"" + stateStr + "\",";
         json += "\"version\":\"" + String(controllerPtr->getFirmwareVersion()) + "\",";
         json += "\"wifiConnected\":" + String(WifiManager::isConnected() ? "true" : "false") + ",";
@@ -705,7 +707,9 @@ void WebDashboard::init(SmartBoxController& controller) {
             request->send(200, "application/json", "{\"status\":\"scanning\"}");
         } else {
             String results = WifiManager::getScanResultsJson();
-            String json = "{\"status\":\"complete\",\"networks\":" + results + "}";
+            String json;
+            json.reserve(results.length() + 64);
+            json = "{\"status\":\"complete\",\"networks\":" + results + "}";
             request->send(200, "application/json", json);
         }
     });

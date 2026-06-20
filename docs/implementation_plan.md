@@ -1,154 +1,71 @@
-# Night Sleep Mode Implementation Plan
+# Implementation Plan - SmartBox Memory Optimization & Watchdog Integration
 
-This plan describes how we will implement the **Night Sleep Mode (야간 절전 모드)** on the ESP32-C6 SmartBox. 
+This plan implements heap memory optimization to prevent fragmentation, registers a FreeRTOS Task Watchdog Timer (TWDT) for system reliability, and configures a daily proactive reboot.
 
-During nighttime (23:00 ~ 06:00 KST), the device will disable all radio communications (Wi-Fi) to conserve battery power, suspend non-essential background tasks (Telemetry and Auto-OTA), and yet continue to operate the core FSM and ultrasonic/motor peripherals for local lid operations.
+## User Review Required
+
+> [!IMPORTANT]
+> - The Task Watchdog Timer (TWDT) will reboot the ESP32-C6 if either the main `loop()` or the background `NetworkTask` freezes for more than 10 seconds.
+> - To prevent reboot loops during OTA flashing, both tasks will temporarily deregister from the TWDT when entering the OTA state, and will re-register if the OTA update fails.
+> - A daily proactive reboot is configured at 4:00 AM KST when the system is in `STATE_IDLE` and the motor is fully stopped, resetting memory fragmentation.
 
 ---
 
 ## Proposed Changes
 
-### 1. SmartBox Controller Integration
+### 1. Heap Memory Optimization (String Reservation)
 
-We need to track the active power mode in the core state machine and block telemetry while in night sleep mode.
+To prevent heap fragmentation due to frequent dynamic `String` reallocations in the web server response and network scan output:
 
-#### [MODIFY] [SmartBoxController.h](../src/SmartBoxController.h)
-- Add a private boolean field `nightSleepActive` initialized to `false`.
-- Add public setter and getter methods:
-  ```cpp
-  bool isNightSleepActive() const { return nightSleepActive; }
-  void setNightSleepMode(bool active) { nightSleepActive = active; }
-  ```
-
-#### [MODIFY] [SmartBoxController.cpp](../src/SmartBoxController.cpp)
-- Initialize `nightSleepActive(false)` in the constructor initialization list.
-- Modify `canSendTelemetry()` to return `false` if `nightSleepActive` is true.
-
----
-
-### 2. Wi-Fi Manager Enhancements
-
-We need explicit commands to cleanly shut down the ESP32 Wi-Fi radio and restore STA mode using saved credentials.
-
-#### [MODIFY] [WifiManager.h](../src/WifiManager.h)
-- Declare static methods:
-  ```cpp
-  static void stopWiFi();
-  static void startWiFi(const char* ssid, const char* password);
-  ```
+#### [MODIFY] [WebDashboard.cpp](../src/WebDashboard.cpp)
+- Call `json.reserve(512);` at the start of `/api/status` response generation.
+- Call `json.reserve(results.length() + 64);` inside the `/api/wifi/scan` complete state response generation.
 
 #### [MODIFY] [WifiManager.cpp](../src/WifiManager.cpp)
-- Implement `stopWiFi()`:
-  - Disconnect from current AP.
-  - Set `connected = false`.
-  - Set mode to `WIFI_OFF`.
-  - Print log `[WIFI] Wi-Fi module disabled (WIFI_OFF).`
-- Implement `startWiFi(const char* ssid, const char* password)`:
-  - Set mode to `WIFI_STA`.
-  - Initiate connection using the credentials.
-  - Print log `[WIFI] Wi-Fi STA mode enabled. Connecting to AP '%s'...`
+- Optimize `WifiManager::getScanResultsJson()` by calling `json.reserve(32 + n * 64);` to allocate the required buffer once, rather than reallocating dynamically on each loop iteration.
 
 ---
 
-### 3. Task Suspension (Telemetry & Auto-OTA)
-
-We will bypass background operations when Night Sleep Mode is active to prevent redundant network checks and failures.
-
-#### [MODIFY] [TelemetryManager.cpp](../src/TelemetryManager.cpp)
-- In `TelemetryManager::update()`, add an early return check:
-  ```cpp
-  if (controllerPtr->isNightSleepActive()) {
-      return;
-  }
-  ```
-
-#### [MODIFY] [AutoOtaManager.cpp](../src/AutoOtaManager.cpp)
-- In `AutoOtaManager::update()`, add an early return check:
-  ```cpp
-  if (controllerPtr->isNightSleepActive()) {
-      return;
-  }
-  ```
-
----
-
-### 4. Time-based Power Manager (New Component)
-
-We will introduce a new manager to monitor the system time (from NTP) and control transitions between day and night modes.
-
-#### [NEW] [PowerManager.h](../src/PowerManager.h)
-- Declare static interface:
-  ```cpp
-  #ifndef POWER_MANAGER_H
-  #define POWER_MANAGER_H
-
-  #include "SmartBoxController.h"
-
-  class PowerManager {
-  private:
-      static SmartBoxController* controllerPtr;
-      static unsigned long lastCheckTime;
-
-  public:
-      static void init(SmartBoxController& controller);
-      static void update();
-  };
-
-  #endif // POWER_MANAGER_H
-  ```
-
-#### [NEW] [PowerManager.cpp](../src/PowerManager.cpp)
-- Implement time-based check:
-  - Every 30 seconds (non-blocking), retrieve local system time via standard `getLocalTime(&timeinfo, 0)`.
-  - Determine if current hour falls in the night sleep window (23:00 to 06:00): `timeinfo.tm_hour >= 23 || timeinfo.tm_hour < 6`.
-  - **Enter Sleep:** If night time and `controllerPtr->isNightSleepActive()` is `false`:
-    - Call `controllerPtr->setNightSleepMode(true);`
-    - Call `WifiManager::stopWiFi();`
-    - Log: `[POWER] 진입: 야간 절전 모드 활성화. Wi-Fi OFF.`
-  - **Exit Sleep (Wake):** If day time and `controllerPtr->isNightSleepActive()` is `true`:
-    - Call `controllerPtr->setNightSleepMode(false);`
-    - Load saved credentials using `ConfigManager::loadWifiCredentials(ssid, pass)`.
-    - Call `WifiManager::startWiFi(ssid.c_str(), pass.c_str());`
-    - Log: `[POWER] 해제: 주간 모드 전환. Wi-Fi 재연결 시도 중...`
-
----
-
-### 5. Integration in Main Application Loop
+### 2. Task Watchdog Timer (TWDT) Integration
 
 #### [MODIFY] [main.cpp](../src/main.cpp)
-- Include `PowerManager.h`.
-- Initialize in `setup()`: `PowerManager::init(controller);`
-- Call in `loop()`: `PowerManager::update();` (immediately after `controller.update()`).
+- Include `<esp_task_wdt.h>` under `#ifndef NATIVE_BUILD`.
+- In `setup()` (under `#ifndef NATIVE_BUILD`), initialize TWDT using version-safe configuration for ESP32 Arduino Core 3.x (checking `ESP_ARDUINO_VERSION_MAJOR >= 3`):
+  - Timeout: 10,000ms.
+  - Enable panic reboot.
+  - Subscribe the `loopTask` (using `esp_task_wdt_add(NULL)`).
+- In `NetworkTask` loop, subscribe the task with `esp_task_wdt_add(NULL)` and call `esp_task_wdt_reset()` on each loop iteration.
+- In `loop()`, call `esp_task_wdt_reset()` at the top.
+- Add an OTA guard to the main `loop()`: if the controller is in OTA mode (`STATE_OTA_UPDATING`), unsubscribe the `loopTask` from the TWDT to prevent resets during flashing. Re-subscribe if it returns to `STATE_IDLE` (recovery from OTA failure).
 
-#### [MODIFY] [platformio.ini](../platformio.ini)
-- Exclude `PowerManager.cpp` from `esp32-c6-test` and `native` environments by adding `-<PowerManager.cpp>` to `build_src_filter` to ensure target tests compile cleanly without network dependencies.
+#### [MODIFY] [AutoOtaManager.cpp](../src/AutoOtaManager.cpp)
+- Include `<esp_task_wdt.h>` under `#ifndef NATIVE_BUILD`.
+- Inside `runOtaProcess(bool force)`, unsubscribe the calling `NetworkTask` from the WDT before starting the blocking OTA flash download: `esp_task_wdt_delete(NULL)`.
+- If the OTA update fails (e.g., `HTTP_UPDATE_FAILED` or `HTTP_UPDATE_NO_UPDATES`), re-subscribe `NetworkTask` to the WDT: `esp_task_wdt_add(NULL)`.
 
 ---
 
-### 6. Testing
+### 3. Proactive Daily Reboot Scheduling
 
-#### [MODIFY] [test_main.cpp](../test/test_native/test_main.cpp)
-- Add a unit test `test_night_sleep_mode()` verifying:
-  - Initial state is false.
-  - Setting `setNightSleepMode(true)` works.
-  - When night sleep is active, `canSendTelemetry()` returns false.
+#### [MODIFY] [PowerManager.cpp](../src/PowerManager.cpp)
+- In `PowerManager::update()`, check if `timeinfo.tm_hour == 4` (04:00 AM KST), state is `STATE_IDLE`, and `!controllerPtr->isMotorRunning()`.
+- Use `Preferences` (under namespace `"smartbox"`, key `"reboot_day"`) to read and write the day of the year (`timeinfo.tm_yday`).
+- If `reboot_day` does not match the current day, save the current day to `Preferences` and call `ESP.restart()`. This guarantees the reboot only triggers once per day.
 
 ---
 
 ## Verification Plan
 
 ### Automated Tests
-1. Run `esp32-c6-test` build:
-   `pio run -e esp32-c6-test`
-2. Validate that the new unit test compiles and passes correctly.
+- Run PlatformIO native unit tests to ensure that the code compiles and existing tests pass:
+  ```powershell
+  pio test -e native
+  ```
 
 ### Manual Verification
-1. Flash firmware to target board.
-2. Verify startup logs, Wi-Fi initialization, and NTP synchronization.
-3. Simulate/mock night sleep time transition (by changing the range check or system clock temporarily) and verify serial prints:
-   - `[POWER] 진입: 야간 절전 모드 활성화. Wi-Fi OFF.`
-   - `[WIFI] Wi-Fi module disabled (WIFI_OFF).`
-4. Verify that local proximity triggering (motion sensor opening/closing the lid) still works normally during sleep.
-5. Simulate day time wake transition and verify prints:
-   - `[POWER] 해제: 주간 모드 전환. Wi-Fi 재연결 시도 중...`
-   - `[WIFI] Wi-Fi STA mode enabled. Connecting to AP...`
+- Verify compilation of the firmware:
+  ```powershell
+  pio run -e esp32-c6-devkitc-1
+  ```
+- Upload and monitor the serial logs to verify successful WDT initialization, feeding logs, and verify that the device is running stably.
+- Trigger manual OTA through the dashboard to verify that WDT doesn't reboot the device mid-OTA.

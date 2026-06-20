@@ -9,6 +9,10 @@
 #include "TelemetryManager.h"
 #include "PowerManager.h"
 
+#ifndef NATIVE_BUILD
+#include <esp_task_wdt.h>
+#endif
+
 // Hardware pin assignments as per AGENTS.md
 // TRIG = GPIO 4, ECHO = GPIO 5
 static Esp32Hardware hardware(4, 5);
@@ -35,7 +39,14 @@ static void onStateChanged(State prevState, State newState) {
 #ifndef NATIVE_BUILD
 static void NetworkTask(void* pvParameters) {
     Serial.println("[SYSTEM] Background NetworkTask loop started.");
+    
+    // Register background task to TWDT
+    esp_task_wdt_add(NULL);
+    
     for (;;) {
+        // Feed watchdog
+        esp_task_wdt_reset();
+        
         // Run Auto-OTA scheduler
         AutoOtaManager::update();
         
@@ -107,15 +118,53 @@ void setup() {
     Serial.println("[SYSTEM] Background NetworkTask created successfully.");
 #endif
 
+#ifndef NATIVE_BUILD
+    // 11. Configure and initialize the Task Watchdog Timer (TWDT)
+    #if ESP_ARDUINO_VERSION_MAJOR >= 3
+    esp_task_wdt_config_t wdt_config = {
+        .timeout_ms = 10000,
+        .idle_core_mask = 0,
+        .trigger_panic = true
+    };
+    esp_task_wdt_init(&wdt_config);
+    #else
+    esp_task_wdt_init(10, true);
+    #endif
+    esp_task_wdt_add(NULL); // Subscribe loopTask to TWDT
+    Serial.println("[SYSTEM] Task Watchdog Timer (TWDT) initialized (10s timeout, loopTask subscribed).");
+#endif
+
     Serial.println("[SYSTEM] Initialization finished. FSM Loop running.");
 }
 
 void loop() {
+#ifndef NATIVE_BUILD
+    static bool loopTaskSubscribed = true;
+    if (controller.isOtaMode()) {
+        if (loopTaskSubscribed) {
+            esp_task_wdt_delete(NULL);
+            loopTaskSubscribed = false;
+            Serial.println("[SYSTEM] loopTask unsubscribed from WDT for OTA");
+        }
+        delay(100); // Yield CPU to async web server for OTA data processing
+        return;
+    } else {
+        if (!loopTaskSubscribed) {
+            esp_task_wdt_add(NULL);
+            loopTaskSubscribed = true;
+            Serial.println("[SYSTEM] loopTask re-subscribed to WDT after OTA idle recovery");
+        }
+    }
+    
+    // Feed watchdog
+    esp_task_wdt_reset();
+#else
     // OTA 모드일 때 FSM/센서 루프 완전 정지 (이중 안전장치)
     if (controller.isOtaMode()) {
         delay(100); // Yield CPU to async web server for OTA data processing
         return;
     }
+#endif
 
     // Run core FSM updates
     controller.update();

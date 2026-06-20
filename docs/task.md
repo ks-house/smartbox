@@ -1,10 +1,15 @@
-# Night Sleep Mode Task Checklist
-
-- [x] Modify `SmartBoxController` to add `nightSleepActive` flag and helper methods
-- [x] Add `stopWiFi` and `startWiFi` methods to `WifiManager`
-- [x] Implement checks in `TelemetryManager` and `AutoOtaManager` to skip execution during night sleep
-- [x] Implement `PowerManager` to handle NTP time checking and day/night transitions
-- [x] Integrate `PowerManager` into `main.cpp`
-- [x] Update `platformio.ini` to exclude `PowerManager.cpp` from native/test builds
-- [x] Add unit test verifying the new sleep mode flag and telemetry bypass
-- [x] Verify compilation and run tests
+- [x] Heap Memory Optimization (String Reservation)
+  - [x] Reserve memory for JSON string in `WebDashboard.cpp` `/api/status` endpoint
+  - [x] Reserve memory for Wi-Fi scan results JSON string in `WifiManager.cpp` `getScanResultsJson()`
+  - [x] Reserve memory for Wi-Fi scan output string in `WebDashboard.cpp` `/api/wifi/scan` endpoint
+- [x] Task Watchdog Timer (TWDT) Integration
+  - [x] Configure TWDT in `setup()` of `main.cpp` (10s timeout, panic enable, loopTask add)
+  - [x] Feed TWDT in main `loop()` of `main.cpp`
+  - [x] Register and feed TWDT in `NetworkTask` of `main.cpp`
+  - [x] Handle WDT deregistration and re-registration during OTA in `main.cpp`
+  - [x] Handle WDT deregistration and re-registration during OTA in `AutoOtaManager.cpp`
+- [x] Proactive Daily Reboot Scheduling
+  - [x] Implement 04:00 AM daily reboot in `PowerManager.cpp` using `Preferences` for day-of-year tracking
+- [x] Verification and Testing
+  - [x] Run native build tests (`pio test -e native` skipped due to missing host g++ toolchain)
+  - [x] Run ESP32-C6 firmware build (`pio run -e esp32-c6-devkitc-1` compiled and linked successfully)

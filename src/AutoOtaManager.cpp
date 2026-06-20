@@ -6,6 +6,10 @@
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
 
+#ifndef NATIVE_BUILD
+#include <esp_task_wdt.h>
+#endif
+
 SmartBoxController* AutoOtaManager::controllerPtr = nullptr;
 unsigned long AutoOtaManager::lastScheduleCheck = 0;
 int AutoOtaManager::lastOtaCheckDay = -1;
@@ -159,6 +163,12 @@ void AutoOtaManager::runOtaProcess(bool force) {
         }
         delay(500); // Allow physical contacts to fully separate
         
+#ifndef NATIVE_BUILD
+        // Unsubscribe current task (NetworkTask) from WDT during flashing
+        esp_task_wdt_delete(NULL);
+        Serial.println("[OTA] NetworkTask unsubscribed from WDT for flashing.");
+#endif
+
         Serial.printf("[OTA] Step 3: Fetching firmware binary from %s...\n", FIRMWARE_URL);
         
         WiFiClientSecure client2;
@@ -178,10 +188,22 @@ void AutoOtaManager::runOtaProcess(bool force) {
             // Failure recovery: restore FSM to STATE_IDLE
             controllerPtr->transitionTo(STATE_IDLE);
             Serial.println("[OTA] Recovered state to STATE_IDLE after update failure.");
+            
+#ifndef NATIVE_BUILD
+            // Re-subscribe NetworkTask to WDT
+            esp_task_wdt_add(NULL);
+            Serial.println("[OTA] NetworkTask re-subscribed to WDT after failure recovery.");
+#endif
         } else if (ret == HTTP_UPDATE_NO_UPDATES) {
             Serial.println("[OTA] HTTP update response: No updates available.");
             otaState = OTA_STATE_UP_TO_DATE;
             controllerPtr->transitionTo(STATE_IDLE);
+            
+#ifndef NATIVE_BUILD
+            // Re-subscribe NetworkTask to WDT
+            esp_task_wdt_add(NULL);
+            Serial.println("[OTA] NetworkTask re-subscribed to WDT after no-update recovery.");
+#endif
         } else if (ret == HTTP_UPDATE_OK) {
             Serial.println("[OTA] HTTPS update SUCCESS! Rebooting device in 1.5 seconds...");
             otaState = OTA_STATE_SUCCESS;
