@@ -11,7 +11,8 @@ SmartBoxController::SmartBoxController(HardwareInterface& hardware)
     : hw(hardware), currentState(STATE_IDLE), stateTimer(0), sensorTimer(0), 
       cooldownTimer(0), isCooldown(false), distanceHistoryIdx(0), lastDetectStartTime(0), stateCallback(nullptr),
       batteryVoltage(12.0f), motorCurrent(0.0f), currentDistance(999.0f), relaysIsolated(false),
-      initialState(STATE_IDLE), nightSleepActive(false), maintenanceRequested(false) {
+      initialState(STATE_IDLE), nightSleepActive(false), maintenanceRequested(false),
+      holdStartTime(0), sensorDeadlockFlag(false) {
     for (int i = 0; i < 5; i++) {
         distanceHistory[i] = 999.0f;
     }
@@ -40,6 +41,8 @@ void SmartBoxController::init() {
     distanceHistoryIdx = 0;
     lastDetectStartTime = 0;
     maintenanceRequested = false;
+    holdStartTime = 0;
+    sensorDeadlockFlag = false;
     
     // Fill median filter buffer
     for (int i = 0; i < 5; i++) {
@@ -115,14 +118,27 @@ void SmartBoxController::update() {
 
         case STATE_IDLE:
             setRelayStates(false, false, false);
+            
+            // Self-healing: if the sensor is clear, reset the deadlock flag
+            if (currentDistance > config.distThreshold) {
+                if (sensorDeadlockFlag) {
+                    Serial.printf("[SENSOR] Deadlock cleared. Path is clean: %.1f cm. Self-healing active.\n", currentDistance);
+                    sensorDeadlockFlag = false;
+                }
+            }
+            
             if (currentDistance > 0.0f && currentDistance < config.distThreshold && !isCooldown) {
-                if (lastDetectStartTime == 0) {
-                    lastDetectStartTime = hw.getMillis();
-                } else if (hw.getMillis() - lastDetectStartTime >= config.debounceDelay) {
-                    Serial.printf("[SENSOR] Human approach detected: %.1f cm for %lu ms. Starting opening.\n",
-                                  currentDistance, hw.getMillis() - lastDetectStartTime);
+                if (!sensorDeadlockFlag) {
+                    if (lastDetectStartTime == 0) {
+                        lastDetectStartTime = hw.getMillis();
+                    } else if (hw.getMillis() - lastDetectStartTime >= config.debounceDelay) {
+                        Serial.printf("[SENSOR] Human approach detected: %.1f cm for %lu ms. Starting opening.\n",
+                                      currentDistance, hw.getMillis() - lastDetectStartTime);
+                        lastDetectStartTime = 0;
+                        transitionTo(STATE_OPEN_START);
+                    }
+                } else {
                     lastDetectStartTime = 0;
-                    transitionTo(STATE_OPEN_START);
                 }
             } else {
                 lastDetectStartTime = 0;
@@ -176,6 +192,14 @@ void SmartBoxController::update() {
             
         case STATE_HOLD:
             setRelayStates(false, false, false);
+            
+            if (hw.getMillis() - holdStartTime >= config.maxHoldTime) {
+                Serial.println("[EMERGENCY] Sensor Deadlock detected (Max Hold Time exceeded). Forcing close!");
+                sensorDeadlockFlag = true;
+                transitionTo(STATE_CLOSE_START);
+                break;
+            }
+            
             // If human is still detected within the threshold, reset the timer to keep the lid open
             if (currentDistance > 0.0f && currentDistance < config.distThreshold) {
                 stateTimer = hw.getMillis();
@@ -307,6 +331,9 @@ void SmartBoxController::transitionTo(State newState) {
         currentState = newState;
         stateTimer = hw.getMillis();
         lastDetectStartTime = 0;
+        if (newState == STATE_HOLD) {
+            holdStartTime = hw.getMillis();
+        }
     }
     
     if (stateCallback != nullptr) {

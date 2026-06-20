@@ -52,6 +52,7 @@ struct BoxConfig {
       5000; // Auto-recovery from EMERGENCY_STOP (ms)
   int otaHour = 3;
   int telemetryIntervalMin = 10; // Default: 10 minutes
+  unsigned long maxHoldTime = 180000; // 3 minutes
 };
 
 typedef void (*StateChangeCallback)(State prevState, State newState);
@@ -81,6 +82,8 @@ private:
   bool relaysIsolated;
   bool nightSleepActive;
   bool maintenanceRequested;
+  unsigned long holdStartTime;
+  bool sensorDeadlockFlag;
   mutable std::recursive_mutex dataMutex;
 
   void updateDistanceBuffer();
@@ -94,6 +97,10 @@ public:
   bool isOtaMode() const {
       std::lock_guard<std::recursive_mutex> lock(dataMutex);
       return currentState == STATE_OTA_UPDATING;
+  }
+  bool getSensorDeadlockFlag() const {
+      std::lock_guard<std::recursive_mutex> lock(dataMutex);
+      return sensorDeadlockFlag;
   }
   bool isNightSleepActive() const {
       std::lock_guard<std::recursive_mutex> lock(dataMutex);

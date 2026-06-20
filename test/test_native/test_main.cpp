@@ -542,6 +542,79 @@ void test_telemetry_interval_config(void) {
     TEST_ASSERT_EQUAL(15, updatedCfg.telemetryIntervalMin);
 }
 
+void test_sensor_deadlock_prevention(void) {
+    MockHardware hw;
+    SmartBoxController controller(hw);
+    controller.init();
+    
+    // 1. Trigger open first (simulate human approach)
+    hw.setDistanceCm(30.0f);
+    for (int i = 0; i < 15; ++i) {
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
+    
+    // Complete opening to enter STATE_HOLD
+    hw.advanceMillis(3800);
+    controller.update();
+    TEST_ASSERT_EQUAL(STATE_HOLD, controller.getCurrentState());
+    
+    // Verify that the deadlock flag is initially false
+    TEST_ASSERT_FALSE(controller.getSensorDeadlockFlag());
+    
+    // Simulate persistent human presence (sensor stays at 30cm)
+    // Advance clock by 179 seconds (just under 180 seconds maxHoldTime)
+    for (int i = 0; i < 179; ++i) {
+        hw.advanceMillis(1000);
+        controller.update();
+    }
+    // Should still be in STATE_HOLD
+    TEST_ASSERT_EQUAL(STATE_HOLD, controller.getCurrentState());
+    TEST_ASSERT_FALSE(controller.getSensorDeadlockFlag());
+    
+    // Advance by 2 more seconds (crossing the 180s threshold)
+    hw.advanceMillis(2000);
+    controller.update(); // FSM should transition to STATE_CLOSE_START
+    TEST_ASSERT_EQUAL(STATE_CLOSE_START, controller.getCurrentState());
+    TEST_ASSERT_TRUE(controller.getSensorDeadlockFlag());
+    
+    // Transition to STATE_CLOSING
+    controller.update();
+    TEST_ASSERT_EQUAL(STATE_CLOSING, controller.getCurrentState());
+    
+    // Complete closing to enter STATE_IDLE (actuatorTime default is 3800ms)
+    hw.advanceMillis(3800);
+    controller.update();
+    TEST_ASSERT_EQUAL(STATE_IDLE, controller.getCurrentState());
+    
+    // 2. Anti-Bounce Back: Sensor is still blocked (30cm), but FSM must NOT re-open
+    // Run update for 20 ticks (1 second) and check that state remains IDLE
+    for (int i = 0; i < 20; ++i) {
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    TEST_ASSERT_EQUAL(STATE_IDLE, controller.getCurrentState());
+    TEST_ASSERT_TRUE(controller.getSensorDeadlockFlag());
+    
+    // 3. Self-healing: clear path (sensor at 80cm)
+    hw.setDistanceCm(80.0f);
+    // Standard update to run the check
+    hw.advanceMillis(50);
+    controller.update();
+    
+    // Deadlock flag should be cleared
+    TEST_ASSERT_FALSE(controller.getSensorDeadlockFlag());
+    
+    // 4. Verify FSM can open again now
+    hw.setDistanceCm(30.0f); // Re-approach
+    for (int i = 0; i < 15; ++i) {
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
+}
+
 #ifdef NATIVE_BUILD
 int main(int argc, char **argv) {
     UNITY_BEGIN();
@@ -557,6 +630,7 @@ int main(int argc, char **argv) {
     RUN_TEST(test_night_sleep_mode);
     RUN_TEST(test_maintenance_mode);
     RUN_TEST(test_telemetry_interval_config);
+    RUN_TEST(test_sensor_deadlock_prevention);
     return UNITY_END();
 }
 #else
@@ -577,6 +651,7 @@ void setup() {
     RUN_TEST(test_night_sleep_mode);
     RUN_TEST(test_maintenance_mode);
     RUN_TEST(test_telemetry_interval_config);
+    RUN_TEST(test_sensor_deadlock_prevention);
     UNITY_END();
 }
 
