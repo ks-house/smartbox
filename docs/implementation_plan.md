@@ -12,14 +12,14 @@ This plan details the addition of a configuration property `otaHour` to persist 
 
 ### 1. SmartBox Controller Configuration
 
-#### [MODIFY] [SmartBoxController.h](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/src/SmartBoxController.h)
+#### [MODIFY] [SmartBoxController.h](../src/SmartBoxController.h)
 - Add `int otaHour = 3;` to the `BoxConfig` struct.
 
 ---
 
 ### 2. Configuration Management
 
-#### [MODIFY] [ConfigManager.cpp](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/src/ConfigManager.cpp)
+#### [MODIFY] [ConfigManager.cpp](../src/ConfigManager.cpp)
 - **`loadConfig()`**: Load `otaHour` from NVS Preferences using `prefs.getInt("ota_hour", config.otaHour)`. Include a self-healing range check (defaulting to 3 if out-of-bounds).
 - **`saveConfig()`**: Write `otaHour` to Preferences using `prefs.putInt("ota_hour", config.otaHour)`.
 - Update config log output to print `ota_hour`.
@@ -28,14 +28,14 @@ This plan details the addition of a configuration property `otaHour` to persist 
 
 ### 3. Auto-OTA Scheduler Integration
 
-#### [MODIFY] [AutoOtaManager.cpp](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/src/AutoOtaManager.cpp)
+#### [MODIFY] [AutoOtaManager.cpp](../src/AutoOtaManager.cpp)
 - Update the schedule condition in `AutoOtaManager::update()` to check `timeinfo.tm_hour == controllerPtr->getConfig().otaHour` instead of the hardcoded value `3`.
 
 ---
 
 ### 4. Web Dashboard UI and API Endpoints
 
-#### [MODIFY] [WebDashboard.cpp](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/src/WebDashboard.cpp)
+#### [MODIFY] [WebDashboard.cpp](../src/WebDashboard.cpp)
 - **`/api/status` endpoint**: Add `"otaHour"` key-value pair into the `"config"` block of the returned JSON string.
 - **`/api/config` endpoint**: Support reading the `otaHour` GET parameter, validate it is between 0 and 23, assign it to config, and write to NVS.
 - **`INDEX_HTML` string**:

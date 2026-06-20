@@ -358,4 +358,29 @@ void SmartBoxController::forceAllRelaysOff() {
     }
 }
 
+bool SmartBoxController::isMotorRunning() const {
+    if (currentState == STATE_OPEN_START || currentState == STATE_OPENING ||
+        currentState == STATE_CLOSE_START || currentState == STATE_CLOSING) {
+        return true;
+    }
+    if (currentState == STATE_BATTERY_LOW_SHUTDOWN) {
+        return (hw.getMillis() - stateTimer < config.actuatorTime);
+    }
+    return false;
+}
+
+bool SmartBoxController::canSendTelemetry() const {
+    if (currentState == STATE_OTA_UPDATING) {
+        return false;
+    }
+    if (isMotorRunning()) {
+        return false;
+    }
+    return (currentState == STATE_IDLE || 
+            currentState == STATE_HOLD || 
+            currentState == STATE_EMERGENCY_STOP || 
+            currentState == STATE_STARTUP_OPEN || 
+            (currentState == STATE_BATTERY_LOW_SHUTDOWN && !isMotorRunning()));
+}
+
 

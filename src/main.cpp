@@ -6,6 +6,7 @@
 #include "SmartThingsReporter.h"
 #include "WebDashboard.h"
 #include "AutoOtaManager.h"
+#include "TelemetryManager.h"
 
 // Hardware pin assignments as per AGENTS.md
 // TRIG = GPIO 4, ECHO = GPIO 5
@@ -70,6 +71,9 @@ void setup() {
     // 8. Initialize Auto-OTA scheduler and manager
     AutoOtaManager::init(controller);
 
+    // 9. Initialize InfluxDB telemetry manager
+    TelemetryManager::init(controller);
+
     Serial.println("[SYSTEM] Initialization finished. FSM Loop running.");
 }
 
@@ -91,6 +95,9 @@ void loop() {
 
     // Run Auto-OTA scheduler
     AutoOtaManager::update();
+
+    // Run InfluxDB Telemetry updates
+    TelemetryManager::update();
 
     // 1-second interval diagnostic print
     static unsigned long lastDebug = 0;

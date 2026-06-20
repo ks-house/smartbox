@@ -100,6 +100,8 @@ public:
   float getBatteryVoltage() const { return batteryVoltage; }
   float getMotorCurrent() const { return motorCurrent; }
   float getDistance() const { return currentDistance; }
+  bool isMotorRunning() const;
+  bool canSendTelemetry() const;
 };
 
 #endif // SMART_BOX_CONTROLLER_H
