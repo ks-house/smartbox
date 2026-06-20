@@ -65,11 +65,26 @@
 
 ### 빌드 및 업로드 방법
 1. 레포지토리를 클론하고 PlatformIO 환경에서 프로젝트 폴더를 엽니다.
-2. 보드를 PC와 USB 케이블로 연결합니다. 
+2. **보안 설정 (Secrets Setup):**
+   - `include/secrets.h.example` 파일을 복사하여 `include/secrets.h` 파일을 생성합니다.
+   - `include/secrets.h` 파일 내에 실제 Wi-Fi 정보, InfluxDB 토큰 및 주소, Synology NAS 주소를 기입합니다.
+   - `include/secrets.h` 파일은 민감 정보 노출 방지를 위해 `.gitignore`에 등록되어 외부 저장소에 올라가지 않습니다.
+3. 보드를 PC와 USB 케이블로 연결합니다. 
    *(주의: 보드에 2개의 USB 포트가 있다면 반드시 **`CH343 (UART)`** 포트에 연결하세요.)*
-3. 장치 관리자에서 할당된 COM 포트 번호(예: `COM4`)를 확인합니다.
-4. `platformio.ini` 파일 하단의 `upload_port` 값을 본인의 환경에 맞게 수정합니다.
-5. PlatformIO 하단의 **`➔ (Upload)`** 버튼을 눌러 컴파일 및 펌웨어 플래싱을 진행합니다.
+4. 장치 관리자에서 할당된 COM 포트 번호(예: `COM4`)를 확인합니다.
+5. `platformio.ini` 파일 하단의 `upload_port` 값을 본인의 환경에 맞게 수정합니다.
+6. PlatformIO 하단의 **`➔ (Upload)`** 버튼을 눌러 컴파일 및 펌웨어 플래싱을 진행합니다.
+
+### 🌐 CI/CD 파이프라인 보안 연동 (GitHub Actions)
+GitHub Actions를 통한 자동 배포 시 소스 코드와 마찬가지로 `secrets.h`가 누락되어 빌드가 실패하는 것을 방지하기 위해, 리포지토리의 **GitHub Secrets** 설정을 읽어 빌드 전 `secrets.h` 파일을 동적 생성합니다. GitHub 리포지토리의 `Settings > Secrets and variables > Actions` 메뉴에서 아래 항목들을 등록해야 합니다:
+- `WIFI_SSID`: 기본 WiFi SSID 명
+- `WIFI_PASS`: 기본 WiFi 비밀번호
+- `INFLUXDB_URL`: InfluxDB 서버 주소
+- `INFLUXDB_TOKEN`: InfluxDB 인증용 API 토큰
+- `INFLUXDB_ORG`: InfluxDB 조직 명
+- `INFLUXDB_BUCKET`: InfluxDB 텔레메트리 버킷 명
+- `VERSION_URL`: 펌웨어 버전 manifest.json 원격 URL
+- `FIRMWARE_URL`: 펌웨어 바이너리(.bin) 원격 URL
 
 ---
 

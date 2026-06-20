@@ -64,6 +64,12 @@ The motor direction is controlled by a 2-channel relay. The main 12V power is co
   * *실행 명령어:* `python scripts/export_docs.py [주제명] --num [순번]` (예: `개발및검증_최종` / `03`)
   * 내보낸 결과 파일(`prompts/YYYYMMDD[순번]_[주제명]_prompt.md`)과 복사/생성된 보고서 템플릿(`reports/YYYYMMDD[순번]_[주제명]_report.md`)을 확인하고 Git에 즉각 스테이징 및 커밋하여 변경 이력을 영구 보존해야 합니다.
 
+### 4.7. 보안 및 민감 정보 보호 규정 (Secrets & Security Regulations)
+* WiFi 비밀번호, API 토큰, 개인 NAS 접속 URL/포트 번호 등 보안 민감 정보(Secrets)를 소스 코드(`.cpp`, `.h`), 설정 파일(`.ini`), 스크립트, 혹은 마크다운 문서에 **절대 하드코딩하여 노출하지 마십시오.**
+* 모든 민감 정보는 `include/secrets.h`에 매크로(Constant)로 정의하여 사용해야 하며, 해당 파일은 Git에 트래킹되지 않도록 항상 `.gitignore`로 제외 관리합니다.
+* 외부 기고 및 템플릿 제공을 위해 더미 값이 적힌 `include/secrets.h.example`을 제공하고 유지 관리해야 합니다.
+* CI/CD 파이프라인(GitHub Actions) 환경에서는 빌드 직전에 GitHub Secrets 주입 방식으로 헤더 파일(`secrets.h`)을 빌드 러너 환경 내에서 동적 생성하도록 가이드하고 구현해야 합니다.
+
 ---
 
 ## 5. Future Expansion Context
