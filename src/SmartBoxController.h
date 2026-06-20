@@ -32,8 +32,13 @@ enum State {
   STATE_OTA_UPDATING
 };
 
+// Tuning Constants
+static constexpr float OPEN_THRESHOLD_CM = 50.0f;
+static constexpr unsigned long DEBOUNCE_DELAY_MS = 300;
+
 struct BoxConfig {
-  float distThreshold = 50.0f;
+  float distThreshold = OPEN_THRESHOLD_CM;
+  unsigned long debounceDelay = DEBOUNCE_DELAY_MS;
   unsigned long actuatorTime = 3800;
   unsigned long waitTime = 10000;
   unsigned long cooldownTime = 3000;
@@ -56,10 +61,11 @@ private:
   unsigned long cooldownTimer;
   bool isCooldown;
 
-  // Median filter buffer
+  // Median filter buffer and debounce timer
   static const int FILTER_SIZE = 5;
-  float distBuffer[FILTER_SIZE];
-  int filterIdx;
+  float distanceHistory[5];
+  int distanceHistoryIdx;
+  unsigned long lastDetectStartTime;
 
   BoxConfig config;
   StateChangeCallback stateCallback;

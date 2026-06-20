@@ -55,8 +55,8 @@ void test_relay_interlock_and_guard_delay(void) {
     // Simulate a human approaching (30cm) to trigger STATE_IDLE -> STATE_OPEN_START -> STATE_OPENING
     hw.setDistanceCm(30.0f);
     
-    // Run update 5 times with 50ms intervals to populate the median filter buffer
-    for (int i = 0; i < 5; ++i) {
+    // Run update 15 times with 50ms intervals to populate buffer and pass 300ms debounce
+    for (int i = 0; i < 15; ++i) {
         hw.advanceMillis(50);
         controller.update();
     }
@@ -112,17 +112,17 @@ void test_stall_current_detection(void) {
     SmartBoxController controller(hw);
     controller.init();
     
-    // Trigger opening transition
+    // Trigger opening transition (must satisfy debounce)
     hw.setDistanceCm(30.0f);
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < 15; ++i) {
         hw.advanceMillis(50);
         controller.update();
     }
     
     TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
     
-    // Advance virtual clock by 400ms (within 500ms inrush window)
-    hw.advanceMillis(400);
+    // Advance virtual clock by 150ms (within 500ms inrush window: total 400ms elapsed since entering STATE_OPENING)
+    hw.advanceMillis(150);
     hw.setMotorCurrent(4000.0f); // Exceeds 3000mA stall threshold
     controller.update();
     
@@ -218,7 +218,17 @@ void test_ultrasonic_median_filter(void) {
         hw.advanceMillis(50);
         controller.update();
     }
-    // FSM must transition to STATE_OPEN_START
+    // With 300ms debounce, after 5 updates (only 50ms since median became 30cm), it must still be IDLE
+    TEST_ASSERT_EQUAL(STATE_IDLE, controller.getCurrentState());
+    
+    // Continue close detection for another 6 updates (total 300ms additional, total 350ms continuous)
+    for (int i = 0; i < 6; ++i) {
+        hw.setDistanceCm(30.0f);
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    
+    // FSM must now transition to STATE_OPEN_START
     TEST_ASSERT_EQUAL(STATE_OPEN_START, controller.getCurrentState());
     
     // One more update to transition from OPEN_START to OPENING
@@ -253,7 +263,7 @@ void test_config_and_callback_trigger(void) {
     
     // Proximity target at 80cm (outside default 50cm, inside new 100cm)
     hw.setDistanceCm(80.0f);
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < 15; ++i) {
         hw.advanceMillis(50);
         controller.update();
     }
@@ -274,7 +284,7 @@ void test_hold_duration_and_retrigger(void) {
     
     // 1. Trigger open: Human at 30cm (within threshold)
     hw.setDistanceCm(30.0f);
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < 15; ++i) {
         hw.advanceMillis(50);
         controller.update();
     }
@@ -381,7 +391,7 @@ void test_ota_state_isolation(void) {
     
     // 1. Trigger opening first (simulate mid-operation OTA trigger)
     hw.setDistanceCm(30.0f);
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < 15; ++i) {
         hw.advanceMillis(50);
         controller.update();
     }
@@ -434,13 +444,14 @@ void test_night_sleep_mode(void) {
     // 3. Telemetry must be disabled when in night sleep mode
     TEST_ASSERT_FALSE(controller.canSendTelemetry());
 
-    // 4. Local proximity triggering must still work normally (e.g. state transition to OPEN_START)
+    // 4. Sensor polling must be suppressed when night sleep is active
     hw.setDistanceCm(30.0f);
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < 15; ++i) {
         hw.advanceMillis(50);
         controller.update();
     }
-    TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
+    // Proximity triggering should NOT happen because polling is suppressed
+    TEST_ASSERT_EQUAL(STATE_IDLE, controller.getCurrentState());
 }
 
 #ifdef NATIVE_BUILD

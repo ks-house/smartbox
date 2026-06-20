@@ -9,11 +9,11 @@ static const int ECHO_PIN = 5;
 
 SmartBoxController::SmartBoxController(HardwareInterface& hardware) 
     : hw(hardware), currentState(STATE_IDLE), stateTimer(0), sensorTimer(0), 
-      cooldownTimer(0), isCooldown(false), filterIdx(0), stateCallback(nullptr),
+      cooldownTimer(0), isCooldown(false), distanceHistoryIdx(0), lastDetectStartTime(0), stateCallback(nullptr),
       batteryVoltage(12.0f), motorCurrent(0.0f), currentDistance(999.0f), relaysIsolated(false),
       initialState(STATE_IDLE), nightSleepActive(false) {
-    for (int i = 0; i < FILTER_SIZE; i++) {
-        distBuffer[i] = 999.0f;
+    for (int i = 0; i < 5; i++) {
+        distanceHistory[i] = 999.0f;
     }
 }
 
@@ -37,10 +37,12 @@ void SmartBoxController::init() {
     currentState = initialState;
     isCooldown = false;
     relaysIsolated = false;
+    distanceHistoryIdx = 0;
+    lastDetectStartTime = 0;
     
     // Fill median filter buffer
-    for (int i = 0; i < FILTER_SIZE; i++) {
-        distBuffer[i] = 999.0f;
+    for (int i = 0; i < 5; i++) {
+        distanceHistory[i] = 999.0f;
     }
 }
 
@@ -51,11 +53,13 @@ void SmartBoxController::update() {
         return;
     }
 
-    // Read ultrasonic distance every 50ms and update buffer
-    if (hw.getMillis() - sensorTimer >= 50) {
-        sensorTimer = hw.getMillis();
-        updateDistanceBuffer();
-        currentDistance = getFilteredDistance();
+    // Read ultrasonic distance every 50ms and update buffer (unless Night Sleep is active)
+    if (!nightSleepActive && currentState != STATE_OTA_UPDATING) {
+        if (hw.getMillis() - sensorTimer >= 50) {
+            sensorTimer = hw.getMillis();
+            updateDistanceBuffer();
+            currentDistance = getFilteredDistance();
+        }
     }
     
     // Read INA219 battery/motor stats every 200ms
@@ -100,9 +104,17 @@ void SmartBoxController::update() {
 
         case STATE_IDLE:
             setRelayStates(false, false, false);
-            if (currentDistance > 0 && currentDistance < config.distThreshold && !isCooldown) {
-                Serial.printf("[SENSOR] Human approach detected: %.1f cm. Starting opening.\n", currentDistance);
-                transitionTo(STATE_OPEN_START);
+            if (currentDistance > 0.0f && currentDistance < config.distThreshold && !isCooldown) {
+                if (lastDetectStartTime == 0) {
+                    lastDetectStartTime = hw.getMillis();
+                } else if (hw.getMillis() - lastDetectStartTime >= config.debounceDelay) {
+                    Serial.printf("[SENSOR] Human approach detected: %.1f cm for %lu ms. Starting opening.\n",
+                                  currentDistance, hw.getMillis() - lastDetectStartTime);
+                    lastDetectStartTime = 0;
+                    transitionTo(STATE_OPEN_START);
+                }
+            } else {
+                lastDetectStartTime = 0;
             }
             break;
             
@@ -261,6 +273,7 @@ void SmartBoxController::transitionTo(State newState) {
     State prev = currentState;
     currentState = newState;
     stateTimer = hw.getMillis();
+    lastDetectStartTime = 0;
     
     if (stateCallback != nullptr) {
         stateCallback(prev, newState);
@@ -271,18 +284,18 @@ void SmartBoxController::transitionTo(State newState) {
 
 void SmartBoxController::updateDistanceBuffer() {
     float raw = hw.getDistanceCm();
-    distBuffer[filterIdx] = raw;
-    filterIdx = (filterIdx + 1) % FILTER_SIZE;
+    distanceHistory[distanceHistoryIdx] = raw;
+    distanceHistoryIdx = (distanceHistoryIdx + 1) % 5;
 }
 
 float SmartBoxController::getFilteredDistance() {
-    float sorted[FILTER_SIZE];
-    for (int i = 0; i < FILTER_SIZE; i++) {
-        sorted[i] = distBuffer[i];
+    float sorted[5];
+    for (int i = 0; i < 5; i++) {
+        sorted[i] = distanceHistory[i];
     }
     // Bubble sort
-    for (int i = 0; i < FILTER_SIZE - 1; i++) {
-        for (int j = i + 1; j < FILTER_SIZE; j++) {
+    for (int i = 0; i < 4; i++) {
+        for (int j = i + 1; j < 5; j++) {
             if (sorted[i] > sorted[j]) {
                 float temp = sorted[i];
                 sorted[i] = sorted[j];
@@ -290,7 +303,7 @@ float SmartBoxController::getFilteredDistance() {
             }
         }
     }
-    return sorted[FILTER_SIZE / 2];
+    return sorted[2];
 }
 
 void SmartBoxController::readSensors() {
