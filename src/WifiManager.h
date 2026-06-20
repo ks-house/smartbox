@@ -17,6 +17,8 @@ public:
     static int getScanStatus();
     static String getScanResultsJson();
     static void connectTo(const char* ssid, const char* password);
+    static void stopWiFi();
+    static void startWiFi(const char* ssid, const char* password);
 };
 
 #endif // WIFI_MANAGER_H

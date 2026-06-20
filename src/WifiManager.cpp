@@ -102,3 +102,23 @@ void WifiManager::connectTo(const char* ssid, const char* password) {
     WiFi.disconnect();
     WiFi.begin(_staSsid.c_str(), _staPass.c_str());
 }
+
+void WifiManager::stopWiFi() {
+    connected = false;
+    WiFi.disconnect();
+    WiFi.mode(WIFI_OFF);
+    Serial.println("[WIFI] Wi-Fi module disabled (WIFI_OFF).");
+}
+
+void WifiManager::startWiFi(const char* ssid, const char* password) {
+    WiFi.mode(WIFI_STA);
+    if (ssid != nullptr && strlen(ssid) > 0) {
+        _staSsid = ssid;
+        _staPass = password ? password : "";
+        WiFi.begin(_staSsid.c_str(), _staPass.c_str());
+        Serial.printf("[WIFI] Wi-Fi STA mode enabled. Connecting to AP '%s'...\n", _staSsid.c_str());
+    } else {
+        Serial.println("[WIFI] Wi-Fi STA mode enabled. No credentials provided.");
+    }
+    lastConnectRetry = millis();
+}

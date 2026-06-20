@@ -7,6 +7,7 @@
 #include "WebDashboard.h"
 #include "AutoOtaManager.h"
 #include "TelemetryManager.h"
+#include "PowerManager.h"
 
 // Hardware pin assignments as per AGENTS.md
 // TRIG = GPIO 4, ECHO = GPIO 5
@@ -74,6 +75,9 @@ void setup() {
     // 9. Initialize InfluxDB telemetry manager
     TelemetryManager::init(controller);
 
+    // 10. Initialize time-based power management
+    PowerManager::init(controller);
+
     Serial.println("[SYSTEM] Initialization finished. FSM Loop running.");
 }
 
@@ -98,6 +102,9 @@ void loop() {
 
     // Run InfluxDB Telemetry updates
     TelemetryManager::update();
+
+    // Run Power Manager updates
+    PowerManager::update();
 
     // 1-second interval diagnostic print
     static unsigned long lastDebug = 0;

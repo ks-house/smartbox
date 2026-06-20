@@ -69,6 +69,7 @@ private:
   float motorCurrent;
   float currentDistance;
   bool relaysIsolated;
+  bool nightSleepActive;
 
   void updateDistanceBuffer();
   float getFilteredDistance();
@@ -79,6 +80,8 @@ public:
   void transitionTo(State newState);
   void forceAllRelaysOff();
   bool isOtaMode() const { return currentState == STATE_OTA_UPDATING; }
+  bool isNightSleepActive() const { return nightSleepActive; }
+  void setNightSleepMode(bool active) { nightSleepActive = active; }
   SmartBoxController(HardwareInterface &hardware);
   ~SmartBoxController() {}
 

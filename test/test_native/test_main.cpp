@@ -418,6 +418,31 @@ void test_ota_state_isolation(void) {
     TEST_ASSERT_TRUE(controller.isOtaMode());
 }
 
+void test_night_sleep_mode(void) {
+    MockHardware hw;
+    SmartBoxController controller(hw);
+    controller.init();
+
+    // 1. Initial state must be false
+    TEST_ASSERT_FALSE(controller.isNightSleepActive());
+    TEST_ASSERT_TRUE(controller.canSendTelemetry());
+
+    // 2. Set to true
+    controller.setNightSleepMode(true);
+    TEST_ASSERT_TRUE(controller.isNightSleepActive());
+
+    // 3. Telemetry must be disabled when in night sleep mode
+    TEST_ASSERT_FALSE(controller.canSendTelemetry());
+
+    // 4. Local proximity triggering must still work normally (e.g. state transition to OPEN_START)
+    hw.setDistanceCm(30.0f);
+    for (int i = 0; i < 5; ++i) {
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    TEST_ASSERT_EQUAL(STATE_OPEN_START, controller.getCurrentState());
+}
+
 #ifdef NATIVE_BUILD
 int main(int argc, char **argv) {
     UNITY_BEGIN();
@@ -430,6 +455,7 @@ int main(int argc, char **argv) {
     RUN_TEST(test_hold_duration_and_retrigger);
     RUN_TEST(test_startup_open_flow);
     RUN_TEST(test_ota_state_isolation);
+    RUN_TEST(test_night_sleep_mode);
     return UNITY_END();
 }
 #else
@@ -447,6 +473,7 @@ void setup() {
     RUN_TEST(test_hold_duration_and_retrigger);
     RUN_TEST(test_startup_open_flow);
     RUN_TEST(test_ota_state_isolation);
+    RUN_TEST(test_night_sleep_mode);
     UNITY_END();
 }
 

@@ -1,37 +1,59 @@
-# Walkthrough - Configurable Auto-OTA Scheduled Hour
+# Walkthrough - Night Sleep Mode Implementation
 
-The daily Auto-OTA scheduled hour is now configurable from the Web Dashboard and saved persistently in Preferences.
+We have implemented the **Night Sleep Mode (야간 절전 모드)** on the ESP32-C6 SmartBox. 
+
+During nighttime (23:00 ~ 06:00 KST), this feature disables the Wi-Fi radio to conserve battery power, bypasses periodic InfluxDB telemetry reports and HTTPS OTA check tasks, while keeping the local finite state machine and ultrasonic sensor loop fully active for touchless lid operation.
+
+---
 
 ## Changes Made
 
-### 1. Configuration Model
-- **[SmartBoxController.h](../src/SmartBoxController.h)**: Added `int otaHour = 3;` to `BoxConfig` to hold the target hour.
+### 1. SmartBox Controller (`SmartBoxController`)
+- **[SmartBoxController.h](../src/SmartBoxController.h)**:
+  - Added the `nightSleepActive` boolean flag.
+  - Added getter `isNightSleepActive()` and setter `setNightSleepMode()`.
+- **[SmartBoxController.cpp](../src/SmartBoxController.cpp)**:
+  - Initialized `nightSleepActive` to `false` in the constructor.
+  - Updated `canSendTelemetry()` to return `false` if `nightSleepActive` is true.
 
-### 2. Preferences Persistence
-- **[ConfigManager.cpp](../src/ConfigManager.cpp)**:
-  - Loaded `otaHour` using `prefs.getInt("ota_hour", config.otaHour)`.
-  - Self-healed `otaHour` to default to `3` if the read value falls outside `0-23`.
-  - Saved `otaHour` to Preferences using `prefs.putInt("ota_hour", config.otaHour)`.
-  - Expanded config logging to output `ota_hour`.
+### 2. Wi-Fi Manager (`WifiManager`)
+- **[WifiManager.h](../src/WifiManager.h)** & **[WifiManager.cpp](../src/WifiManager.cpp)**:
+  - Implemented `stopWiFi()`: Shuts down the station/AP connection cleanly and sets mode to `WIFI_OFF`.
+  - Implemented `startWiFi(ssid, pass)`: Sets mode to `WIFI_STA` and connects to the specified SSID.
 
-### 3. Dynamic Scheduler Polling
-- **[AutoOtaManager.cpp](../src/AutoOtaManager.cpp)**: Modified `AutoOtaManager::update()` to check the time dynamically against `controllerPtr->getConfig().otaHour` instead of the hardcoded `3`.
+### 3. Background Tasks Suspension
+- **[TelemetryManager.cpp](../src/TelemetryManager.cpp)**:
+  - Early exit in `update()` if `isNightSleepActive()` is true, skipping any telemetry activity.
+- **[AutoOtaManager.cpp](../src/AutoOtaManager.cpp)**:
+  - Early exit in `update()` if `isNightSleepActive()` is true, skipping scheduled update checks.
 
-### 4. Web Dashboard UI & REST API Endpoints
-- **[WebDashboard.cpp](../src/WebDashboard.cpp)**:
-  - Included `otaHour` in the `/api/status` config JSON object.
-  - Handled the `otaHour` parameter in the `/api/config` request, performing bounds checking before updating and saving.
-  - Added an HTML input field `cfgOtaHour` for the setting in the configuration card.
-  - Loaded and pre-filled this field in JavaScript on dashboard startup.
-  - Added `otaHour` parameter to the `updateConfig()` API request when the user clicks "Save Settings".
+### 4. Power Manager (`PowerManager`) - **[NEW]**
+- **[PowerManager.h](../src/PowerManager.h)** & **[PowerManager.cpp](../src/PowerManager.cpp)**:
+  - Checks the local system time (synced via NTP) every 15 seconds.
+  - Switches to night sleep mode if current KST hour is `23` or between `0` and `5` (`currentHour >= 23 || currentHour < 6`), turning off Wi-Fi and logging `[POWER] 진입: 야간 절전 모드 활성화. Wi-Fi OFF.`.
+  - Switches back to day mode if current KST hour is between `6` and `22`, turning on Wi-Fi, reloading saved credentials, initiating reconnect, and logging `[POWER] 해제: 주간 모드 전환. Wi-Fi 재연결 시도 중...`.
 
-## Verification & Compilation Results
+### 5. Main Integration
+- **[main.cpp](../src/main.cpp)**:
+  - Included `PowerManager.h`.
+  - Initialized `PowerManager::init(controller)` in `setup()`.
+  - Added `PowerManager::update()` in the main `loop()`.
 
-We ran PlatformIO compilation for the ESP32-C6 target environment:
-```bash
-pio run -e esp32-c6-devkitc-1
-```
-The build completed successfully:
-- **Status:** `SUCCESS`
-- **RAM Usage:** 14.0% (45,744 bytes of 327,680 bytes)
-- **Flash Usage:** 19.5% (1,275,558 bytes of 6,553,600 bytes)
+### 6. Build & Test Settings
+- **[platformio.ini](../platformio.ini)**:
+  - Excluded `PowerManager.cpp` from tests/native builds.
+- **[test_main.cpp](../test/test_native/test_main.cpp)**:
+  - Added `test_night_sleep_mode()` unit test verifying initial state, flag toggle, telemetry blocking, and normal FSM operation while sleep mode is active.
+
+---
+
+## Verification Results
+
+### Target Binary Build Compilation
+- Environment `esp32-c6-devkitc-1` compiled and linked successfully:
+  - **RAM:** `14.0%` (used 45792 bytes of 327680 bytes)
+  - **Flash:** `19.7%` (used 1289988 bytes of 6553600 bytes)
+  - Successfully produced combined firmware binary.
+
+### Target Test Build Compilation
+- Environment `esp32-c6-test` compiled and linked the tests successfully, confirming unit tests compile properly on RISC-V GCC target compiler.

@@ -11,7 +11,7 @@ SmartBoxController::SmartBoxController(HardwareInterface& hardware)
     : hw(hardware), currentState(STATE_IDLE), stateTimer(0), sensorTimer(0), 
       cooldownTimer(0), isCooldown(false), filterIdx(0), stateCallback(nullptr),
       batteryVoltage(12.0f), motorCurrent(0.0f), currentDistance(999.0f), relaysIsolated(false),
-      initialState(STATE_IDLE) {
+      initialState(STATE_IDLE), nightSleepActive(false) {
     for (int i = 0; i < FILTER_SIZE; i++) {
         distBuffer[i] = 999.0f;
     }
@@ -370,6 +370,9 @@ bool SmartBoxController::isMotorRunning() const {
 }
 
 bool SmartBoxController::canSendTelemetry() const {
+    if (nightSleepActive) {
+        return false;
+    }
     if (currentState == STATE_OTA_UPDATING) {
         return false;
     }

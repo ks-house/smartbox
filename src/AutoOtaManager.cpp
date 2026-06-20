@@ -17,6 +17,12 @@ void AutoOtaManager::init(SmartBoxController& controller) {
 }
 
 void AutoOtaManager::update() {
+    if (controllerPtr == nullptr) {
+        return;
+    }
+    if (controllerPtr->isNightSleepActive()) {
+        return;
+    }
     if (!WifiManager::isConnected()) {
         return;
     }

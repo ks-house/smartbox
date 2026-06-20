@@ -45,6 +45,10 @@ void TelemetryManager::update() {
         return;
     }
 
+    if (controllerPtr->isNightSleepActive()) {
+        return;
+    }
+
     // Check if 30 seconds (30,000ms) have passed
     unsigned long now = millis();
     if (now - lastSendTime < 30000) {
