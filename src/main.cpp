@@ -3,7 +3,7 @@
 #include "SmartBoxController.h"
 #include "ConfigManager.h"
 #include "WifiManager.h"
-#include "SmartThingsReporter.h"
+
 #include "WebDashboard.h"
 #include "AutoOtaManager.h"
 #include "TelemetryManager.h"
@@ -26,8 +26,7 @@ static void onStateChanged(State prevState, State newState) {
         return;
     }
     
-    SmartThingsReporter::reportStateChange(prevState, newState);
-    
+
     // Save logical lid state in Preferences based on transition
     if (newState == STATE_HOLD || newState == STATE_OPENING || newState == STATE_BATTERY_LOW_SHUTDOWN || newState == STATE_STARTUP_OPEN) {
         ConfigManager::saveLidState(true);
@@ -92,9 +91,6 @@ void setup() {
 
     // 6. Initialize Web Dashboard
     WebDashboard::init(controller);
-
-    // 7. Initialize SmartThings webhook reporter
-    SmartThingsReporter::init(nullptr); // Webhook can be passed here
 
     // 8. Initialize Auto-OTA scheduler and manager
     AutoOtaManager::init(controller);
