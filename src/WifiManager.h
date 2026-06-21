@@ -9,6 +9,8 @@ private:
     static unsigned long lastConnectRetry;
     static bool connected;
     static DNSServer dnsServer;
+    static String _apSsid;
+    static String _apPass;
     static void onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info);
 
 public:

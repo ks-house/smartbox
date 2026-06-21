@@ -142,13 +142,15 @@ void test_stall_current_detection(void) {
     controller.update();
     TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
     
-    // Sample 3: exceeding threshold -> should NOT transition to EMERGENCY_STOP (protection temporarily disabled)
+    // Sample 3: exceeding threshold -> MUST transition to EMERGENCY_STOP (anti-pinch protection active)
     hw.setMotorCurrent(4000.0f);
     controller.update();
-    TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
+    TEST_ASSERT_EQUAL(STATE_EMERGENCY_STOP, controller.getCurrentState());
     
-    // Relays should NOT be isolated to INPUT yet since it is still in STATE_OPENING
-    // (We will not check for INPUT here as it's active)
+    // All relays must be isolated to INPUT (high-impedance) for safety
+    TEST_ASSERT_EQUAL(INPUT, hw.getPinMode(RELAY_MAIN_PIN));
+    TEST_ASSERT_EQUAL(INPUT, hw.getPinMode(RELAY_DIR_A_PIN));
+    TEST_ASSERT_EQUAL(INPUT, hw.getPinMode(RELAY_DIR_B_PIN));
 }
 
 void test_low_battery_shutdown(void) {

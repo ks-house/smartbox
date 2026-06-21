@@ -115,6 +115,11 @@ void SmartBoxController::update() {
                 Serial.printf("[SENSOR] Startup open: Human approach detected: %.1f cm. Starting 10s wait to close.\n", currentDistance);
                 transitionTo(STATE_HOLD);
             }
+            // Timeout guard: auto-close after 30 seconds if no human approaches
+            if (hw.getMillis() - stateTimer >= 30000) {
+                Serial.println("[STATE] STATE_STARTUP_OPEN timeout (30s). No approach detected. Auto-closing.");
+                transitionTo(STATE_CLOSE_START);
+            }
             break;
 
         case STATE_IDLE:
@@ -161,16 +166,13 @@ void SmartBoxController::update() {
                     Serial.printf("[WARN] Stall candidate OPEN (%d/3): %.1f mA (Limit: %.1f mA)\n",
                                   openStallCount, motorCurrent, config.currentStallLimit);
                     if (openStallCount >= 3) {
-                        Serial.printf("[WARN] MOTOR STALL DETECTED DURING OPEN (STALL PROTECTION DISABLED)! Current: %.1f mA (Limit: %.1f mA)\n", motorCurrent, config.currentStallLimit);
+                        Serial.printf("[WARN] MOTOR STALL DETECTED DURING OPEN! Current: %.1f mA (Limit: %.1f mA)\n", motorCurrent, config.currentStallLimit);
                         Serial.printf("[DIAGNOSTIC] Time Elapsed: %lu ms, Batt: %.2f V, Dist: %.1f cm\n",
                                       hw.getMillis() - stateTimer, batteryVoltage, currentDistance);
-                        // Temporarily disabled as requested by the user
-                        /*
                         openStallCount = 0;
                         forceAllRelaysOff();
                         transitionTo(STATE_EMERGENCY_STOP);
                         break;
-                        */
                     }
                 } else {
                     openStallCount = 0; // Current normal — reset counter
@@ -228,16 +230,13 @@ void SmartBoxController::update() {
                     Serial.printf("[WARN] Stall candidate CLOSE (%d/3): %.1f mA (Limit: %.1f mA)\n",
                                   closeStallCount, motorCurrent, config.currentStallLimit);
                     if (closeStallCount >= 3) {
-                        Serial.printf("[WARN] MOTOR STALL DETECTED DURING CLOSE (STALL PROTECTION DISABLED)! Current: %.1f mA (Limit: %.1f mA)\n", motorCurrent, config.currentStallLimit);
+                        Serial.printf("[WARN] MOTOR STALL DETECTED DURING CLOSE! Current: %.1f mA (Limit: %.1f mA)\n", motorCurrent, config.currentStallLimit);
                         Serial.printf("[DIAGNOSTIC] Time Elapsed: %lu ms, Batt: %.2f V, Dist: %.1f cm\n",
                                       hw.getMillis() - stateTimer, batteryVoltage, currentDistance);
-                        // Temporarily disabled as requested by the user
-                        /*
                         closeStallCount = 0;
                         forceAllRelaysOff();
                         transitionTo(STATE_EMERGENCY_STOP);
                         break;
-                        */
                     }
                 } else {
                     closeStallCount = 0; // Current normal — reset counter

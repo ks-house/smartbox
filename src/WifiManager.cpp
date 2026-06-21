@@ -5,6 +5,8 @@
 unsigned long WifiManager::lastConnectRetry = 0;
 bool WifiManager::connected = false;
 DNSServer WifiManager::dnsServer;
+String WifiManager::_apSsid = "";
+String WifiManager::_apPass = "";
 static String _staSsid = "";
 static String _staPass = "";
 
@@ -33,6 +35,10 @@ void WifiManager::onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
 
 void WifiManager::init(const char* apSsid, const char* apPass, const char* staSsid, const char* staPass) {
     WiFi.onEvent(onWiFiEvent);
+    
+    // Remember AP credentials for post-sleep restoration
+    _apSsid = apSsid ? apSsid : "";
+    _apPass = apPass ? apPass : "";
     
     // Set both Access Point and Station modes
     WiFi.mode(WIFI_AP_STA);
@@ -120,15 +126,27 @@ void WifiManager::stopWiFi() {
 }
 
 void WifiManager::startWiFi(const char* ssid, const char* password) {
-    dnsServer.stop();
-    WiFi.mode(WIFI_STA);
+    // Restore AP+STA dual mode (not STA-only) to keep local dashboard accessible
+    WiFi.mode(WIFI_AP_STA);
+    
+    // Re-establish Soft AP with stored credentials
+    if (_apSsid.length() > 0) {
+        WiFi.softAP(_apSsid.c_str(), _apPass.c_str());
+        Serial.printf("[WIFI] SoftAP '%s' restored. IP: %s\n", _apSsid.c_str(), WiFi.softAPIP().toString().c_str());
+    }
+    
+    // Restart captive portal DNS server
+    dnsServer.start(53, "*", WiFi.softAPIP());
+    Serial.println("[WIFI] Captive Portal DNS server restarted on port 53.");
+    
+    // Connect to external AP if credentials are provided
     if (ssid != nullptr && strlen(ssid) > 0) {
         _staSsid = ssid;
         _staPass = password ? password : "";
         WiFi.begin(_staSsid.c_str(), _staPass.c_str());
-        Serial.printf("[WIFI] Wi-Fi STA mode enabled. Connecting to AP '%s'...\n", _staSsid.c_str());
+        Serial.printf("[WIFI] Wi-Fi STA connecting to AP '%s'...\n", _staSsid.c_str());
     } else {
-        Serial.println("[WIFI] Wi-Fi STA mode enabled. No credentials provided.");
+        Serial.println("[WIFI] Wi-Fi AP_STA mode enabled. No STA credentials provided.");
     }
     lastConnectRetry = millis();
 }
