@@ -10,6 +10,24 @@ String WifiManager::_apPass = "";
 static String _staSsid = "";
 static String _staPass = "";
 
+// JSON string escape helper (anonymous namespace — internal linkage only)
+namespace {
+    String escapeJson(const String& input) {
+        String out;
+        out.reserve(input.length() + 8);
+        for (unsigned int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            if      (c == '"')  { out += '\\'; out += '"'; }
+            else if (c == '\\') { out += '\\'; out += '\\'; }
+            else if (c == '\n') { out += '\\'; out += 'n'; }
+            else if (c == '\r') { out += '\\'; out += 'r'; }
+            else if (c == '\t') { out += '\\'; out += 't'; }
+            else                { out += c; }
+        }
+        return out;
+    }
+}
+
 void WifiManager::onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
     switch(event) {
         case ARDUINO_EVENT_WIFI_STA_CONNECTED:
@@ -38,12 +56,21 @@ void WifiManager::init(const char* apSsid, const char* apPass, const char* staSs
     
     // Remember AP credentials for post-sleep restoration
     _apSsid = apSsid ? apSsid : "";
-    _apPass = apPass ? apPass : "";
+    
+    // Enforce minimum 8-character AP password to prevent open Wi-Fi
+    static const char* DEFAULT_AP_PASS = "smartbox_admin";
+    const char* effectiveApPass = apPass;
+    if (effectiveApPass == nullptr || strlen(effectiveApPass) < 8) {
+        Serial.printf("[WIFI] WARNING: AP password is too short or null (len=%d). Forcing default password.\n",
+                      effectiveApPass ? (int)strlen(effectiveApPass) : 0);
+        effectiveApPass = DEFAULT_AP_PASS;
+    }
+    _apPass = effectiveApPass;
     
     // Set both Access Point and Station modes
     WiFi.mode(WIFI_AP_STA);
-    WiFi.softAP(apSsid, apPass);
-    Serial.printf("[WIFI] SoftAP '%s' active. IP: %s\n", apSsid, WiFi.softAPIP().toString().c_str());
+    WiFi.softAP(apSsid, effectiveApPass);
+    Serial.printf("[WIFI] SoftAP '%s' active (password protected). IP: %s\n", apSsid, WiFi.softAPIP().toString().c_str());
     
     dnsServer.start(53, "*", WiFi.softAPIP());
     Serial.println("[WIFI] Captive Portal DNS server started on port 53.");
@@ -95,7 +122,7 @@ String WifiManager::getScanResultsJson() {
     for (int i = 0; i < n; ++i) {
         if (i > 0) json += ",";
         json += "{";
-        json += "\"ssid\":\"" + WiFi.SSID(i) + "\",";
+        json += "\"ssid\":\"" + escapeJson(WiFi.SSID(i)) + "\",";
         json += "\"rssi\":" + String(WiFi.RSSI(i));
         json += "}";
     }

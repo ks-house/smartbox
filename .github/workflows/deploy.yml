@@ -37,10 +37,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Create secrets.h from GitHub Secrets
+        env:
+          SECRET_ROOT_CA_CERT: ${{ secrets.SECRET_ROOT_CA_CERT }}
         run: |
-          cat <<EOF > include/secrets.h
+          cat <<'HEREDOC' > include/secrets.h
           #ifndef SECRETS_H
           #define SECRETS_H
+          HEREDOC
+
+          # Append single-line secrets
+          cat <<EOF >> include/secrets.h
           #define SECRET_WIFI_SSID "${{ secrets.SECRET_WIFI_SSID }}"
           #define SECRET_WIFI_PASS "${{ secrets.SECRET_WIFI_PASS }}"
           #define SECRET_INFLUXDB_URL "${{ secrets.SECRET_INFLUXDB_URL }}"
@@ -51,8 +57,16 @@ jobs:
           #define SECRET_FIRMWARE_URL "${{ secrets.SECRET_FIRMWARE_URL }}"
           #define SECRET_DASHBOARD_USER "${{ secrets.SECRET_DASHBOARD_USER }}"
           #define SECRET_DASHBOARD_PASS "${{ secrets.SECRET_DASHBOARD_PASS }}"
-          #endif
+          #define SECRET_AP_PASS "${{ secrets.SECRET_AP_PASS }}"
           EOF
+
+          # Append multi-line Root CA cert using env variable (safe for PEM newlines)
+          printf '#define SECRET_ROOT_CA_CERT R"(\n%s\n)"\n' "${SECRET_ROOT_CA_CERT}" >> include/secrets.h
+
+          # Close header guard
+          echo '#endif // SECRETS_H' >> include/secrets.h
+
+          echo "[CI] include/secrets.h generated successfully."
 
       - name: Set up Python
         uses: actions/setup-python@v5

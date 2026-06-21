@@ -58,8 +58,7 @@ void TelemetryManager::telemetryTaskFunction(void* pvParameters) {
     
     Serial.printf("[TELEMETRY-ASYNC] Initializing %s batch transmission to InfluxDB, size: %d\n", payload->type, payload->count);
     
-    InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
-    client.setInsecure();
+    InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN, SECRET_ROOT_CA_CERT);
     
     bool success = true;
     unsigned long baseTime = (payload->count > 0) ? payload->data[0].timestamp_ms : 0;

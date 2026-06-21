@@ -5,6 +5,7 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
+#include "secrets.h"
 
 #ifndef NATIVE_BUILD
 #include <esp_task_wdt.h>
@@ -109,7 +110,7 @@ void AutoOtaManager::runOtaProcess(bool force) {
     
     Serial.println("[OTA] Step 1: Checking remote firmware version...");
     WiFiClientSecure client;
-    client.setInsecure(); // Bypass ROOT CA validation
+    client.setCACert(SECRET_ROOT_CA_CERT); // TLS Root CA verification
     
     HTTPClient http;
     http.begin(client, VERSION_URL);
@@ -172,7 +173,7 @@ void AutoOtaManager::runOtaProcess(bool force) {
         Serial.printf("[OTA] Step 3: Fetching firmware binary from %s...\n", FIRMWARE_URL);
         
         WiFiClientSecure client2;
-        client2.setInsecure();
+        client2.setCACert(SECRET_ROOT_CA_CERT); // TLS Root CA verification
         
         t_httpUpdate_return ret = httpUpdate.update(client2, FIRMWARE_URL);
         

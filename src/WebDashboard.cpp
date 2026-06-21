@@ -9,6 +9,24 @@
 AsyncWebServer WebDashboard::server(80);
 SmartBoxController* WebDashboard::controllerPtr = nullptr;
 
+// JSON string escape helper (anonymous namespace — internal linkage only)
+namespace {
+    String escapeJson(const String& input) {
+        String out;
+        out.reserve(input.length() + 8);
+        for (unsigned int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            if      (c == '"')  { out += '\\'; out += '"'; }
+            else if (c == '\\') { out += '\\'; out += '\\'; }
+            else if (c == '\n') { out += '\\'; out += 'n'; }
+            else if (c == '\r') { out += '\\'; out += 'r'; }
+            else if (c == '\t') { out += '\\'; out += 't'; }
+            else                { out += c; }
+        }
+        return out;
+    }
+}
+
 // Embedded Premium Responsive HTML/CSS/JS Dashboard
 const char INDEX_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
@@ -589,11 +607,11 @@ void WebDashboard::init(SmartBoxController& controller) {
         json += "\"current\":" + String(controllerPtr->getMotorCurrent(), 2) + ",";
         json += "\"distance\":" + String(controllerPtr->getDistance(), 1) + ",";
         json += "\"time\":" + String(millis()) + ","; // Time placeholder
-        json += "\"firmwareUrl\":\"" + String(SECRET_FIRMWARE_URL) + "\",";
+        json += "\"firmwareUrl\":\"" + escapeJson(String(SECRET_FIRMWARE_URL)) + "\",";
         json += "\"maintenance\":" + String(controllerPtr->getCurrentState() == STATE_MAINTENANCE ? "true" : "false") + ",";
         json += "\"maintenanceTime\":" + String(controllerPtr->getMaintenanceRemainingSeconds()) + ",";
         json += "\"otaState\":\"" + AutoOtaManager::getOtaStateString() + "\",";
-        json += "\"otaError\":\"" + AutoOtaManager::getOtaErrorMessage() + "\",";
+        json += "\"otaError\":\"" + escapeJson(AutoOtaManager::getOtaErrorMessage()) + "\",";
         json += "\"config\":{";
         json += "\"dist\":" + String(cfg.distThreshold, 1) + ",";
         json += "\"wait\":" + String(cfg.waitTime) + ",";

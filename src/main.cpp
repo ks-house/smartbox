@@ -88,7 +88,7 @@ void setup() {
     String savedSsid = "";
     String savedPass = "";
     ConfigManager::loadWifiCredentials(savedSsid, savedPass);
-    WifiManager::init("SmartBox-WiFi", "", savedSsid.c_str(), savedPass.c_str());
+    WifiManager::init("SmartBox-WiFi", SECRET_AP_PASS, savedSsid.c_str(), savedPass.c_str());
 
     // 6. Initialize Web Dashboard
     WebDashboard::init(controller);
