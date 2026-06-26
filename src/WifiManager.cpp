@@ -87,6 +87,11 @@ void WifiManager::init(const char* apSsid, const char* apPass, const char* staSs
 void WifiManager::update() {
     dnsServer.processNextRequest();
     
+    // Do not attempt to connect/reconnect while a scan is in progress
+    if (WiFi.scanComplete() == WIFI_SCAN_RUNNING) {
+        return;
+    }
+    
     // Non-blocking auto-reconnect polling every 15 seconds
     if (!_staSsid.isEmpty() && !connected && (millis() - lastConnectRetry >= 15000)) {
         lastConnectRetry = millis();
@@ -102,8 +107,12 @@ bool WifiManager::isConnected() {
 
 void WifiManager::startScan() {
     Serial.println("[WIFI] Starting asynchronous WiFi scan...");
-    // Trigger asynchronous scan
-    WiFi.scanNetworks(true, false, false, 150);
+    
+    // Ensure no ongoing connection attempt blocks the RF stack
+    WiFi.disconnect();
+    
+    // Trigger asynchronous scan with 300ms channel dwell time
+    WiFi.scanNetworks(true, false, false, 300);
 }
 
 int WifiManager::getScanStatus() {

@@ -480,6 +480,15 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
                 } else {
                   selectSsid.innerHTML = '<option value="">No networks found</option>';
                 }
+              } else if (pollData.status === 'failed') {
+                clearInterval(scanPollingInterval);
+                scanPollingInterval = null;
+                
+                btnScan.disabled = false;
+                btnScan.className = 'btn btn-primary';
+                btnScan.style.background = 'var(--info)';
+                btnScan.innerText = 'Scan Networks';
+                selectSsid.innerHTML = '<option value="">Scan failed. Try again.</option>';
               }
             } catch (e) {
               console.error('Error polling wifi scan:', e);
@@ -715,14 +724,17 @@ void WebDashboard::init(SmartBoxController& controller) {
         if (!checkAuth(request)) return;
         bool forceStart = request->hasParam("start");
         int status = WifiManager::getScanStatus();
-        if (forceStart || status == -2) {
+        
+        if (forceStart) {
             if (status >= 0) {
                 WiFi.scanDelete();
             }
             WifiManager::startScan();
             request->send(200, "application/json", "{\"status\":\"scanning\"}");
-        } else if (status == -1) {
+        } else if (status == -1) { // WIFI_SCAN_RUNNING
             request->send(200, "application/json", "{\"status\":\"scanning\"}");
+        } else if (status == -2) { // WIFI_SCAN_FAILED
+            request->send(200, "application/json", "{\"status\":\"failed\",\"message\":\"Scan failed\"}");
         } else {
             String results = WifiManager::getScanResultsJson();
             String json;
