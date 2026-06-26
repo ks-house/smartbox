@@ -13,10 +13,14 @@ struct TelemetryData {
     unsigned long timestamp_ms;
 };
 
+#include <stdint.h>
+
 struct BatchPayload {
     TelemetryData* data;
     int count;
     char type[16];
+    unsigned long uploadStartMillis;
+    uint64_t currentEpochMs;
 };
 
 class TelemetryManager {

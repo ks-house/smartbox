@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <InfluxDbClient.h>
+#include <sys/time.h>
 
 SmartBoxController* TelemetryManager::controllerPtr = nullptr;
 unsigned long TelemetryManager::lastSendTime = 0;
@@ -60,6 +61,9 @@ void TelemetryManager::telemetryTaskFunction(void* pvParameters) {
     
     InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN, SECRET_ROOT_CA_CERT);
     
+    // Configure write options with Milliseconds write precision
+    client.setWriteOptions(WriteOptions().writePrecision(WritePrecision::MS));
+    
     bool success = true;
     unsigned long baseTime = (payload->count > 0) ? payload->data[0].timestamp_ms : 0;
     
@@ -88,6 +92,15 @@ void TelemetryManager::telemetryTaskFunction(void* pvParameters) {
         unsigned long offset = d.timestamp_ms - baseTime;
         pointDevice.addField("offset_ms", (int)offset);
         
+        // Calculate the absolute Epoch time in ms for this point
+        uint64_t pointEpochMs;
+        if (payload->uploadStartMillis >= d.timestamp_ms) {
+            pointEpochMs = payload->currentEpochMs - (payload->uploadStartMillis - d.timestamp_ms);
+        } else {
+            pointEpochMs = payload->currentEpochMs + (d.timestamp_ms - payload->uploadStartMillis);
+        }
+        pointDevice.setTime(pointEpochMs);
+        
         // Append diagnostic data to the first point if there are any failures cached
         if (i == 0 && failedCount > 0) {
             pointDevice.addField("failed_tx_count", failedCount);
@@ -96,8 +109,8 @@ void TelemetryManager::telemetryTaskFunction(void* pvParameters) {
                           failedCount, errMsg.c_str());
         }
         
-        Serial.printf("[TELEMETRY-ASYNC] Batch point %d/%d -> offset: %d ms, batt: %.2f V, curr: %.1f mA, state: %s\n",
-                      i + 1, payload->count, (int)offset, d.battery_v, d.motor_current, stateToString((State)d.state));
+        Serial.printf("[TELEMETRY-ASYNC] Batch point %d/%d -> offset: %d ms, timestamp: %llu, batt: %.2f V, curr: %.1f mA, state: %s\n",
+                      i + 1, payload->count, (int)offset, pointEpochMs, d.battery_v, d.motor_current, stateToString((State)d.state));
                       
         if (!client.writePoint(pointDevice)) {
             success = false;
@@ -194,6 +207,11 @@ void TelemetryManager::update() {
                         payload->data[i] = eventBuffer[i];
                     }
                     
+                    payload->uploadStartMillis = millis();
+                    struct timeval tv;
+                    gettimeofday(&tv, NULL);
+                    payload->currentEpochMs = (uint64_t)tv.tv_sec * 1000 + (tv.tv_usec / 1000);
+                    
                     bufferCount = 0;
                     
                     BaseType_t res = xTaskCreate(
@@ -270,6 +288,11 @@ void TelemetryManager::update() {
                 for (int i = 0; i < heartbeatCount; i++) {
                     payload->data[i] = heartbeatBuffer[i];
                 }
+                
+                payload->uploadStartMillis = millis();
+                struct timeval tv;
+                gettimeofday(&tv, NULL);
+                payload->currentEpochMs = (uint64_t)tv.tv_sec * 1000 + (tv.tv_usec / 1000);
                 
                 // Reset heartbeat buffer count
                 heartbeatCount = 0;
