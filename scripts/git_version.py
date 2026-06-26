@@ -4,7 +4,7 @@ import os
 Import("env")
 
 def get_git_version():
-    base_version = "0.0.1"
+    base_version = "0.1.0"
     try:
         # Try to read base version from src/SmartBoxController.h
         proj_dir = env.get("PROJECT_DIR", "")

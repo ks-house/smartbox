@@ -1,22 +1,8 @@
-- [x] Heap Memory Optimization (String Reservation)
-  - [x] Reserve memory for JSON string in `WebDashboard.cpp` `/api/status` endpoint
-  - [x] Reserve memory for Wi-Fi scan results JSON string in `WifiManager.cpp` `getScanResultsJson()`
-  - [x] Reserve memory for Wi-Fi scan output string in `WebDashboard.cpp` `/api/wifi/scan` endpoint
-- [x] Task Watchdog Timer (TWDT) Integration
-  - [x] Configure TWDT in `setup()` of `main.cpp` (10s timeout, panic enable, loopTask add)
-  - [x] Feed TWDT in main `loop()` of `main.cpp`
-  - [x] Register and feed TWDT in `NetworkTask` of `main.cpp`
-  - [x] Handle WDT deregistration and re-registration during OTA in `main.cpp`
-  - [x] Handle WDT deregistration and re-registration during OTA in `AutoOtaManager.cpp`
-- [x] Proactive Daily Reboot Scheduling
-  - [x] Implement 04:00 AM daily reboot in `PowerManager.cpp` using `Preferences` for day-of-year tracking
-- [x] Deep Power Diet — Dynamic CPU Frequency Scaling & Adaptive Sensor Polling
-  - [x] Add `setCpuFrequencyMhz(80)` on night sleep entry in `PowerManager.cpp`
-  - [x] Add `setCpuFrequencyMhz(160)` on daytime resume in `PowerManager.cpp`
-  - [x] Wrap CPU frequency calls in `#ifndef NATIVE_BUILD` guard
-  - [x] Change sensor polling from fixed 50ms to adaptive 50ms/250ms in `SmartBoxController.cpp`
-  - [x] Update `test_night_sleep_mode` in `test_main.cpp` for adaptive polling verification
-- [x] Verification and Testing
-  - [x] Run native build tests (`pio test -e native` skipped due to missing host g++ toolchain)
-  - [x] Run ESP32-C6 firmware build (`pio run -e esp32-c6-devkitc-1` compiled and linked successfully)
-  - [ ] CI pipeline verification (pending push)
+- `[x]` Add `wifi_rssi` to `TelemetryData` in `TelemetryManager.h`
+- `[x]` Implement sampling filter and WiFi change detection in `TelemetryManager.cpp`
+- `[x]` Implement field filtering at write time in `telemetryTaskFunction`
+- `[x]` Verify compilation of telemetry changes via PlatformIO build
+- `[x]` Bump `FIRMWARE_VERSION` to `0.1.0` in `SmartBoxController.h` and `git_version.py`
+- `[x]` Copy updated plan, task list, and walkthrough artifacts to `docs/` folder
+- `[x]` Verify final compilation of version bump changes
+- `[/]` Stage, commit, and push all changes to git

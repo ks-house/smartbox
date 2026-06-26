@@ -1,71 +1,51 @@
-# Implementation Plan - SmartBox Memory Optimization & Watchdog Integration
+# Telemetry Timestamp Alignment, Field Filtering, and Version Bump to 0.1.0 Plan
 
-This plan implements heap memory optimization to prevent fragmentation, registers a FreeRTOS Task Watchdog Timer (TWDT) for system reliability, and configures a daily proactive reboot.
-
-## User Review Required
-
-> [!IMPORTANT]
-> - The Task Watchdog Timer (TWDT) will reboot the ESP32-C6 if either the main `loop()` or the background `NetworkTask` freezes for more than 10 seconds.
-> - To prevent reboot loops during OTA flashing, both tasks will temporarily deregister from the TWDT when entering the OTA state, and will re-register if the OTA update fails.
-> - A daily proactive reboot is configured at 4:00 AM KST when the system is in `STATE_IDLE` and the motor is fully stopped, resetting memory fragmentation.
-
----
+This plan implements conditional field filtering and absolute timestamp alignment for InfluxDB telemetry, and bumps the firmware version to 0.1.0.
 
 ## Proposed Changes
 
-### 1. Heap Memory Optimization (String Reservation)
+### Telemetry System
 
-To prevent heap fragmentation due to frequent dynamic `String` reallocations in the web server response and network scan output:
+#### [MODIFY] [TelemetryManager.h](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/src/TelemetryManager.h)
+- Add `wifi_rssi` (`int`) to `TelemetryData` struct to capture WiFi signal strength.
+- Add `uploadStartMillis` (`unsigned long`) and `currentEpochMs` (`uint64_t`) to `BatchPayload` struct.
 
-#### [MODIFY] [WebDashboard.cpp](../src/WebDashboard.cpp)
-- Call `json.reserve(512);` at the start of `/api/status` response generation.
-- Call `json.reserve(results.length() + 64);` inside the `/api/wifi/scan` complete state response generation.
+#### [MODIFY] [TelemetryManager.cpp](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/src/TelemetryManager.cpp)
+- **Field Filtering at Sampling Time:**
+  - Record `distance_cm` only if `<= 100.0f`. Otherwise, set to `-1.0f` (sentinel).
+  - Record `wifi_rssi` using `WiFi.RSSI()`.
+- **WiFi Change Update:**
+  - Add non-blocking check every 10 seconds.
+  - If WiFi connection state changes or RSSI changes by `>= 5 dBm`, trigger immediate async telemetry upload.
+- **Field Filtering at Write Time:**
+  - Only write `distance_cm` if `>= 0.0f`.
+  - Only write `state`, `state_str`, and `motor_current` if the state is not `STATE_IDLE`.
+  - Only write `wifi_rssi` if it is not `0`.
+- **Timestamp Alignment:**
+  - Set write options to `WritePrecision::MS`.
+  - Calculate absolute epoch milliseconds using captured references and set on points via `pointDevice.setTime()`.
 
-#### [MODIFY] [WifiManager.cpp](../src/WifiManager.cpp)
-- Optimize `WifiManager::getScanResultsJson()` by calling `json.reserve(32 + n * 64);` to allocate the required buffer once, rather than reallocating dynamically on each loop iteration.
+### Version Configuration
 
----
+#### [MODIFY] [SmartBoxController.h](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/src/SmartBoxController.h)
+- Bump default `FIRMWARE_VERSION` from `"0.0.1"` to `"0.1.0"`.
 
-### 2. Task Watchdog Timer (TWDT) Integration
+#### [MODIFY] [git_version.py](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/scripts/git_version.py)
+- Bump fallback `base_version` to `"0.1.0"`.
 
-#### [MODIFY] [main.cpp](../src/main.cpp)
-- Include `<esp_task_wdt.h>` under `#ifndef NATIVE_BUILD`.
-- In `setup()` (under `#ifndef NATIVE_BUILD`), initialize TWDT using version-safe configuration for ESP32 Arduino Core 3.x (checking `ESP_ARDUINO_VERSION_MAJOR >= 3`):
-  - Timeout: 10,000ms.
-  - Enable panic reboot.
-  - Subscribe the `loopTask` (using `esp_task_wdt_add(NULL)`).
-- In `NetworkTask` loop, subscribe the task with `esp_task_wdt_add(NULL)` and call `esp_task_wdt_reset()` on each loop iteration.
-- In `loop()`, call `esp_task_wdt_reset()` at the top.
-- Add an OTA guard to the main `loop()`: if the controller is in OTA mode (`STATE_OTA_UPDATING`), unsubscribe the `loopTask` from the TWDT to prevent resets during flashing. Re-subscribe if it returns to `STATE_IDLE` (recovery from OTA failure).
+### Repository Documentation
 
-#### [MODIFY] [AutoOtaManager.cpp](../src/AutoOtaManager.cpp)
-- Include `<esp_task_wdt.h>` under `#ifndef NATIVE_BUILD`.
-- Inside `runOtaProcess(bool force)`, unsubscribe the calling `NetworkTask` from the WDT before starting the blocking OTA flash download: `esp_task_wdt_delete(NULL)`.
-- If the OTA update fails (e.g., `HTTP_UPDATE_FAILED` or `HTTP_UPDATE_NO_UPDATES`), re-subscribe `NetworkTask` to the WDT: `esp_task_wdt_add(NULL)`.
-
----
-
-### 3. Proactive Daily Reboot Scheduling
-
-#### [MODIFY] [PowerManager.cpp](../src/PowerManager.cpp)
-- In `PowerManager::update()`, check if `timeinfo.tm_hour == 4` (04:00 AM KST), state is `STATE_IDLE`, and `!controllerPtr->isMotorRunning()`.
-- Use `Preferences` (under namespace `"smartbox"`, key `"reboot_day"`) to read and write the day of the year (`timeinfo.tm_yday`).
-- If `reboot_day` does not match the current day, save the current day to `Preferences` and call `ESP.restart()`. This guarantees the reboot only triggers once per day.
-
----
+#### [MODIFY] [implementation_plan.md](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/docs/implementation_plan.md)
+#### [MODIFY] [task.md](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/docs/task.md)
+#### [MODIFY] [walkthrough.md](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/docs/walkthrough.md)
+- Overwrite previous docs with the plans, tasks, and walkthrough files corresponding to the current version `0.1.0` release.
 
 ## Verification Plan
 
 ### Automated Tests
-- Run PlatformIO native unit tests to ensure that the code compiles and existing tests pass:
-  ```powershell
-  pio test -e native
-  ```
+- Build the firmware using PlatformIO:
+  - `pio run`
 
 ### Manual Verification
-- Verify compilation of the firmware:
-  ```powershell
-  pio run -e esp32-c6-devkitc-1
-  ```
-- Upload and monitor the serial logs to verify successful WDT initialization, feeding logs, and verify that the device is running stably.
-- Trigger manual OTA through the dashboard to verify that WDT doesn't reboot the device mid-OTA.
+- Verify the dynamic version print in the build logs: `[git_version] Extracted dynamic version: 0.1.0-g<commit>`.
+- Push changes to GitHub.
