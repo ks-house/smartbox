@@ -10,6 +10,7 @@ struct TelemetryData {
     float distance_cm;
     float motor_current;
     int state;
+    int wifi_rssi;
     unsigned long timestamp_ms;
 };
 

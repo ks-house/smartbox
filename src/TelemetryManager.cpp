@@ -84,10 +84,23 @@ void TelemetryManager::telemetryTaskFunction(void* pvParameters) {
         pointDevice.addTag("type", payload->type);
         
         pointDevice.addField("battery_v", d.battery_v);
-        pointDevice.addField("distance_cm", d.distance_cm);
-        pointDevice.addField("motor_current", d.motor_current);
-        pointDevice.addField("state", d.state);
-        pointDevice.addField("state_str", stateToString((State)d.state));
+        
+        // 1. 센서 측정 거리는 100cm 이하일 때만 수집해서 전송 (data.distance_cm = -1.0f 이면 100cm 초과임)
+        if (d.distance_cm >= 0.0f) {
+            pointDevice.addField("distance_cm", d.distance_cm);
+        }
+        
+        // 2 & 3. State와 모터 전류는 IDLE 상태가 아닐 때만 수집해서 전송
+        if (d.state != (int)STATE_IDLE) {
+            pointDevice.addField("motor_current", d.motor_current);
+            pointDevice.addField("state", d.state);
+            pointDevice.addField("state_str", stateToString((State)d.state));
+        }
+        
+        // 4. WiFi RSSI가 수집되었을 때 전송
+        if (d.wifi_rssi != 0) {
+            pointDevice.addField("wifi_rssi", d.wifi_rssi);
+        }
         
         unsigned long offset = d.timestamp_ms - baseTime;
         pointDevice.addField("offset_ms", (int)offset);
@@ -164,20 +177,23 @@ void TelemetryManager::update() {
         return;
     }
 
+    unsigned long now = millis();
+
     // 1. High-frequency active state (motor running) sampling and buffering
     bool isMotor = controllerPtr->isMotorRunning();
 
     if (isMotor) {
         wasMotorRunning = true;
-        unsigned long now = millis();
         if (now - lastSampleTime >= 500) {
             lastSampleTime = now;
             
             TelemetryData data;
             data.battery_v = controllerPtr->getBatteryVoltage();
-            data.distance_cm = controllerPtr->getDistance();
+            float dist = controllerPtr->getDistance();
+            data.distance_cm = (dist <= 100.0f) ? dist : -1.0f;
             data.motor_current = controllerPtr->getMotorCurrent();
             data.state = (int)controllerPtr->getCurrentState();
+            data.wifi_rssi = WifiManager::isConnected() ? WiFi.RSSI() : 0;
             data.timestamp_ms = now;
             
             if (bufferCount < MAX_BATCH_SIZE) {
@@ -237,7 +253,6 @@ void TelemetryManager::update() {
     }
 
     // 2. Regular heartbeat sampling (every 1 minute / 60,000ms)
-    unsigned long now = millis();
     if (lastHeartbeatSampleTime == 0) {
         lastHeartbeatSampleTime = now;
     }
@@ -247,9 +262,11 @@ void TelemetryManager::update() {
         
         TelemetryData data;
         data.battery_v = controllerPtr->getBatteryVoltage();
-        data.distance_cm = controllerPtr->getDistance();
+        float dist = controllerPtr->getDistance();
+        data.distance_cm = (dist <= 100.0f) ? dist : -1.0f;
         data.motor_current = controllerPtr->getMotorCurrent();
         data.state = (int)controllerPtr->getCurrentState();
+        data.wifi_rssi = WifiManager::isConnected() ? WiFi.RSSI() : 0;
         data.timestamp_ms = now;
         
         if (heartbeatCount < 60) {
@@ -313,6 +330,67 @@ void TelemetryManager::update() {
                 }
             } else {
                 Serial.println("[TELEMETRY] Heartbeat interval elapsed, but cannot send telemetry. Keeping data in buffer.");
+            }
+        }
+    }
+
+    // 4. WiFi change detection (every 10 seconds)
+    static bool lastWifiConnected = false;
+    static int lastWifiRssi = 0;
+    static unsigned long lastWifiCheckTime = 0;
+    
+    if (now - lastWifiCheckTime >= 10000) {
+        lastWifiCheckTime = now;
+        
+        bool currentWifiConnected = WifiManager::isConnected();
+        int currentWifiRssi = currentWifiConnected ? WiFi.RSSI() : 0;
+        
+        bool statusChanged = (currentWifiConnected != lastWifiConnected);
+        bool rssiChanged = currentWifiConnected && (abs(currentWifiRssi - lastWifiRssi) >= 5);
+        
+        if (statusChanged || rssiChanged) {
+            Serial.printf("[TELEMETRY] WiFi change detected. Connected: %d -> %d, RSSI: %d -> %d\n",
+                          lastWifiConnected, currentWifiConnected, lastWifiRssi, currentWifiRssi);
+            
+            lastWifiConnected = currentWifiConnected;
+            lastWifiRssi = currentWifiRssi;
+            
+            if (currentWifiConnected && controllerPtr->canSendTelemetry()) {
+                Serial.println("[TELEMETRY] Spawning async WiFi change transmission...");
+                
+                BatchPayload* payload = new BatchPayload();
+                payload->count = 1;
+                snprintf(payload->type, sizeof(payload->type), "wifi");
+                payload->data = new TelemetryData[1];
+                
+                TelemetryData d;
+                d.battery_v = controllerPtr->getBatteryVoltage();
+                float dist = controllerPtr->getDistance();
+                d.distance_cm = (dist <= 100.0f) ? dist : -1.0f;
+                d.motor_current = controllerPtr->getMotorCurrent();
+                d.state = (int)controllerPtr->getCurrentState();
+                d.wifi_rssi = currentWifiRssi;
+                d.timestamp_ms = now;
+                
+                payload->data[0] = d;
+                payload->uploadStartMillis = now;
+                struct timeval tv;
+                gettimeofday(&tv, NULL);
+                payload->currentEpochMs = (uint64_t)tv.tv_sec * 1000 + (tv.tv_usec / 1000);
+                
+                BaseType_t res = xTaskCreate(
+                    telemetryTaskFunction,
+                    "WifiBatch",
+                    8192,
+                    payload,
+                    1,
+                    NULL
+                );
+                if (res != pdPASS) {
+                    Serial.println("[TELEMETRY] Failed to create WifiBatch task. Reclaiming memory.");
+                    delete[] payload->data;
+                    delete payload;
+                }
             }
         }
     }
