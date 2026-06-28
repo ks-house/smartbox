@@ -313,6 +313,15 @@ void SmartBoxController::forceOpen() {
     }
 }
 
+void SmartBoxController::forceClose() {
+    if (currentState != STATE_BATTERY_LOW_SHUTDOWN && currentState != STATE_EMERGENCY_STOP) {
+        if (currentState != STATE_IDLE && currentState != STATE_CLOSING && currentState != STATE_CLOSE_START) {
+            maintenanceRequested = false;
+            transitionTo(STATE_CLOSE_START);
+        }
+    }
+}
+
 void SmartBoxController::resetEmergency() {
     if (currentState == STATE_EMERGENCY_STOP) {
         currentState = STATE_IDLE;

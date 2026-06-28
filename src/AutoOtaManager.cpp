@@ -73,12 +73,12 @@ void AutoOtaManager::update() {
         return;
     }
     
-    // Auto-OTA at configured hour
+    // Auto-OTA at configured hour or later (catch-up if missed due to sleep/reboot)
     int scheduledHour = controllerPtr->getConfig().otaHour;
-    if (timeinfo.tm_hour == scheduledHour) {
+    if (timeinfo.tm_hour >= scheduledHour) {
         if (lastOtaCheckDay != timeinfo.tm_mday) {
             lastOtaCheckDay = timeinfo.tm_mday;
-            Serial.printf("[AUTO-OTA] Scheduled trigger time (%d:00 KST) reached. Running AutoOta...\n", scheduledHour);
+            Serial.printf("[AUTO-OTA] Scheduled trigger time (%d:00 KST) reached or passed. Running AutoOta...\n", scheduledHour);
             runOtaProcess(false);
         }
     }

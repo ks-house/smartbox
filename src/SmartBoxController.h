@@ -50,7 +50,7 @@ struct BoxConfig {
       3000.0f; // Dual actuator: 100N/60mm/s x2 @ 12V, normal run ~2000mA
   unsigned long emergencyRecoveryTime =
       5000; // Auto-recovery from EMERGENCY_STOP (ms)
-  int otaHour = 3;
+  int otaHour = 0; // Changed to 0 (midnight) for safe catch-up check
   int telemetryIntervalMin = 10; // Default: 10 minutes
   unsigned long maxHoldTime = 180000; // 3 minutes
 };
@@ -126,6 +126,7 @@ public:
   void setInitialState(State state) { initialState = state; }
 
   void forceOpen();
+  void forceClose();
   void resetEmergency();
   void startMaintenanceMode();
   void stopMaintenanceMode();

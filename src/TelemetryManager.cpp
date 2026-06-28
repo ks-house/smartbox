@@ -23,6 +23,13 @@ int TelemetryManager::pendingFailedTxCount = 0;
 String TelemetryManager::lastNetworkError = "";
 std::mutex TelemetryManager::diagMutex;
 
+// ── InfluxDB log forwarding queue ─────────────────────────
+RemoteLogEntry TelemetryManager::logQueue[MAX_LOG_QUEUE];
+int TelemetryManager::logQueueCount = 0;
+std::mutex TelemetryManager::logQueueMutex;
+
+bool TelemetryManager::wakeupTelemetryPending = false;
+
 // Connection parameters as constants
 static const char* INFLUXDB_URL = SECRET_INFLUXDB_URL;
 static const char* INFLUXDB_TOKEN = SECRET_INFLUXDB_TOKEN;
@@ -146,6 +153,50 @@ void TelemetryManager::telemetryTaskFunction(void* pvParameters) {
     } else {
         Serial.println("[TELEMETRY-ASYNC] Asynchronous batch write completed with some failures.");
     }
+
+    // ── Flush InfluxDB log queue (WARN/ERROR entries) ─────
+    {
+        std::lock_guard<std::mutex> lock(logQueueMutex);
+        if (logQueueCount > 0) {
+            Serial.printf("[TELEMETRY-ASYNC] Flushing %d log entries to InfluxDB (smartbox_log)...\n", logQueueCount);
+
+            struct timeval tvLog;
+            gettimeofday(&tvLog, NULL);
+            uint64_t nowEpochMs = (uint64_t)tvLog.tv_sec * 1000 + (tvLog.tv_usec / 1000);
+            unsigned long nowMs = millis();
+
+            for (int i = 0; i < logQueueCount; i++) {
+                const RemoteLogEntry& le = logQueue[i];
+                Point logPoint("smartbox_log");
+                logPoint.addTag("device", DEVICE_TAG);
+                const char* lvlStr = "INFO";
+                switch (le.level) {
+                    case LogLevel::DEBUG: lvlStr = "DEBUG"; break;
+                    case LogLevel::INFO:  lvlStr = "INFO";  break;
+                    case LogLevel::WARN:  lvlStr = "WARN";  break;
+                    case LogLevel::ERROR: lvlStr = "ERROR"; break;
+                }
+                logPoint.addTag("level", lvlStr);
+                logPoint.addField("message", le.message);
+
+                // Approximate epoch time for this log entry
+                uint64_t logEpochMs;
+                if (nowMs >= le.timestamp_ms) {
+                    logEpochMs = nowEpochMs - (nowMs - le.timestamp_ms);
+                } else {
+                    logEpochMs = nowEpochMs;
+                }
+                logPoint.setTime(logEpochMs);
+
+                if (!client.writePoint(logPoint)) {
+                    Serial.printf("[TELEMETRY-ASYNC] Log entry %d write failed: %s\n",
+                                  i, client.getLastErrorMessage().c_str());
+                }
+            }
+            logQueueCount = 0;
+            Serial.println("[TELEMETRY-ASYNC] Log queue flushed.");
+        }
+    }
     
     // Safely reclaim allocated memory
     delete[] payload->data;
@@ -162,10 +213,34 @@ void TelemetryManager::init(SmartBoxController& controller) {
     lastSampleTime = 0;
     heartbeatCount = 0;
     lastHeartbeatSampleTime = 0;
+    logQueueCount = 0;
+    wakeupTelemetryPending = false;
     
     std::lock_guard<std::mutex> lock(diagMutex);
     pendingFailedTxCount = 0;
     lastNetworkError = "";
+}
+
+void TelemetryManager::notifySleepEnd() {
+    wakeupTelemetryPending = true;
+    lastSendTime = 0; // Force immediate heartbeat on next update cycle
+}
+
+// ── pushLog: called by RemoteLogger to queue WARN/ERROR for InfluxDB ─
+void TelemetryManager::pushLog(LogLevel level, const char* message) {
+    std::lock_guard<std::mutex> lock(logQueueMutex);
+    if (logQueueCount >= MAX_LOG_QUEUE) {
+        // Ring: drop oldest entry
+        for (int i = 1; i < MAX_LOG_QUEUE; i++) {
+            logQueue[i - 1] = logQueue[i];
+        }
+        logQueueCount = MAX_LOG_QUEUE - 1;
+    }
+    RemoteLogEntry& e = logQueue[logQueueCount++];
+    e.timestamp_ms = millis();
+    e.level = level;
+    strncpy(e.message, message, sizeof(e.message) - 1);
+    e.message[sizeof(e.message) - 1] = '\0';
 }
 
 void TelemetryManager::update() {
@@ -178,6 +253,46 @@ void TelemetryManager::update() {
     }
 
     unsigned long now = millis();
+
+    // 0. Wakeup Telemetry processing
+    if (wakeupTelemetryPending && WifiManager::isConnected()) {
+        wakeupTelemetryPending = false;
+        if (controllerPtr->canSendTelemetry()) {
+            Serial.println("[TELEMETRY] Spawning async wakeup transmission after sleep...");
+            BatchPayload* payload = new BatchPayload();
+            payload->count = 1;
+            snprintf(payload->type, sizeof(payload->type), "wakeup");
+            payload->data = new TelemetryData[1];
+            
+            TelemetryData d;
+            d.battery_v = controllerPtr->getBatteryVoltage();
+            float dist = controllerPtr->getDistance();
+            d.distance_cm = (dist <= 100.0f) ? dist : -1.0f;
+            d.motor_current = controllerPtr->getMotorCurrent();
+            d.state = (int)controllerPtr->getCurrentState();
+            d.wifi_rssi = WiFi.RSSI();
+            d.timestamp_ms = now;
+            
+            payload->data[0] = d;
+            payload->uploadStartMillis = now;
+            struct timeval tv;
+            gettimeofday(&tv, NULL);
+            payload->currentEpochMs = (uint64_t)tv.tv_sec * 1000 + (tv.tv_usec / 1000);
+            
+            BaseType_t res = xTaskCreate(
+                telemetryTaskFunction,
+                "WakeupBatch",
+                8192,
+                payload,
+                1,
+                NULL
+            );
+            if (res != pdPASS) {
+                delete[] payload->data;
+                delete payload;
+            }
+        }
+    }
 
     // 1. High-frequency active state (motor running) sampling and buffering
     bool isMotor = controllerPtr->isMotorRunning();

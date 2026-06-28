@@ -2,11 +2,13 @@
 #include "ConfigManager.h"
 #include "WifiManager.h"
 #include "AutoOtaManager.h"
+#include "RemoteLogger.h"
 #include "secrets.h"
 #include <Arduino.h>
 #include <WiFi.h>
 
 AsyncWebServer WebDashboard::server(80);
+AsyncWebSocket WebDashboard::wsLog("/api/logs");
 SmartBoxController* WebDashboard::controllerPtr = nullptr;
 
 // JSON string escape helper (anonymous namespace — internal linkage only)
@@ -123,7 +125,10 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
     <!-- Remote Commands -->
     <button class='btn btn-disabled' id='btnRelease' disabled onclick='releaseEmergency()'>Release Emergency Lock</button>
-    <button class='btn btn-primary' id='btnOpen' onclick='forceOpen()'>Remote Force Open</button>
+    <div style='display:flex; gap:10px; margin-bottom:10px;'>
+      <button class='btn btn-primary' id='btnOpen' onclick='forceOpen()' style='margin-bottom:0;'>Remote Force Open</button>
+      <button class='btn btn-danger' id='btnClose' onclick='forceClose()' style='margin-bottom:0; background:var(--warning);'>Remote Force Close</button>
+    </div>
     <button class='btn' id='btnMaintenance' onclick='toggleMaintenance()' style='background: var(--warning); box-shadow: 0 8px 20px rgba(245,158,11,0.2); color: white;'>🧹 수동 청소 모드 (5분 열림)</button>
 
     <!-- Sensitivity Settings -->
@@ -179,6 +184,27 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       </div>
       <div id='nasOtaStatus' style='display:none; padding: 12px; border-radius: 12px; margin-bottom: 15px; font-weight: 600; text-align: center;'></div>
       <button class='btn btn-primary' id='btnNasOta' onclick='updateFromNas()' style='background: var(--info); box-shadow: 0 8px 20px rgba(10,132,255,0.2);'>Fetch & Update</button>
+    </div>
+
+    <!-- ===== Remote Log Viewer ===== -->
+    <div class='card' style='margin-top: 20px;'>
+      <div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;'>
+        <h3 style='font-size:1.15rem; font-weight:600; color:#a5b4fc; margin:0;'>📋 Remote Serial Log</h3>
+        <div style='display:flex; gap:8px; align-items:center;'>
+          <span id='wsStatusDot' style='display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--danger);'></span>
+          <span id='wsStatusTxt' style='font-size:0.78rem; color:var(--text-muted);'>Disconnected</span>
+          <button onclick='clearLogView()' style='padding:4px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:var(--text-muted);cursor:pointer;font-size:0.78rem;'>Clear</button>
+          <button onclick='toggleLogPause()' id='btnLogPause' style='padding:4px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:var(--text-muted);cursor:pointer;font-size:0.78rem;'>Pause</button>
+        </div>
+      </div>
+      <!-- Level filter chips -->
+      <div style='display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;'>
+        <span onclick='toggleFilter(this,"DEBUG")' data-lvl='DEBUG' class='log-chip chip-on' style='cursor:pointer;padding:3px 10px;border-radius:20px;font-size:0.72rem;background:rgba(133,138,157,0.15);color:#858a9d;'>DEBUG</span>
+        <span onclick='toggleFilter(this,"INFO")'  data-lvl='INFO'  class='log-chip chip-on' style='cursor:pointer;padding:3px 10px;border-radius:20px;font-size:0.72rem;background:rgba(16,185,129,0.15);color:#10b981;'>INFO</span>
+        <span onclick='toggleFilter(this,"WARN")'  data-lvl='WARN'  class='log-chip chip-on' style='cursor:pointer;padding:3px 10px;border-radius:20px;font-size:0.72rem;background:rgba(245,158,11,0.15);color:#f59e0b;'>WARN</span>
+        <span onclick='toggleFilter(this,"ERROR")' data-lvl='ERROR' class='log-chip chip-on' style='cursor:pointer;padding:3px 10px;border-radius:20px;font-size:0.72rem;background:rgba(239,68,68,0.15);color:#ef4444;'>ERROR</span>
+      </div>
+      <div id='logContainer' style='font-family:monospace;font-size:0.78rem;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:12px;height:280px;overflow-y:auto;color:#c9d1e3;'></div>
     </div>
   </div>
 
@@ -326,6 +352,13 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     async function forceOpen() {
       if(confirm('Force open the lid remotely?')) {
         await fetch('/api/open');
+        updateStatus();
+      }
+    }
+    
+    async function forceClose() {
+      if(confirm('Force close the lid remotely?')) {
+        await fetch('/api/close');
         updateStatus();
       }
     }
@@ -555,6 +588,90 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     
     setInterval(updateStatus, 1000);
     updateStatus();
+
+    // ===== WebSocket Remote Logger =====
+    const LOG_COLORS = { DEBUG:'#858a9d', INFO:'#10b981', WARN:'#f59e0b', ERROR:'#ef4444' };
+    let logPaused = false;
+    let activeFilters = new Set(['DEBUG','INFO','WARN','ERROR']);
+    let logBuffer = [];
+
+    function toggleFilter(el, lvl) {
+      if (activeFilters.has(lvl)) {
+        activeFilters.delete(lvl);
+        el.style.opacity = '0.35';
+        el.classList.remove('chip-on');
+      } else {
+        activeFilters.add(lvl);
+        el.style.opacity = '1';
+        el.classList.add('chip-on');
+      }
+      rebuildLogView();
+    }
+
+    function rebuildLogView() {
+      const container = document.getElementById('logContainer');
+      container.innerHTML = '';
+      logBuffer.forEach(e => { if (activeFilters.has(e.lvl)) appendLogLine(e, false); });
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function appendLogLine(entry, scroll=true) {
+      if (!activeFilters.has(entry.lvl)) return;
+      const container = document.getElementById('logContainer');
+      const div = document.createElement('div');
+      div.style.cssText = 'padding:2px 0; border-bottom:1px solid rgba(255,255,255,0.03); white-space:pre-wrap; word-break:break-all;';
+      const uptimeSec = (entry.ts / 1000).toFixed(1);
+      const col = LOG_COLORS[entry.lvl] || '#c9d1e3';
+      div.innerHTML = `<span style='color:#4b5563;'>[+${uptimeSec}s]</span> <span style='color:${col};font-weight:600;'>${entry.lvl.padEnd(5)}</span> <span>${entry.msg}</span>`;
+      container.appendChild(div);
+      if (scroll && !logPaused) container.scrollTop = container.scrollHeight;
+    }
+
+    function clearLogView() {
+      logBuffer = [];
+      document.getElementById('logContainer').innerHTML = '';
+    }
+
+    function toggleLogPause() {
+      logPaused = !logPaused;
+      document.getElementById('btnLogPause').innerText = logPaused ? 'Resume' : 'Pause';
+      if (!logPaused) document.getElementById('logContainer').scrollTop = document.getElementById('logContainer').scrollHeight;
+    }
+
+    function connectWS() {
+      const dot = document.getElementById('wsStatusDot');
+      const txt = document.getElementById('wsStatusTxt');
+      const wsUrl = 'ws://' + location.host + '/api/logs';
+      const ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        dot.style.background = 'var(--success)';
+        txt.innerText = 'Connected';
+      };
+      ws.onclose = () => {
+        dot.style.background = 'var(--danger)';
+        txt.innerText = 'Disconnected — retrying...';
+        setTimeout(connectWS, 3000);
+      };
+      ws.onerror = () => ws.close();
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'history') {
+            // Initial history dump
+            msg.data.forEach(e => { logBuffer.push(e); appendLogLine(e, false); });
+            document.getElementById('logContainer').scrollTop = document.getElementById('logContainer').scrollHeight;
+          } else {
+            // Live entry: {ts, lvl, msg}
+            logBuffer.push(msg);
+            if (logBuffer.length > 200) logBuffer.shift();
+            appendLogLine(msg);
+          }
+        } catch(e) { console.error('WS parse error', e); }
+      };
+    }
+    connectWS();
   </script>
 </body>
 </html>
@@ -572,7 +689,20 @@ static bool checkAuth(AsyncWebServerRequest *request) {
 
 void WebDashboard::init(SmartBoxController& controller) {
     controllerPtr = &controller;
-    
+
+    // ── WebSocket log endpoint setup ──────────────────────────
+    wsLog.onEvent(RemoteLogger::onWsEvent);
+    server.addHandler(&wsLog);
+    RemoteLogger::init(&wsLog);
+    Serial.println("[DASHBOARD] WebSocket log endpoint active: ws://<ip>/api/logs");
+
+    // ── Log history REST endpoint (for non-WS clients) ────────
+    server.on("/api/logs/history", HTTP_GET, [](AsyncWebServerRequest *request){
+        if (!checkAuth(request)) return;
+        String json = RemoteLogger::getHistoryJson();
+        request->send(200, "application/json", json);
+    });
+
     // Serve HTML Dashboard
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
         if (!checkAuth(request)) return;
@@ -650,6 +780,17 @@ void WebDashboard::init(SmartBoxController& controller) {
         if (controllerPtr != nullptr) {
             controllerPtr->forceOpen();
             request->send(200, "application/json", "{\"status\":\"opening\"}");
+        } else {
+            request->send(500, "application/json", "{\"status\":\"error\"}");
+        }
+    });
+    
+    // Remote Force Close endpoint
+    server.on("/api/close", HTTP_GET, [](AsyncWebServerRequest *request){
+        if (!checkAuth(request)) return;
+        if (controllerPtr != nullptr) {
+            controllerPtr->forceClose();
+            request->send(200, "application/json", "{\"status\":\"closing\"}");
         } else {
             request->send(500, "application/json", "{\"status\":\"error\"}");
         }

@@ -46,7 +46,7 @@ void ConfigManager::loadConfig(BoxConfig& config) {
         config.emergencyRecoveryTime = 5000; // 5s default auto-recovery
     }
     if (config.otaHour < 0 || config.otaHour > 23) {
-        config.otaHour = 3;
+        config.otaHour = 0;
     }
     if (config.telemetryIntervalMin < 1 || config.telemetryIntervalMin > 1440) {
         config.telemetryIntervalMin = 10;

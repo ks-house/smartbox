@@ -5,4 +5,4 @@
 - `[x]` Bump `FIRMWARE_VERSION` to `0.1.0` in `SmartBoxController.h` and `git_version.py`
 - `[x]` Copy updated plan, task list, and walkthrough artifacts to `docs/` folder
 - `[x]` Verify final compilation of version bump changes
-- `[/]` Stage, commit, and push all changes to git
+- `[x]` Stage, commit, and push all changes to git

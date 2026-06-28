@@ -6,7 +6,8 @@
 
 class WebDashboard {
 private:
-    static AsyncWebServer server;
+    static AsyncWebServer  server;
+    static AsyncWebSocket  wsLog;   // WebSocket endpoint for real-time log streaming
     static SmartBoxController* controllerPtr;
 
 public:

@@ -8,6 +8,7 @@
 #include "AutoOtaManager.h"
 #include "TelemetryManager.h"
 #include "PowerManager.h"
+#include "RemoteLogger.h"
 
 #ifndef NATIVE_BUILD
 #include <esp_task_wdt.h>
@@ -97,6 +98,10 @@ void setup() {
 
     // 9. Initialize InfluxDB telemetry manager
     TelemetryManager::init(controller);
+
+    // Register TelemetryManager log queue as WARN/ERROR forwarding target
+    RemoteLogger::onWarnError = TelemetryManager::pushLog;
+    Serial.println("[SYSTEM] RemoteLogger WARN/ERROR -> TelemetryManager::pushLog callback registered.");
 
     // 10. Initialize time-based power management
     PowerManager::init(controller);

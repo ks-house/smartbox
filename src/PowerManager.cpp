@@ -1,6 +1,7 @@
 #include "PowerManager.h"
 #include "WifiManager.h"
 #include "ConfigManager.h"
+#include "TelemetryManager.h"
 #include <Arduino.h>
 #include <time.h>
 #ifndef NATIVE_BUILD
@@ -84,6 +85,9 @@ void PowerManager::update() {
             String savedPass = "";
             ConfigManager::loadWifiCredentials(savedSsid, savedPass);
             WifiManager::startWiFi(savedSsid.c_str(), savedPass.c_str());
+            
+            // Notify TelemetryManager to send a wakeup point once connected
+            TelemetryManager::notifySleepEnd();
         }
     }
 }
