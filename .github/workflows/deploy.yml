@@ -58,6 +58,10 @@ jobs:
           #define SECRET_DASHBOARD_USER "${{ secrets.SECRET_DASHBOARD_USER }}"
           #define SECRET_DASHBOARD_PASS "${{ secrets.SECRET_DASHBOARD_PASS }}"
           #define SECRET_AP_PASS "${{ secrets.SECRET_AP_PASS }}"
+          #define SECRET_MQTT_HOST "${{ secrets.SECRET_MQTT_HOST }}"
+          #define SECRET_MQTT_PORT ${{ secrets.SECRET_MQTT_PORT }}
+          #define SECRET_MQTT_USER "${{ secrets.SECRET_MQTT_USER }}"
+          #define SECRET_MQTT_PASS "${{ secrets.SECRET_MQTT_PASS }}"
           EOF
 
           # Append multi-line Root CA cert using env variable (safe for PEM newlines)
