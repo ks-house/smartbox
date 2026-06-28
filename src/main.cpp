@@ -9,6 +9,7 @@
 #include "TelemetryManager.h"
 #include "PowerManager.h"
 #include "RemoteLogger.h"
+#include "MqttManager.h"
 
 #ifndef NATIVE_BUILD
 #include <esp_task_wdt.h>
@@ -18,6 +19,7 @@
 // TRIG = GPIO 4, ECHO = GPIO 5
 static Esp32Hardware hardware(4, 5);
 static SmartBoxController controller(hardware);
+static MqttManager mqttManager(controller);
 
 // Callback to dispatch state changes asynchronously
 static void onStateChanged(State prevState, State newState) {
@@ -43,6 +45,8 @@ static void NetworkTask(void* pvParameters) {
     // Register background task to TWDT
     esp_task_wdt_add(NULL);
     
+    static unsigned long lastMqttTelemetry = 0;
+
     for (;;) {
         // Feed watchdog
         esp_task_wdt_reset();
@@ -52,6 +56,15 @@ static void NetworkTask(void* pvParameters) {
         
         // Run InfluxDB Telemetry updates
         TelemetryManager::update();
+
+        // Run MQTT updates
+        mqttManager.update();
+
+        // Periodic MQTT Telemetry (every 30 seconds)
+        if (millis() - lastMqttTelemetry >= 30000) {
+            lastMqttTelemetry = millis();
+            mqttManager.publishTelemetry();
+        }
         
         // Yield CPU
         vTaskDelay(pdMS_TO_TICKS(100));
@@ -99,11 +112,17 @@ void setup() {
     // 9. Initialize InfluxDB telemetry manager
     TelemetryManager::init(controller);
 
-    // Register TelemetryManager log queue as WARN/ERROR forwarding target
-    RemoteLogger::onWarnError = TelemetryManager::pushLog;
-    Serial.println("[SYSTEM] RemoteLogger WARN/ERROR -> TelemetryManager::pushLog callback registered.");
+    // 10. Initialize MQTT Manager
+    mqttManager.begin();
 
-    // 10. Initialize time-based power management
+    // Register combined log forwarding target (InfluxDB + MQTT)
+    RemoteLogger::onWarnError = [](LogLevel level, const char* message) {
+        TelemetryManager::pushLog(level, message);
+        mqttManager.publishLog(level, message);
+    };
+    Serial.println("[SYSTEM] RemoteLogger WARN/ERROR -> TelemetryManager & MqttManager callback registered.");
+
+    // 11. Initialize time-based power management
     PowerManager::init(controller);
 
 #ifndef NATIVE_BUILD
@@ -178,6 +197,10 @@ void loop() {
 
     // Run Power Manager updates
     PowerManager::update();
+
+#ifdef NATIVE_BUILD
+    mqttManager.update();
+#endif
 
     // 1-second interval diagnostic print
     static unsigned long lastDebug = 0;
