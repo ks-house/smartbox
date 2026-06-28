@@ -1,5 +1,4 @@
 #include "RemoteLogger.h"
-#include "MqttManager.h"
 #include <stdarg.h>
 #include <time.h>
 
@@ -30,23 +29,19 @@ const char* RemoteLogger::levelStr(LogLevel lvl) {
     }
 }
 
-// Broadcast a single entry JSON to all connected WS clients and MQTT
+// Broadcast a single entry JSON to all connected WS clients
 void RemoteLogger::broadcastEntry(const LogEntry& entry) {
-    if (_ws != nullptr && _ws->count() > 0) {
-        // Format: {"ts":12345,"lvl":"INFO","msg":"..."}
-        char buf[160];
-        snprintf(buf, sizeof(buf),
-            "{\"ts\":%lu,\"lvl\":\"%s\",\"msg\":\"%s\"}",
-            entry.timestamp_ms,
-            levelStr(entry.level),
-            entry.message);
+    if (_ws == nullptr || _ws->count() == 0) return;
 
-        _ws->textAll(buf);
-    }
-    
-    // Also publish to MQTT
-    // Include MqttManager.h at the top if not included
-    MqttManager::publishLog(levelStr(entry.level), entry.message);
+    // Format: {"ts":12345,"lvl":"INFO","msg":"..."}
+    char buf[160];
+    snprintf(buf, sizeof(buf),
+        "{\"ts\":%lu,\"lvl\":\"%s\",\"msg\":\"%s\"}",
+        entry.timestamp_ms,
+        levelStr(entry.level),
+        entry.message);
+
+    _ws->textAll(buf);
 }
 
 // ── log ────────────────────────────────────────────────────

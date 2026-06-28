@@ -27,8 +27,6 @@ static void onStateChanged(State prevState, State newState) {
         return;
     }
     
-    // Publish new state to MQTT
-    MqttManager::publishState(newState);
 
     // Save logical lid state in Preferences based on transition
     if (newState == STATE_HOLD || newState == STATE_OPENING || newState == STATE_BATTERY_LOW_SHUTDOWN || newState == STATE_STARTUP_OPEN) {
@@ -54,9 +52,6 @@ static void NetworkTask(void* pvParameters) {
         
         // Run InfluxDB Telemetry updates
         TelemetryManager::update();
-
-        // Run MQTT Client loop
-        MqttManager::update();
         
         // Yield CPU
         vTaskDelay(pdMS_TO_TICKS(100));
@@ -97,9 +92,6 @@ void setup() {
 
     // 6. Initialize Web Dashboard
     WebDashboard::init(controller);
-
-    // 7. Initialize MQTT Manager
-    MqttManager::init(controller);
 
     // 8. Initialize Auto-OTA scheduler and manager
     AutoOtaManager::init(controller);
@@ -196,13 +188,5 @@ void loop() {
                       controller.getBatteryVoltage(),
                       controller.getMotorCurrent(),
                       (int)controller.getCurrentState());
-                      
-        // Publish basic telemetry to MQTT
-        char jsonBuf[128];
-        snprintf(jsonBuf, sizeof(jsonBuf), "{\"dist\":%.1f, \"batt\":%.2f, \"curr\":%.1f}",
-                 controller.getDistance(),
-                 controller.getBatteryVoltage(),
-                 controller.getMotorCurrent());
-        MqttManager::publishTelemetry(jsonBuf);
     }
 }
