@@ -909,6 +909,12 @@ void WebDashboard::init(SmartBoxController& controller) {
         }
         
         ConfigManager::saveWifiCredentials(ssid, password);
+        if (controllerPtr != nullptr && controllerPtr->isNightSleepActive()) {
+            controllerPtr->setNightSleepMode(false);
+#ifndef NATIVE_BUILD
+            setCpuFrequencyMhz(160);
+#endif
+        }
         WifiManager::connectTo(ssid.c_str(), password.c_str());
         
         request->send(200, "application/json", "{\"status\":\"connecting\",\"message\":\"Initiating connection\"}");

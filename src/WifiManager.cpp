@@ -69,6 +69,7 @@ void WifiManager::init(const char* apSsid, const char* apPass, const char* staSs
     
     // Set both Access Point and Station modes
     WiFi.mode(WIFI_AP_STA);
+    WiFi.setSleep(false);
     WiFi.softAP(apSsid, effectiveApPass);
     Serial.printf("[WIFI] SoftAP '%s' active (password protected). IP: %s\n", apSsid, WiFi.softAPIP().toString().c_str());
     
@@ -87,8 +88,8 @@ void WifiManager::init(const char* apSsid, const char* apPass, const char* staSs
 void WifiManager::update() {
     dnsServer.processNextRequest();
     
-    // Do not attempt to connect/reconnect while a scan is in progress
-    if (WiFi.scanComplete() == WIFI_SCAN_RUNNING) {
+    // Do not attempt to connect/reconnect while Wi-Fi is disabled or scan is running
+    if (WiFi.getMode() == WIFI_OFF || WiFi.scanComplete() == WIFI_SCAN_RUNNING) {
         return;
     }
     
@@ -149,6 +150,16 @@ void WifiManager::connectTo(const char* ssid, const char* password) {
     lastConnectRetry = millis();
     
     Serial.printf("[WIFI] Initiating dynamic connection to '%s'...\n", _staSsid.c_str());
+    
+    // Restore AP+STA dual mode if Wi-Fi was disabled (e.g. by Night Sleep)
+    if (WiFi.getMode() != WIFI_AP_STA) {
+        WiFi.mode(WIFI_AP_STA);
+        if (_apSsid.length() > 0) {
+            WiFi.softAP(_apSsid.c_str(), _apPass.c_str());
+        }
+        dnsServer.start(53, "*", WiFi.softAPIP());
+    }
+    WiFi.setSleep(false);
     WiFi.disconnect();
     WiFi.begin(_staSsid.c_str(), _staPass.c_str());
 }
@@ -164,6 +175,7 @@ void WifiManager::stopWiFi() {
 void WifiManager::startWiFi(const char* ssid, const char* password) {
     // Restore AP+STA dual mode (not STA-only) to keep local dashboard accessible
     WiFi.mode(WIFI_AP_STA);
+    WiFi.setSleep(false);
     
     // Re-establish Soft AP with stored credentials
     if (_apSsid.length() > 0) {
