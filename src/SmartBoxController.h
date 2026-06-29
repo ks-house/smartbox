@@ -80,10 +80,12 @@ private:
   float motorCurrent;
   float currentDistance;
   bool relaysIsolated;
-  bool nightSleepActive;
   bool maintenanceRequested;
   unsigned long holdStartTime;
   bool sensorDeadlockFlag;
+  // BUG-02 fix: stall counters as member vars to prevent cross-entry accumulation
+  int openStallCount;
+  int closeStallCount;
   mutable std::recursive_mutex dataMutex;
 
   void updateDistanceBuffer();
@@ -101,14 +103,6 @@ public:
   bool getSensorDeadlockFlag() const {
       std::lock_guard<std::recursive_mutex> lock(dataMutex);
       return sensorDeadlockFlag;
-  }
-  bool isNightSleepActive() const {
-      std::lock_guard<std::recursive_mutex> lock(dataMutex);
-      return nightSleepActive;
-  }
-  void setNightSleepMode(bool active) {
-      std::lock_guard<std::recursive_mutex> lock(dataMutex);
-      nightSleepActive = active;
   }
   SmartBoxController(HardwareInterface &hardware);
   ~SmartBoxController() {}

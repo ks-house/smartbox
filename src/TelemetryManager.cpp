@@ -43,7 +43,7 @@ void TelemetryManager::notifySleepEnd() {
 }
 
 void TelemetryManager::update() {
-    if (controllerPtr == nullptr || controllerPtr->isNightSleepActive()) {
+    if (controllerPtr == nullptr) {
         return;
     }
 
@@ -86,9 +86,8 @@ void TelemetryManager::update() {
             if (bufferCount < MAX_BATCH_SIZE) {
                 eventBuffer[bufferCount++] = data;
             } else {
-                for (int i = 1; i < MAX_BATCH_SIZE; i++) {
-                    eventBuffer[i - 1] = eventBuffer[i];
-                }
+                // BUG-06 fix: use memmove instead of O(N) loop
+                memmove(&eventBuffer[0], &eventBuffer[1], (MAX_BATCH_SIZE - 1) * sizeof(TelemetryData));
                 eventBuffer[MAX_BATCH_SIZE - 1] = data;
             }
         }
@@ -125,9 +124,8 @@ void TelemetryManager::update() {
         if (heartbeatCount < 60) {
             heartbeatBuffer[heartbeatCount++] = data;
         } else {
-            for (int i = 1; i < 60; i++) {
-                heartbeatBuffer[i - 1] = heartbeatBuffer[i];
-            }
+            // BUG-06 fix: use memmove instead of O(N) loop
+            memmove(&heartbeatBuffer[0], &heartbeatBuffer[1], 59 * sizeof(TelemetryData));
             heartbeatBuffer[59] = data;
         }
     }

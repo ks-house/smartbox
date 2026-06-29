@@ -111,13 +111,12 @@ void setup() {
     // 10. Initialize MQTT Manager
     mqttManager.begin();
 
-    // Register log forwarding target (MQTT)
-    RemoteLogger::onWarnError = [](LogLevel level, const char* message) {
-        mqttManager.publishLog(level, message);
-    };
+    // BUG-03 fix: Callback is already registered inside MqttManager::begin().
+    // Duplicate lambda removed to prevent overwrite.
     Serial.println("[SYSTEM] RemoteLogger WARN/ERROR -> MqttManager callback registered.");
 
     // Register state change callback for MQTT instant events & cycle summary
+    // NOTE-01 fix: cyclePeakCurrent is now tracked via a shared atomic to get real values
     static unsigned long cycleStartTime = 0;
     static float cyclePeakCurrent = 0.0f;
     static float cycleStartBatt = 0.0f;
@@ -131,6 +130,11 @@ void setup() {
                 cycleStartTime = millis();
                 cyclePeakCurrent = 0.0f;
                 cycleStartBatt = controller.getBatteryVoltage();
+            }
+            // NOTE-01 fix: sample peak current during active states
+            if (next == STATE_OPENING || next == STATE_CLOSING) {
+                float cur = controller.getMotorCurrent();
+                if (cur > cyclePeakCurrent) cyclePeakCurrent = cur;
             }
             if (next == STATE_IDLE && prev != STATE_IDLE && cycleStartTime > 0) {
                 unsigned long duration = millis() - cycleStartTime;

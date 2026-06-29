@@ -9,15 +9,17 @@ DNSServer WifiManager::dnsServer;
 WebServer WifiManager::webServer(80);
 String WifiManager::_apSsid = "";
 String WifiManager::_apPass = "";
+String WifiManager::_staSsid = "";  // BUG-08 fix: class static definition
+String WifiManager::_staPass = "";  // BUG-08 fix: class static definition
 unsigned long WifiManager::bootTime = 0;
 bool WifiManager::apTimeoutReached = false;
+bool WifiManager::dnsServerStarted = false;  // BUG-01 fix
 
 ProvState WifiManager::provState = ProvState::IDLE;
 String WifiManager::stationIp = "";
 unsigned long WifiManager::connectStartTime = 0;
 
-static String _staSsid = "";
-static String _staPass = "";
+
 
 namespace {
     String escapeJson(const String& input) {
@@ -31,6 +33,22 @@ namespace {
             else if (c == '\r') { out += '\\'; out += 'r'; }
             else if (c == '\t') { out += '\\'; out += 't'; }
             else                { out += c; }
+        }
+        return out;
+    }
+
+    // BUG-04 fix: HTML-escape user input to prevent injection / parse errors
+    String escapeHtml(const String& input) {
+        String out;
+        out.reserve(input.length() + 16);
+        for (unsigned int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            if      (c == '&')  out += "&amp;";
+            else if (c == '<')  out += "&lt;";
+            else if (c == '>')  out += "&gt;";
+            else if (c == '"')  out += "&quot;";
+            else if (c == '\'') out += "&#39;";
+            else                out += c;
         }
         return out;
     }
@@ -116,7 +134,7 @@ void WifiManager::handleSave() {
                       ".box{background:#1e1e1e;max-width:400px;margin:0 auto;padding:20px;border-radius:12px;}"
                       "#res{margin-top:20px;font-size:18px;font-weight:bold;}"
                       "</style></head>"
-                      "<body><div class='box'><h2>📡 Connecting to Wi-Fi</h2><p>Saved <b>" + ssid + "</b>. Verifying connection...</p>"
+                      "<body><div class='box'><h2>📡 Connecting</h2><p>Saved <b>" + escapeHtml(ssid) + "</b>. Verifying connection...</p>"
                       "<div id='res'>🔄 Initiating connection...</div>"
                       "<p><a href='/' style='color:#00e676;'>Return to Setup Page</a></p></div>"
                       "<script>"
@@ -166,7 +184,11 @@ void WifiManager::init(const char* apSsid, const char* apPass, const char* staSs
     WiFi.softAP(apSsid, effectiveApPass);
     Serial.printf("[WIFI] On-Demand SoftAP '%s' active for 5 mins. IP: %s\n", apSsid, WiFi.softAPIP().toString().c_str());
     
-    dnsServer.start(53, "*", WiFi.softAPIP());
+    // BUG-01 fix: guard against double-start
+    if (!dnsServerStarted) {
+        dnsServer.start(53, "*", WiFi.softAPIP());
+        dnsServerStarted = true;
+    }
     
     webServer.on("/", HTTP_GET, handleRoot);
     webServer.on("/save", HTTP_POST, handleSave);
@@ -183,7 +205,10 @@ void WifiManager::init(const char* apSsid, const char* apPass, const char* staSs
 void WifiManager::update() {
     if (!apTimeoutReached && (millis() - bootTime >= 300000)) {
         apTimeoutReached = true;
-        dnsServer.stop();
+        if (dnsServerStarted) {
+            dnsServer.stop();
+            dnsServerStarted = false;  // BUG-01 fix: track DNS state
+        }
         webServer.stop();
         WiFi.mode(WIFI_STA);
         Serial.println("[WIFI] 5-minute boot provisioning window expired. SoftAP disabled for power saving.");
@@ -201,7 +226,8 @@ void WifiManager::update() {
         }
     }
 
-    if (WiFi.getMode() == WIFI_OFF || WiFi.scanComplete() == WIFI_SCAN_RUNNING) {
+    // BUG-09 fix: removed redundant scanComplete() guard (scan feature unused)
+    if (WiFi.getMode() == WIFI_OFF) {
         return;
     }
     
@@ -257,7 +283,11 @@ void WifiManager::connectTo(const char* ssid, const char* password) {
         if (_apSsid.length() > 0) {
             WiFi.softAP(_apSsid.c_str(), _apPass.c_str());
         }
-        dnsServer.start(53, "*", WiFi.softAPIP());
+        // BUG-01 fix: only start DNS if not already running
+        if (!dnsServerStarted) {
+            dnsServer.start(53, "*", WiFi.softAPIP());
+            dnsServerStarted = true;
+        }
     }
     WiFi.setSleep(false);
     WiFi.disconnect();
@@ -267,7 +297,10 @@ void WifiManager::connectTo(const char* ssid, const char* password) {
 void WifiManager::stopWiFi() {
     connected = false;
     provState = ProvState::IDLE;
-    dnsServer.stop();
+    if (dnsServerStarted) {
+        dnsServer.stop();
+        dnsServerStarted = false;  // BUG-01 fix
+    }
     webServer.stop();
     WiFi.disconnect();
     WiFi.mode(WIFI_OFF);
@@ -282,7 +315,11 @@ void WifiManager::startWiFi(const char* ssid, const char* password) {
         if (_apSsid.length() > 0) {
             WiFi.softAP(_apSsid.c_str(), _apPass.c_str());
         }
-        dnsServer.start(53, "*", WiFi.softAPIP());
+        // BUG-01 fix: only start DNS if not already running
+        if (!dnsServerStarted) {
+            dnsServer.start(53, "*", WiFi.softAPIP());
+            dnsServerStarted = true;
+        }
         webServer.begin();
     }
     

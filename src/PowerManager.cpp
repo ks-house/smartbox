@@ -1,7 +1,4 @@
 #include "PowerManager.h"
-#include "WifiManager.h"
-#include "ConfigManager.h"
-#include "TelemetryManager.h"
 #include <Arduino.h>
 #include <time.h>
 #ifndef NATIVE_BUILD
@@ -42,6 +39,7 @@ void PowerManager::update() {
     int currentHour = timeinfo.tm_hour;
 
     // Proactive daily reboot scheduling at 04:00 AM
+    // Only reboots when FSM is in IDLE and motor is stopped to ensure safety
     if (currentHour == 4 && controllerPtr->getCurrentState() == STATE_IDLE && !controllerPtr->isMotorRunning()) {
 #ifndef NATIVE_BUILD
         Preferences prefs;
@@ -58,37 +56,6 @@ void PowerManager::update() {
         }
 #endif
     }
-
-    // Temporarily disabled Night Sleep mode for MQTT testing
-    bool isNight = false; // (currentHour >= 23 || currentHour < 6);
-
-    if (isNight) {
-        if (!controllerPtr->isNightSleepActive()) {
-            Serial.println("[POWER] 진입: 야간 절전 모드 활성화. Wi-Fi OFF.");
-            controllerPtr->setNightSleepMode(true);
-            WifiManager::stopWiFi();
-#ifndef NATIVE_BUILD
-            setCpuFrequencyMhz(80);
-            Serial.println("[POWER] CPU Frequency scaled to 80 MHz");
-#endif
-        }
-    } else {
-        if (controllerPtr->isNightSleepActive()) {
-            Serial.println("[POWER] 해제: 주간 모드 전환. Wi-Fi 재연결 시도 중...");
-#ifndef NATIVE_BUILD
-            setCpuFrequencyMhz(160);
-            Serial.println("[POWER] CPU Frequency scaled to 160 MHz");
-#endif
-            controllerPtr->setNightSleepMode(false);
-            
-            // Re-load saved credentials to connect
-            String savedSsid = "";
-            String savedPass = "";
-            ConfigManager::loadWifiCredentials(savedSsid, savedPass);
-            WifiManager::startWiFi(savedSsid.c_str(), savedPass.c_str());
-            
-            // Notify TelemetryManager to send a wakeup point once connected
-            TelemetryManager::notifySleepEnd();
-        }
-    }
+    // Night Sleep mode has been removed by user request.
+    // The device runs 24/7 without any time-based power gating.
 }

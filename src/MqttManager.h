@@ -21,8 +21,6 @@ public:
     void begin();
     void update(); // Non-blocking state update and timer checks
 
-    void onNightSleepStart();
-    void onNightSleepEnd();
 
     void publishLog(LogLevel level, const char* message);
     void publishTelemetry();
@@ -37,7 +35,7 @@ public:
     // Home Assistant MQTT Auto Discovery
     void publishAutoDiscovery();
     
-    bool isConnected() const { return const_cast<AsyncMqttClient&>(m_mqttClient).connected(); }
+    bool isConnected() { return m_mqttClient.connected(); }  // BUG-10 fix: removed const_cast anti-pattern
     bool isDebugLoggingActive() const { return m_debugLoggingActive; }
 
 private:
@@ -57,8 +55,8 @@ private:
 
     bool m_debugLoggingActive;
     unsigned long m_debugStartTime;
-    bool m_wasNightSleep;
     bool m_wasConnected;
+    bool m_isConnecting;  // BUG-05 fix: prevent duplicate connection attempts
 
     static constexpr unsigned long DEBUG_MODE_DURATION_MS = 300000; // 5 minutes
 };

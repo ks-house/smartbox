@@ -11,8 +11,9 @@ SmartBoxController::SmartBoxController(HardwareInterface& hardware)
     : hw(hardware), currentState(STATE_IDLE), stateTimer(0), sensorTimer(0), 
       cooldownTimer(0), isCooldown(false), distanceHistoryIdx(0), lastDetectStartTime(0), stateCallback(nullptr),
       batteryVoltage(12.0f), motorCurrent(0.0f), currentDistance(999.0f), relaysIsolated(false),
-      initialState(STATE_IDLE), nightSleepActive(false), maintenanceRequested(false),
-      holdStartTime(0), sensorDeadlockFlag(false) {
+      initialState(STATE_IDLE), maintenanceRequested(false),
+      holdStartTime(0), sensorDeadlockFlag(false),
+      openStallCount(0), closeStallCount(0) {
     for (int i = 0; i < 5; i++) {
         distanceHistory[i] = 999.0f;
     }
@@ -43,6 +44,8 @@ void SmartBoxController::init() {
     maintenanceRequested = false;
     holdStartTime = 0;
     sensorDeadlockFlag = false;
+    openStallCount = 0;
+    closeStallCount = 0;
     
     // Fill median filter buffer
     for (int i = 0; i < 5; i++) {
@@ -57,18 +60,9 @@ void SmartBoxController::update() {
         return;
     }
 
-    bool isSleep;
-    State state;
-    {
-        std::lock_guard<std::recursive_mutex> lock(dataMutex);
-        isSleep = nightSleepActive;
-        state = currentState;
-    }
-
-    // Adaptive sensor polling: 50ms (daytime) / 250ms (night sleep) for power savings
-    if (state != STATE_OTA_UPDATING) {
-        unsigned long pollInterval = isSleep ? 250 : 50;
-        if (hw.getMillis() - sensorTimer >= pollInterval) {
+    // Adaptive sensor polling: fixed 50ms interval
+    if (currentState != STATE_OTA_UPDATING) {
+        if (hw.getMillis() - sensorTimer >= 50) {
             sensorTimer = hw.getMillis();
             updateDistanceBuffer();
             float filtered = getFilteredDistance();
@@ -159,7 +153,6 @@ void SmartBoxController::update() {
             
         case STATE_OPENING: {
             // Bypass motor inrush current for the first 500ms (dual actuator startup)
-            static int openStallCount = 0;
             if (hw.getMillis() - stateTimer > 500) {
                 if (motorCurrent > config.currentStallLimit) {
                     openStallCount++;
@@ -178,7 +171,7 @@ void SmartBoxController::update() {
                     openStallCount = 0; // Current normal — reset counter
                 }
             } else {
-                openStallCount = 0; // Reset on re-entry
+                openStallCount = 0; // Reset at inrush bypass window start
             }
             if (hw.getMillis() - stateTimer >= config.actuatorTime) {
                 Serial.println("[STATE] Opening completed.");
@@ -223,7 +216,6 @@ void SmartBoxController::update() {
             
         case STATE_CLOSING: {
             // Bypass motor inrush current for the first 500ms (dual actuator startup)
-            static int closeStallCount = 0;
             if (hw.getMillis() - stateTimer > 500) {
                 if (motorCurrent > config.currentStallLimit) {
                     closeStallCount++;
@@ -242,7 +234,7 @@ void SmartBoxController::update() {
                     closeStallCount = 0; // Current normal — reset counter
                 }
             } else {
-                closeStallCount = 0; // Reset on re-entry
+                closeStallCount = 0; // Reset at inrush bypass window start
             }
             // Safety reopen if human is detected during close (bypassed if sensor is deadlocked)
             if (currentDistance > 0 && currentDistance < config.distThreshold && !sensorDeadlockFlag) {
@@ -343,6 +335,9 @@ void SmartBoxController::transitionTo(State newState) {
         if (newState == STATE_HOLD) {
             holdStartTime = hw.getMillis();
         }
+        // BUG-02 fix: reset stall counters on every state transition
+        openStallCount = 0;
+        closeStallCount = 0;
     }
     
     if (stateCallback != nullptr) {
@@ -462,9 +457,6 @@ bool SmartBoxController::isMotorRunning() const {
 
 bool SmartBoxController::canSendTelemetry() const {
     std::lock_guard<std::recursive_mutex> lock(dataMutex);
-    if (nightSleepActive) {
-        return false;
-    }
     if (currentState == STATE_OTA_UPDATING) {
         return false;
     }

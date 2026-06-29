@@ -46,9 +46,6 @@ void AutoOtaManager::update() {
     if (controllerPtr == nullptr) {
         return;
     }
-    if (controllerPtr->isNightSleepActive()) {
-        return;
-    }
     if (!WifiManager::isConnected()) {
         return;
     }
@@ -186,25 +183,24 @@ void AutoOtaManager::runOtaProcess(bool force) {
             String errStr = "Update failed: " + httpUpdate.getLastErrorString();
             strncpy(otaErrorMessage, errStr.c_str(), sizeof(otaErrorMessage) - 1);
             
+#ifndef NATIVE_BUILD
+            // BUG-07 fix: re-subscribe WDT BEFORE transitionTo() so stateCallback runs under WDT protection
+            esp_task_wdt_add(NULL);
+            Serial.println("[OTA] NetworkTask re-subscribed to WDT before state recovery.");
+#endif
             // Failure recovery: restore FSM to STATE_IDLE
             controllerPtr->transitionTo(STATE_IDLE);
             Serial.println("[OTA] Recovered state to STATE_IDLE after update failure.");
             
-#ifndef NATIVE_BUILD
-            // Re-subscribe NetworkTask to WDT
-            esp_task_wdt_add(NULL);
-            Serial.println("[OTA] NetworkTask re-subscribed to WDT after failure recovery.");
-#endif
         } else if (ret == HTTP_UPDATE_NO_UPDATES) {
             Serial.println("[OTA] HTTP update response: No updates available.");
             otaState = OTA_STATE_UP_TO_DATE;
-            controllerPtr->transitionTo(STATE_IDLE);
-            
 #ifndef NATIVE_BUILD
-            // Re-subscribe NetworkTask to WDT
+            // BUG-07 fix: re-subscribe WDT BEFORE transitionTo()
             esp_task_wdt_add(NULL);
-            Serial.println("[OTA] NetworkTask re-subscribed to WDT after no-update recovery.");
+            Serial.println("[OTA] NetworkTask re-subscribed to WDT before no-update recovery.");
 #endif
+            controllerPtr->transitionTo(STATE_IDLE);
         } else if (ret == HTTP_UPDATE_OK) {
             Serial.println("[OTA] HTTPS update SUCCESS! Rebooting device in 1.5 seconds...");
             otaState = OTA_STATE_SUCCESS;

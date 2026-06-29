@@ -23,8 +23,8 @@ MqttManager::MqttManager(SmartBoxController& controller)
     : m_controller(controller),
       m_debugLoggingActive(false),
       m_debugStartTime(0),
-      m_wasNightSleep(false),
-      m_wasConnected(false) {
+      m_wasConnected(false),
+      m_isConnecting(false) {  // BUG-05 fix
     g_mqttManagerInstance = this;
 }
 
@@ -60,13 +60,15 @@ void MqttManager::begin() {
 }
 
 void MqttManager::connectToMqtt() {
-    if (m_controller.isNightSleepActive()) {
-        RLOG_D("[MQTT] Skip connect during Night Sleep mode\n");
+    // BUG-05 fix: prevent duplicate connection attempts
+    if (m_isConnecting) {
+        RLOG_D("[MQTT] Connection already in progress, skipping.\n");
         return;
     }
 
     if (WifiManager::isConnected() && !m_mqttClient.connected()) {
         RLOG_I("[MQTT] Connecting to MQTT broker...\n");
+        m_isConnecting = true;
         m_mqttClient.connect();
     }
 }
@@ -75,6 +77,7 @@ void MqttManager::onMqttConnect(bool sessionPresent) {
     RLOG_I("[MQTT] Connected to broker successfully! Session present: %d\n", sessionPresent);
     m_reconnectTimer.detach();
     m_wasConnected = true;
+    m_isConnecting = false;  // BUG-05 fix
 
     // Subscribe to command topic
     m_mqttClient.subscribe("smartbox/command", 1);
@@ -98,9 +101,9 @@ void MqttManager::onMqttConnect(bool sessionPresent) {
 void MqttManager::onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
     RLOG_W("[MQTT] Disconnected from MQTT broker. Reason: %d\n", static_cast<int>(reason));
     m_wasConnected = false;
+    m_isConnecting = false;  // BUG-05 fix: clear connecting flag on disconnect
 
-    // Do not attempt reconnection if Night Sleep is active
-    if (!m_controller.isNightSleepActive() && WifiManager::isConnected()) {
+    if (WifiManager::isConnected()) {
         m_reconnectTimer.once(5.0f, +[](MqttManager* instance) {
             instance->connectToMqtt();
         }, this);
@@ -258,18 +261,8 @@ void MqttManager::handleSetConfig(const JsonDocument& doc) {
 }
 
 void MqttManager::update() {
-    bool currentSleepState = m_controller.isNightSleepActive();
-
-    // Night Sleep transition handling
-    if (currentSleepState && !m_wasNightSleep) {
-        onNightSleepStart();
-    } else if (!currentSleepState && m_wasNightSleep) {
-        onNightSleepEnd();
-    }
-    m_wasNightSleep = currentSleepState;
-
-    // Wi-Fi connection recovery check
-    if (!currentSleepState && WifiManager::isConnected() && !m_mqttClient.connected() && !m_wasConnected) {
+    // BUG-05 fix: only attempt fallback connect if not already connecting/connected
+    if (WifiManager::isConnected() && !m_mqttClient.connected() && !m_isConnecting) {
         static unsigned long lastCheck = 0;
         if (millis() - lastCheck > 10000) {
             lastCheck = millis();
@@ -285,19 +278,6 @@ void MqttManager::update() {
             publishLog(LogLevel::INFO, "[MQTT] Dynamic Debug Logging timed out after 5 minutes. Reverting to Normal mode.");
         }
     }
-}
-
-void MqttManager::onNightSleepStart() {
-    RLOG_I("[MQTT] Night Sleep started. Disconnecting MQTT cleanly...\n");
-    m_reconnectTimer.detach();
-    if (m_mqttClient.connected()) {
-        m_mqttClient.disconnect();
-    }
-}
-
-void MqttManager::onNightSleepEnd() {
-    RLOG_I("[MQTT] Night Sleep ended. Reconnecting MQTT...\n");
-    connectToMqtt();
 }
 
 void MqttManager::publishLog(LogLevel level, const char* message) {
@@ -350,7 +330,6 @@ void MqttManager::publishTelemetry() {
     doc["timestamp"] = millis();
     doc["fsm_state"] = stateToString(static_cast<int>(m_controller.getCurrentState()));
     doc["distance_cm"] = m_controller.getDistance();
-    doc["night_sleep"] = m_controller.isNightSleepActive();
     doc["wifi_rssi"] = WiFi.RSSI();
     doc["free_heap"] = ESP.getFreeHeap();
 

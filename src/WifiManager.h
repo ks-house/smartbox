@@ -20,8 +20,11 @@ private:
     static WebServer webServer;
     static String _apSsid;
     static String _apPass;
+    static String _staSsid;  // BUG-08 fix: moved from file-scope to class static
+    static String _staPass;  // BUG-08 fix: moved from file-scope to class static
     static unsigned long bootTime;
     static bool apTimeoutReached;
+    static bool dnsServerStarted;  // BUG-01 fix: prevent double DNS server start
 
     static ProvState provState;
     static String stationIp;
