@@ -12,6 +12,10 @@ String WifiManager::_apPass = "";
 unsigned long WifiManager::bootTime = 0;
 bool WifiManager::apTimeoutReached = false;
 
+ProvState WifiManager::provState = ProvState::IDLE;
+String WifiManager::stationIp = "";
+unsigned long WifiManager::connectStartTime = 0;
+
 static String _staSsid = "";
 static String _staPass = "";
 
@@ -38,9 +42,11 @@ void WifiManager::onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
             Serial.println("[WIFI] Connected to external WiFi AP successfully.");
             break;
         case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+            stationIp = WiFi.localIP().toString();
             Serial.print("[WIFI] Station got IP address: ");
-            Serial.println(WiFi.localIP());
+            Serial.println(stationIp);
             connected = true;
+            provState = ProvState::SUCCESS;
             configTime(9 * 3600, 0, "pool.ntp.org", "time.nist.gov");
             Serial.println("[TIME] NTP Sync initialized (KST, UTC+9).");
             break;
@@ -48,6 +54,9 @@ void WifiManager::onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
             if (connected) {
                 Serial.println("[WIFI] Disconnected from external WiFi AP.");
                 connected = false;
+            }
+            if (provState == ProvState::CONNECTING && (millis() - connectStartTime >= 12000)) {
+                provState = ProvState::FAILED;
             }
             break;
         default:
@@ -62,14 +71,35 @@ void WifiManager::handleRoot() {
                   ".card{background:#1e1e1e;max-width:400px;margin:0 auto;padding:20px;border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,0.5)}"
                   "input{width:100%;padding:10px;margin:8px 0;box-sizing:border-box;border-radius:6px;border:1px solid #444;background:#2a2a2a;color:#fff}"
                   "button{width:100%;padding:12px;background:#00e676;border:none;border-radius:6px;color:#000;font-weight:bold;cursor:pointer;margin-top:10px}"
+                  "#status{margin-top:15px;padding:12px;border-radius:6px;font-size:14px;display:none;}"
+                  ".connecting{background:#ff9800;color:#000;}"
+                  ".success{background:#4caf50;color:#fff;}"
+                  ".failed{background:#f44336;color:#fff;}"
                   "</style></head><body><div class='card'>"
                   "<h2>📶 SmartBox Wi-Fi Setup</h2>"
-                  "<p>Enter your local Wi-Fi router credentials below. (AP active for 5 min on boot)</p>"
+                  "<p>Enter your local Wi-Fi router credentials below.</p>"
                   "<form action='/save' method='POST'>"
                   "<input type='text' name='ssid' placeholder='Wi-Fi Network Name (SSID)' required><br>"
                   "<input type='password' name='pass' placeholder='Password'><br>"
                   "<button type='submit'>Save & Connect</button>"
-                  "</form></div></body></html>";
+                  "</form>"
+                  "<div id='status'></div>"
+                  "</div>"
+                  "<script>"
+                  "function checkStatus(){"
+                  "fetch('/api/wifi-status').then(r=>r.json()).then(d=>{"
+                  "var el=document.getElementById('status');"
+                  "if(d.status==='connecting'){"
+                  "el.style.display='block';el.className='connecting';el.innerHTML='🔄 Connecting to '+d.ssid+'...';"
+                  "}else if(d.status==='success'){"
+                  "el.style.display='block';el.className='success';el.innerHTML='✅ Connected! IP: <b>'+d.ip+'</b>';"
+                  "}else if(d.status==='failed'){"
+                  "el.style.display='block';el.className='failed';el.innerHTML='❌ Connection failed. Check password.';"
+                  "}"
+                  "});"
+                  "}"
+                  "setInterval(checkStatus, 1500);checkStatus();"
+                  "</script></body></html>";
     webServer.send(200, "text/html", html);
 }
 
@@ -82,8 +112,23 @@ void WifiManager::handleSave() {
         ConfigManager::saveWifiCredentials(ssid.c_str(), pass.c_str());
         
         String html = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
-                      "<title>Saved</title><style>body{font-family:sans-serif;background:#121212;color:#eee;text-align:center;padding:50px;}</style></head>"
-                      "<body><h2>✅ Wi-Fi Credentials Saved!</h2><p>Connecting to <b>" + ssid + "</b>...</p></body></html>";
+                      "<title>Connecting...</title><style>body{font-family:sans-serif;background:#121212;color:#eee;text-align:center;padding:50px;}"
+                      ".box{background:#1e1e1e;max-width:400px;margin:0 auto;padding:20px;border-radius:12px;}"
+                      "#res{margin-top:20px;font-size:18px;font-weight:bold;}"
+                      "</style></head>"
+                      "<body><div class='box'><h2>📡 Connecting to Wi-Fi</h2><p>Saved <b>" + ssid + "</b>. Verifying connection...</p>"
+                      "<div id='res'>🔄 Initiating connection...</div>"
+                      "<p><a href='/' style='color:#00e676;'>Return to Setup Page</a></p></div>"
+                      "<script>"
+                      "function poll(){"
+                      "fetch('/api/wifi-status').then(r=>r.json()).then(d=>{"
+                      "var el=document.getElementById('res');"
+                      "if(d.status==='connecting'){el.innerHTML='🔄 Connecting to "+ssid+"...';}"
+                      "else if(d.status==='success'){el.style.color='#4caf50';el.innerHTML='🎉 Connected Successfully!<br>IP Address: '+d.ip;}"
+                      "else if(d.status==='failed'){el.style.color='#f44336';el.innerHTML='❌ Connection Failed!<br>Please check SSID and Password.';}"
+                      "});}"
+                      "setInterval(poll, 1200);poll();"
+                      "</script></body></html>";
         webServer.send(200, "text/html", html);
         connectTo(ssid.c_str(), pass.c_str());
     } else {
@@ -91,10 +136,22 @@ void WifiManager::handleSave() {
     }
 }
 
+void WifiManager::handleStatus() {
+    String st = "idle";
+    if (provState == ProvState::CONNECTING) st = "connecting";
+    else if (provState == ProvState::SUCCESS) st = "success";
+    else if (provState == ProvState::FAILED) st = "failed";
+
+    String json = "{\"status\":\"" + st + "\",\"ssid\":\"" + escapeJson(_staSsid) + "\",\"ip\":\"" + stationIp + "\"}";
+    webServer.send(200, "application/json", json);
+}
+
 void WifiManager::init(const char* apSsid, const char* apPass, const char* staSsid, const char* staPass) {
     WiFi.onEvent(onWiFiEvent);
     bootTime = millis();
     apTimeoutReached = false;
+    provState = ProvState::IDLE;
+    stationIp = "";
     
     _apSsid = apSsid ? apSsid : "";
     static const char* DEFAULT_AP_PASS = "smartbox_admin";
@@ -113,26 +170,22 @@ void WifiManager::init(const char* apSsid, const char* apPass, const char* staSs
     
     webServer.on("/", HTTP_GET, handleRoot);
     webServer.on("/save", HTTP_POST, handleSave);
-    webServer.onNotFound(handleRoot); // Captive portal redirect
+    webServer.on("/api/wifi-status", HTTP_GET, handleStatus);
+    webServer.onNotFound(handleRoot);
     webServer.begin();
     Serial.println("[WIFI] Provisioning WebServer & Captive Portal started on port 80.");
     
     if (staSsid != nullptr && strlen(staSsid) > 0) {
-        _staSsid = staSsid;
-        _staPass = staPass ? staPass : "";
-        WiFi.begin(_staSsid.c_str(), _staPass.c_str());
-        Serial.printf("[WIFI] Station connecting to AP '%s'...\n", _staSsid.c_str());
-        lastConnectRetry = millis();
+        connectTo(staSsid, staPass ? staPass : "");
     }
 }
 
 void WifiManager::update() {
-    // 1. Process 5-minute AP timeout for power saving
-    if (!apTimeoutReached && (millis() - bootTime >= 300000)) { // 300,000 ms = 5 minutes
+    if (!apTimeoutReached && (millis() - bootTime >= 300000)) {
         apTimeoutReached = true;
         dnsServer.stop();
         webServer.stop();
-        WiFi.mode(WIFI_STA); // Switch to Station-only mode to stop RF AP broadcast
+        WiFi.mode(WIFI_STA);
         Serial.println("[WIFI] 5-minute boot provisioning window expired. SoftAP disabled for power saving.");
     }
 
@@ -141,6 +194,13 @@ void WifiManager::update() {
         webServer.handleClient();
     }
     
+    if (provState == ProvState::CONNECTING && (millis() - connectStartTime >= 15000)) {
+        if (WiFi.status() != WL_CONNECTED) {
+            provState = ProvState::FAILED;
+            Serial.println("[WIFI] Connection attempt timed out (15s). Status set to FAILED.");
+        }
+    }
+
     if (WiFi.getMode() == WIFI_OFF || WiFi.scanComplete() == WIFI_SCAN_RUNNING) {
         return;
     }
@@ -185,6 +245,9 @@ void WifiManager::connectTo(const char* ssid, const char* password) {
     _staSsid = ssid;
     _staPass = password ? password : "";
     connected = false;
+    provState = ProvState::CONNECTING;
+    stationIp = "";
+    connectStartTime = millis();
     lastConnectRetry = millis();
     
     Serial.printf("[WIFI] Initiating dynamic connection to '%s'...\n", _staSsid.c_str());
@@ -203,6 +266,7 @@ void WifiManager::connectTo(const char* ssid, const char* password) {
 
 void WifiManager::stopWiFi() {
     connected = false;
+    provState = ProvState::IDLE;
     dnsServer.stop();
     webServer.stop();
     WiFi.disconnect();
@@ -223,9 +287,6 @@ void WifiManager::startWiFi(const char* ssid, const char* password) {
     }
     
     if (ssid != nullptr && strlen(ssid) > 0) {
-        _staSsid = ssid;
-        _staPass = password ? password : "";
-        WiFi.begin(_staSsid.c_str(), _staPass.c_str());
+        connectTo(ssid, password ? password : "");
     }
-    lastConnectRetry = millis();
 }
