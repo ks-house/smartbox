@@ -89,7 +89,7 @@ jobs:
           FULL_VERSION="${BASE_VERSION}-g${SHORT_SHA}"
           echo "FULL_VERSION=${FULL_VERSION}" >> $GITHUB_ENV
           echo "Building version: ${FULL_VERSION}"
-          PLATFORMIO_BUILD_FLAGS="-D ASYNC_TCP_SSL_ENABLED=1 -DFIRMWARE_VERSION_OVERRIDE=\"\\\"${FULL_VERSION}\\\"\"" pio run -e esp32-c6-devkitc-1
+          PLATFORMIO_BUILD_FLAGS="-DFIRMWARE_VERSION_OVERRIDE=\"\\\"${FULL_VERSION}\\\"\"" pio run -e esp32-c6-devkitc-1
 
       - name: Generate version.json metadata
         run: |
