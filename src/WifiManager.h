@@ -3,15 +3,22 @@
 
 #include <WiFi.h>
 #include <DNSServer.h>
+#include <WebServer.h>
 
 class WifiManager {
 private:
     static unsigned long lastConnectRetry;
     static bool connected;
     static DNSServer dnsServer;
+    static WebServer webServer;
     static String _apSsid;
     static String _apPass;
+    static unsigned long bootTime;
+    static bool apTimeoutReached;
+
     static void onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info);
+    static void handleRoot();
+    static void handleSave();
 
 public:
     static void init(const char* apSsid, const char* apPass, const char* staSsid = nullptr, const char* staPass = nullptr);
