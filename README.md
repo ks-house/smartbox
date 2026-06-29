@@ -3,6 +3,7 @@
 ![Platform](https://img.shields.io/badge/Platform-PlatformIO-orange.svg)
 ![Framework](https://img.shields.io/badge/Framework-Arduino-blue.svg)
 ![Board](https://img.shields.io/badge/Board-ESP32--C6-red.svg)
+![MQTT](https://img.shields.io/badge/Protocol-MQTTS%20TLS-green.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
 **SmartBox**는 단순한 토이 프로젝트가 아닌, **엔터프라이즈 IoT 수준의 고가용성 및 자율 운영 설계**가 적용된 차세대 스마트 수거함 컨트롤러입니다. 
@@ -17,20 +18,20 @@
   * **협착 방지(Anti-Pinch) 긴급 정지:** 구동 중 INA219 전력 센서를 통해 모터 실속(Stall) 전류를 감시하며, 3000mA 초과 시 3회 연속 감지되면 즉각 비상 정지(Emergency Stop) 상태로 전이합니다.
   * **이중 릴레이 안전망:** 방향 릴레이 전환 시 발생 가능한 쇼트를 막기 위해, 1채널 릴레이로 메인 12V 전원을 먼저 컷오프하는 하드웨어 및 소프트웨어 인터락을 강제합니다.
 
-* **네트워크 프로비저닝 및 보안 대시보드**
-  * **Captive Portal 기반 Wi-Fi 설정:** 기기가 `SmartBox-WiFi` AP를 개설하여, 사용자가 휴대폰으로 공유기 연결 설정을 동적으로 프로비저닝할 수 있습니다.
-  * **비동기 내장 웹 대시보드:** HTTP Basic Auth 인증이 적용된 로컬 대시보드에서 실시간 텔레메트리 모니터링, 안전 캘리브레이션 조정 및 수동 오버라이드 조작이 가능합니다.
+* **모던 MQTTS over TLS & Home Assistant 통합**
+  * **단일 통신 파이프라인 (Single Pipeline):** 무거운 InfluxDB 및 레거시 웹 서버를 완전 철거하고 MQTTS over TLS (포트 4883) 단 하나로 통신을 단일화하여 전력과 메모리 자원을 극대화하여 아꼈습니다.
+  * **Home Assistant MQTT Auto Discovery:** 펌웨어가 부팅 시 자기소개(Discovery) 패킷을 발행하여, 사용자가 Home Assistant 설정 파일(`configuration.yaml`)에 코드를 적을 필요 없이 클릭 한 번으로 `[SmartBox]` 기기 및 11개 엔티티가 자동 등록됩니다.
 
 * **자율 운영 및 무인 OTA (Over-The-Air)**
-  * **매일 심야(03:00 KST) 무인 업데이트:** 지정된 HTTPS NAS(Network Attached Storage) 서버에 배포된 `version.json` 매니페스트를 자동으로 Pull 방식으로 폴링하여, 펌웨어 버전의 차이가 있을 때만 백그라운드 OTA를 안전하게 수행합니다.
+  * **매일 심야 무인 업데이트:** 지정된 HTTPS NAS(Network Attached Storage) 서버에 배포된 `version.json` 매니페스트를 자동으로 Pull 방식으로 폴링하여, 펌웨어 버전의 차이가 있을 때만 백그라운드 OTA를 안전하게 수행합니다.
   * **Pre-OTA Hardware Isolation:** 업데이트 개시 즉시 모든 릴레이 전원을 물리적 고임피던스(INPUT)로 완전 격리하여 업데이트 도중의 노이즈로 인한 쇼트 화재를 원천 봉쇄합니다.
 
-* **시계열 텔레메트리 관제 (Telemetry & Analytics)**
-  * **InfluxDB 배치(Batch) 전송:** 배터리 전압, 모터 소모 전류, 감지 거리, 상태 전이 이벤트를 InfluxDB 서버로 비동기 배치 전송하여 중앙화된 시계열 관제가 가능합니다.
-  * **Store & Forward 오프라인 큐:** 통신 음영 발생 시 데이터 로스를 방지하기 위해 로컬 버퍼에 패킷을 저장하고 네트워크 복구 후 재전송합니다.
+* **시계열 배치 텔레메트리 및 하이브리드 이벤트**
+  * **RAM Ring Buffer 배치 전송:** 배터리 전압 및 상태 데이터를 1분 간격으로 RAM 버퍼에 모았다가 일괄 전송하여 Wi-Fi RF 가동 소모 전력을 90% 이상 아낍니다.
+  * **실시간 알람 및 개폐 사이클 요약:** 과전류/저전압 즉시 알람 발행, 100cm 모션 감지 엣지 트리거 및 1회 개폐 동작 완료 시 피크 전류와 동작 시간을 담은 요약 리포트를 발행합니다.
 
 * **극저전력 및 고가용성 확보 (High-Availability)**
-  * **야간 모뎀 슬립 (Night Sleep Mode):** 야간(23:00~06:00 KST)에는 네트워크 모듈을 완전히 끄고 CPU 클럭을 80MHz로 다운클럭하여 전력 소모를 비약적으로 절감합니다. (태양광 충전 공백 대비)
+  * **야간 모뎀 슬립 (Night Sleep Mode):** 야간(23:00~06:00 KST)에는 불필요한 Wi-Fi 트래픽을 끊고 절전 모드로 진입하여 전력 소모를 비약적으로 절감합니다. (태양광 충전 공백 대비)
   * **Proactive Reboot & 하드웨어 Watchdog:** 10초 타임아웃의 듀얼 코어 Task Watchdog Timer(TWDT)가 상시 가동되어, 통신 지연이나 프리징 시 자가 복구합니다.
   * **저전압 셧다운 방어 (`STATE_BATTERY_LOW_SHUTDOWN`):** 배터리가 11.3V 이하로 3초 이상 지속될 경우 남은 전력으로 수거함을 완전 개방시킨 뒤 영구 슬립에 진입하여 관리자의 정비(배터리 교체)를 용이하게 합니다.
 
@@ -73,7 +74,7 @@
 1. 저장소를 클론하고 VS Code 또는 Antigravity IDE의 PlatformIO 환경에서 프로젝트를 엽니다.
 2. **보안 설정 (Secrets Setup):**
    - `include/secrets.h.example` 파일을 복사하여 `include/secrets.h`를 만듭니다.
-   - 내부 설정 파일에 로컬 SoftAP 비밀번호, Wi-Fi 정보, InfluxDB 토큰, HTTPS NAS 대상 루트 CA 인증서를 기입합니다.
+   - 내부 설정 파일에 로컬 SoftAP 비밀번호, Wi-Fi 정보, MQTT 접속 정보, HTTPS NAS 대상 루트 CA 인증서를 기입합니다.
    - *이 파일은 `.gitignore`에 등록되어 외부 저장소로 절대 푸시되지 않습니다.*
 3. ESP32-C6 보드를 PC와 연결합니다. (2개의 USB 포트가 있다면 **`CH343 (UART)`** 포트에 연결하십시오.)
 4. PlatformIO에서 `esp32-c6-devkitc-1` 환경으로 컴파일 및 펌웨어 플래싱을 진행합니다. (포트번호는 자동 감지됩니다.)

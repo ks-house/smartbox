@@ -1,6 +1,6 @@
-# ☀️ 태양광 스마트 자동 수거함 조립 및 개발 매뉴얼 (최신 수정본)
+# ☀️ 태양광 스마트 자동 수거함 조립 및 개발 매뉴얼 (최신 아키텍처 개편본)
 
-본 문서는 ESP32-C6 기반 스마트 자동 수거함 시스템의 하드웨어 스펙, 물리 결선 가이드, 안전 설계 규칙 및 소프트웨어 논블로킹 상태 머신 구현 사양을 규정하는 개발자 공식 가이드라인입니다.
+본 문서는 ESP32-C6 기반 스마트 자동 수거함 시스템의 하드웨어 스펙, 물리 결선 가이드, 안전 설계 규칙 및 소프트웨어 논블로킹 상태 머신(FSM), MQTT 기반 모던 IoT 통합 아키텍처 사양을 규정하는 개발자 공식 가이드라인입니다.
 
 ---
 
@@ -86,9 +86,9 @@ ESP32-C6 보드와 각 모듈은 아래의 확정된 GPIO 번호에 정밀하게
 
 ---
 
-## 5. 소프트웨어 핵심 알고리즘: 논블로킹 유한 상태 머신 (FSM)
+## 5. 소프트웨어 핵심 알고리즘 및 시스템 통신 단일화
 
-`delay()` 사용을 차단하고 `millis()` 기반 비동기 폴링을 통해 저전압 가드, 초음파 필터링, 과전류 보호를 실시간으로 감시합니다.
+`delay()` 사용을 차단하고 `millis()` 기반 비동기 폴링을 통해 저전압 가드, 초음파 필터링, 과전류 보호를 실시간으로 감시하며, 모든 통신은 **MQTT over TLS 단일 파이프라인**으로 수렴됩니다.
 
 ### 📊 유한 상태 머신 (10-States) 정의
 
@@ -135,30 +135,16 @@ ESP32-C6 보드와 각 모듈은 아래의 확정된 GPIO 번호에 정밀하게
 
 * **※ 비상 상태 전이 (Any state ➔ EMERGENCY_STOP):** 구동 중 모터 전류가 `config.currentStallLimit`(기본 3000mA)을 초과하면 즉시 강제 전이됩니다. 500ms 인러시 전류 구간 이후 3회 연속 초과 시 `forceAllRelaysOff()` 후 전이합니다.
 * **※ 배터리 저전압 셧다운 (Any state ➔ BATTERY_LOW_SHUTDOWN):** 배터리가 11.3V 이하로 3초 이상 유지되면 즉시 뚜껑을 강제 개방한 후 릴레이 전원을 영구 차단합니다.
-* **※ HTTPS NAS Pull 무선 펌웨어 업데이트 (Any state ➔ OTA_UPDATING):** NAS로부터 펌웨어 업데이트 요청을 수집하면 즉시 모든 릴레이를 차단(INPUT/고임피던스)하고 FSM 및 루프를 동결합니다.
-* **※ STATE_STARTUP_OPEN 30초 타임아웃:** 재부팅 시 뚜껑이 열린 상태로 진입한 경우, 사람의 접근이 없더라도 30초 경과 시 자동으로 `STATE_CLOSE_START`로 전이하여 무한 개방을 방지합니다.
-* **※ 야간 절전 모드 (Night Sleep Mode):** NTP 시간 동기화 이후, 심야 시간대(23:00 ~ 06:00 KST)에 진입하면 Wi-Fi를 끄고 백그라운드 텔레메트리/OTA 루틴을 중단하여 전력을 비약적으로 아낍니다. 이 상태에서도 로컬 개폐 제어 및 초음파 감지 루프는 실시간 구동을 유지합니다.
+* **※ HTTPS NAS Pull 무선 펌웨어 업데이트 (Any state ➔ OTA_UPDATING):** 원격 제어 및 NAS로부터 펌웨어 업데이트 요청을 수집하면 즉시 모든 릴레이를 차단(INPUT/고임피던스)하고 FSM 및 루프를 동결합니다.
+* **※ 야간 절전 모드 (Night Sleep Mode):** NTP 시간 동기화 이후, 심야 시간대(23:00 ~ 06:00 KST)에 진입하면 불필요한 Wi-Fi 송수신 및 MQTT Ping 트래픽을 차단하기 위해 Disconnect 후 절전 모드로 진입합니다.
 
-### 🔄 상태별 상세 동작 시나리오
-
-1. **`IDLE` (대기):** 50ms 간격 초음파 측정 및 중간값 필터링. 50cm 이내 사람 접근 시 `OPEN_START` 전환. 1채널 릴레이는 완전 차단(고임피던스) 상태 유지.
-2. **`OPEN_START` (개방 시작):** 방향 릴레이 설정 변경(A=LOW, B=HIGH) 전후로 메인 릴레이를 해제하고 100ms씩 안전 시간 확보 ➔ 정회전 출력 개시 ➔ `OPENING` 전환.
-3. **`OPENING` (개방 중):** 3,800ms 동안 타이머 구동. 초기 500ms 기동 전류(Inrush Current) 구간을 보낸 후, 3회 연속 `config.currentStallLimit`(기본 3000mA) 초과 시 `forceAllRelaysOff()` → `EMERGENCY_STOP` 진입(협착 방지 비상정지 활성화). 완료 시 `HOLD` 진입.
-4. **`HOLD` (열림 유지):** 1채널 릴레이 차단(고임피던스)하여 배터리 방전 방지. 최대 5초 대기하며, 사람이 감지 거리(50cm) 밖으로 사라지면 남은 시간에 무관하게 즉시 `CLOSE_START`로 조기 전환.
-5. **`CLOSE_START` (닫힘 시작):** 역회전 릴레이 설정 변경(A=HIGH, B=LOW) 전후로 100ms 안전 가드 적용 ➔ 역회전 출력 개시 ➔ `CLOSING` 전환.
-6. **`CLOSING` (닫힘 중 이중 가드):**
-   * **① [재개방]:** 닫히는 도중 50cm 이내 사람 재감지 시, 동작을 멈추고 안전 가드를 거쳐 `OPEN_START`로 즉시 역회전 개방.
-   * **② [협착/장애물 감지]:** PP 박스의 찌그러짐 또는 이물질 끼임으로 인해 모터 전류가 `config.currentStallLimit`(기본 3000mA)을 3회 연속 초과하면 즉시 `forceAllRelaysOff()` → `EMERGENCY_STOP`으로 고정 (협착 방지 비상정지 활성화).
-7. **`EMERGENCY_STOP` (긴급 정지):** 모든 릴레이 제어 핀을 해제하여 모터 동력을 긴급 격리. 시리얼 로그 및 내장 웹 관리 대시보드 화면에 'Locked' 상태를 출력하며, 웹 서버를 통해 '비상 해제' 명령을 수신하기 전까지는 안전 동결 상태를 무조건 유지.
-8. **`BATTERY_LOW_SHUTDOWN` (저전압 방전 방어):** 배터리가 11.3V 이하로 3초간 지속 수집되면, 닫힌 채 고사하는 것을 막고 관리자의 전지 교체를 유도하기 위해 마지막 잔여 전력을 공급하여 `OPEN_START` 시퀀스 구동(뚜껑 완전 개방). 도달 완료 후 모든 릴레이 제어 핀을 `INPUT`(고임피던스)으로 전환하여 릴레이 보드의 대기 소비전력마저 0mA로 리셋하고 무한 루프로 동작 동결.
-9. **`OTA_UPDATING` (무선 펌웨어 업데이트):** 시놀로지 HTTPS NAS Pull 방식을 통한 무선 펌웨어 업데이트가 시작되는 즉시 진입하는 상태입니다. 이 상태에서는 FSM 루프와 센서 측정을 완전히 동결하고, 메인 릴레이 및 방향 릴레이의 모든 핀을 즉각 `INPUT`(고임피던스) 상태로 전환하여 하드웨어 쇼트나 오작동을 하드웨어 수준에서 원천 차단합니다. 업데이트 완료 후 안전 딜레이를 거쳐 MCU가 재부팅됩니다.
-
-### 📡 초음파 노이즈 필터링 및 웹 서버
-* **중간값 필터 (Median Filter):** 50ms마다 측정값을 수집하여 최근 5개 데이터 중 중간값을 최종 판정 거리로 사용하여 순간적인 외부 센서 오인식 차단.
-* **이동식 웹 서버 대시보드:** ESP32-C6가 자체 AP(`SmartBox-WiFi`, 비밀번호 없음)를 개설하고 80번 포트에 웹 서버 가동. 스마트폰으로 접속 시 실시간 배터리 전압, 소모 전류, 센서 거리, 장치 상태 모니터링이 가능하며 비상 해제 명령 송신 및 시놀로지 HTTPS Pull OTA를 수행할 수 있습니다.
-* **비동기 Wi-Fi 프로비저닝 (Asynchronous Provisioning):** 모터 제어 FSM 루프가 100ms 이상 블로킹되지 않도록 `WiFi.scanNetworks(true)`를 통해 비동기 백그라운드 스캔을 실행합니다. 사용자는 웹 대시보드 화면을 통해 주변 AP를 탐색한 후 SSID 및 비밀번호를 입력하여 기기를 외부 인터넷(STA 모드)에 안전하게 연결할 수 있으며, 이 정보는 NVS(Preferences)에 보존되어 재부팅 후에도 자동으로 유지 및 재연결됩니다.
-* **심야 무인 자동 업데이트 (Auto-OTA) 시스템:** Wi-Fi 연결 성공 시 한국 표준시(KST, UTC+9)로 NTP 동기화를 수행하며, 설정된 예약 시간(기본값: 새벽 3:00 AM KST)에 30초 간격 논블로킹 스크립트에 의해 백그라운드 FreeRTOS 타스크(16KB 스택)가 기동됩니다. 원격 NAS의 `version.json`을 파싱하여 현재 버그 및 버전 차이가 발생했을 때에만 하드웨어 안전 인터락(모든 릴레이 고임피던스 차단) 및 `STATE_OTA_UPDATING` 진입 후 펌웨어 업데이트를 수행하고, 실패 시 자동으로 `STATE_IDLE`로 환원하여 예외 복구합니다.
-* **야간 전력 다이어트 절전 모드 (Night Sleep Mode) 시스템:** 배터리가 태양광으로 충전되지 않는 심야 시간대(23:00 ~ 06:00 KST)에는 `PowerManager`에 의해 Wi-Fi 모듈이 완전히 비활성화(`WIFI_OFF`)되어 전파 송수신 전력 소모를 전면 차단합니다. 절전 모드 작동 시 InfluxDB 텔레메트리(`TelemetryManager`) 전송 태스크 및 Auto-OTA 체크 태스크의 백그라운드 실행 역시 일시 중지(Skip)되어 리소스를 아낍니다. 아침 06:00 KST가 되면 주간 모드로 복원되고 `WifiManager::startWiFi()`를 통해 `WIFI_AP_STA` 듀얼 모드로 재진입합니다. 이 시점에 `SmartBox-WiFi` Soft AP가 자동 복구되고 Captive Portal DNS 서버가 재시작되어 관리자 대시보드 접속이 끊김 없이 유지됩니다. 기존 저장된 STA 크리덴셜로 외부 공유기에도 재접속하며 비동기 백그라운드 태스크 감시를 정상 재개합니다. 절전 모드 중에도 초음파 및 모터 동작 등의 로컬 FSM 상태 머신 루프는 최고 우선순위로 독립 가동됩니다.
+### 🌐 모던 MQTT 단일 파이프라인 & Home Assistant Auto Discovery
+1. **MQTT 단일 파이프라인 통합 (Single Pipeline):**
+   - 레거시 HTTP 웹 대시보드(`WebDashboard`) 및 InfluxDB 직접 전송 모듈을 완전히 제거하여 디바이스의 전력/메모리 소비를 극대화하여 아꼈습니다.
+   - 모든 시계열(배치) 및 실시간 이벤트(상태변화, 모션, 알람, 개폐 사이클) 통신은 MQTTS over TLS (포트 4883) 단 하나로 안전하게 이루어집니다.
+2. **Home Assistant MQTT Auto Discovery 표준 지원:**
+   - 디바이스 부팅 및 MQTT 접속 성공 시 `homeassistant/<component>/smartbox_01/<object_id>/config` 토픽으로 구성 패킷을 발행합니다.
+   - Home Assistant 사용자는 `configuration.yaml` 코딩 없이 클릭 한 번으로 `[SmartBox]` 스마트 쓰레기통 기기 및 11개 엔티티를 자동 등록하여 즉시 사용할 수 있습니다.
 
 ---
 
@@ -173,24 +159,21 @@ ESP32-C6 보드와 각 모듈은 아래의 확정된 GPIO 번호에 정밀하게
 > **⚠️ [규칙 3] 고임피던스(High-Impedance) 릴레이 차단 기법**
 > ESP32의 3.3V Logic Level과 5V Active-Low 릴레이 간의 전압 차이로 인해, 단순히 GPIO를 `HIGH` 출력으로만 밀면 1.7V 전위차가 발생하여 포토커플러 내부 LED가 완전히 꺼지지 않고 미세 전력이 상시 소모되는 현상이 발생합니다. 릴레이를 확실히 차단할 때는 **`pinMode(PIN, INPUT)`(고임피던스)** 모드로 핀을 전환하여 물리적 전류 통로를 완전 차단함으로써 대기 전력을 0mA로 리셋하도록 제어 아키텍처를 통일하십시오.
 
+---
+
 ## 7. GitHub Actions CI/CD 및 Native 테스트 환경
 
 본 프로젝트는 GitHub Actions를 활용하여 지속적 통합(CI) 및 지속적 배포(CD) 파이프라인을 구축해 운영 중입니다.
 
 * **네이티브 테스트 환경 (`[env:native]`):** ESP32-C6 물리 하드웨어 기기가 없이도 호스트 C++ 컴파일러(g++)를 사용해 로컬 PC 및 CI 클라우드 서버에서 FSM의 로직 유닛 테스트를 즉시 수행할 수 있도록 지원합니다. `NATIVE_BUILD` 매크로 지정을 통해 아두이노 종속 코드를 안전하게 격리합니다.
-* **로컬 네이티브 테스트 실행:**
-  ```powershell
-  pio test -e native
-  ```
 * **CI/CD 자동 배포 흐름 (.github/workflows/deploy.yml):**
-  1. **CI - Test (네이티브 테스트):** `main` 브랜치 푸시 감지 시 Ubuntu 환경에서 `pio test -e native`를 기동하여 FSM 및 과전류 차단 안전 기능의 정합성을 검증합니다.
-  2. **CI - Build (타겟 컴파일):** 테스트 통과 시에만 `pio run -e esp32-c6-devkitc-1`을 실행하여 ESP32-C6 타겟 바이너리를 완성합니다.
-  3. **CD - Metadata (버전 관리):** `src/SmartBoxController.h`에 등록된 `FIRMWARE_VERSION` 버전 명세를 읽어 `version.json` 파일을 자동 생성합니다.
-  4. **CD - Deploy (SFTP 전송):** `firmware.bin`과 `version.json` 파일을 Synology NAS의 지정 디렉토리로 안전하게 배포(SFTP)하여 무선 OTA 수거함에 즉시 전파합니다.
+  1. **CI - Test (네이티브 테스트):** `main` 브랜치 푸시 감지 시 Ubuntu 환경에서 `pio test -e native`를 기동합니다.
+  2. **CI - Build (타겟 컴파일):** 테스트 통과 시 `pio run -e esp32-c6-devkitc-1`을 실행하여 슬림화된 ESP32-C6 타겟 바이너리를 완성합니다.
+  3. **CD - Deploy (SFTP 전송):** `firmware.bin`과 `version.json` 메타데이터를 Synology NAS의 지정 디렉토리로 안전하게 SFTP 배포하여 무선 OTA 수거함에 전파합니다.
 
 ---
 
 ## 🔗 관련 문서 및 소스코드
 * **메인 소스코드:** [main.cpp](../src/main.cpp)
-* **하드웨어 BOM 명세:** [HARDWARE_BOM.md](../HARDWARE_BOM.md)
+* **MQTT 아키텍처 명세:** [mqtt_implementation_plan.md](mqtt_implementation_plan.md)
 * **릴레이 분석 리포트:** [26061301_릴레이연결_report.md](../reports/26061301_릴레이연결_report.md)

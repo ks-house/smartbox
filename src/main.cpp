@@ -4,7 +4,6 @@
 #include "ConfigManager.h"
 #include "WifiManager.h"
 
-#include "WebDashboard.h"
 #include "AutoOtaManager.h"
 #include "TelemetryManager.h"
 #include "PowerManager.h"
@@ -102,9 +101,6 @@ void setup() {
     String savedPass = "";
     ConfigManager::loadWifiCredentials(savedSsid, savedPass);
     WifiManager::init("SmartBox-WiFi", SECRET_AP_PASS, savedSsid.c_str(), savedPass.c_str());
-
-    // 6. Initialize Web Dashboard
-    WebDashboard::init(controller);
 
     // 8. Initialize Auto-OTA scheduler and manager
     AutoOtaManager::init(controller);
@@ -231,9 +227,6 @@ void loop() {
 
     // Run Wi-Fi manager updates
     WifiManager::update();
-
-    // Run Web Dashboard updates
-    WebDashboard::update();
 
     // Run Power Manager updates
     PowerManager::update();
