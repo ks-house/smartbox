@@ -85,7 +85,6 @@ void WifiManager::handleSave() {
                       "<title>Saved</title><style>body{font-family:sans-serif;background:#121212;color:#eee;text-align:center;padding:50px;}</style></head>"
                       "<body><h2>✅ Wi-Fi Credentials Saved!</h2><p>Connecting to <b>" + ssid + "</b>...</p></body></html>";
         webServer.send(200, "text/html", html);
-        delay(1000);
         connectTo(ssid.c_str(), pass.c_str());
     } else {
         webServer.send(400, "text/plain", "Bad Request");
