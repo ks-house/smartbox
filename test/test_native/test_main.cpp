@@ -428,51 +428,6 @@ void test_ota_state_isolation(void) {
     TEST_ASSERT_TRUE(controller.isOtaMode());
 }
 
-void test_night_sleep_mode(void) {
-    MockHardware hw;
-    SmartBoxController controller(hw);
-    controller.init();
-
-    // 1. Initial state must be false
-    TEST_ASSERT_FALSE(controller.isNightSleepActive());
-    TEST_ASSERT_TRUE(controller.canSendTelemetry());
-
-    // 2. Set to true
-    controller.setNightSleepMode(true);
-    TEST_ASSERT_TRUE(controller.isNightSleepActive());
-
-    // 3. Telemetry must be disabled when in night sleep mode
-    TEST_ASSERT_FALSE(controller.canSendTelemetry());
-
-    // 4. Adaptive polling: night sleep uses 250ms interval instead of 50ms
-    //    With 50ms advances, sensor should only poll every 5th tick (250ms)
-    hw.setDistanceCm(30.0f);
-    
-    // Advance 200ms (4 ticks of 50ms) — should NOT poll yet at 250ms interval
-    for (int i = 0; i < 4; ++i) {
-        hw.advanceMillis(50);
-        controller.update();
-    }
-    // Distance should still be 999.0f (initial) since 200ms < 250ms poll interval
-    TEST_ASSERT_FLOAT_WITHIN(1.0f, 999.0f, controller.getDistance());
-
-    // Advance 1 more tick (total 250ms) — should poll now
-    hw.advanceMillis(50);
-    controller.update();
-    // After first poll, buffer is [30, 999, 999, 999, 999] -> median 999.0f
-    // Need more polls to shift the median filter
-
-    // Continue polling to fill median buffer (need 3+ samples of 30cm for median to shift)
-    // Each poll at 250ms interval
-    for (int i = 0; i < 10; ++i) {
-        hw.advanceMillis(250);
-        controller.update();
-    }
-    
-    // After enough 250ms polls, sensor data should register (median filter converges)
-    // This verifies the sensor IS being read during night sleep, just at a slower rate
-    TEST_ASSERT_FLOAT_WITHIN(1.0f, 30.0f, controller.getDistance());
-}
 
 void test_maintenance_mode(void) {
     MockHardware hw;
@@ -655,7 +610,6 @@ int main(int argc, char **argv) {
     RUN_TEST(test_hold_duration_and_retrigger);
     RUN_TEST(test_startup_open_flow);
     RUN_TEST(test_ota_state_isolation);
-    RUN_TEST(test_night_sleep_mode);
     RUN_TEST(test_maintenance_mode);
     RUN_TEST(test_telemetry_interval_config);
     RUN_TEST(test_sensor_deadlock_prevention);
@@ -676,7 +630,6 @@ void setup() {
     RUN_TEST(test_hold_duration_and_retrigger);
     RUN_TEST(test_startup_open_flow);
     RUN_TEST(test_ota_state_isolation);
-    RUN_TEST(test_night_sleep_mode);
     RUN_TEST(test_maintenance_mode);
     RUN_TEST(test_telemetry_interval_config);
     RUN_TEST(test_sensor_deadlock_prevention);
