@@ -59,7 +59,8 @@ void PowerManager::update() {
 #endif
     }
 
-    bool isNight = (currentHour >= 23 || currentHour < 6);
+    // Temporarily disabled Night Sleep mode for MQTT testing
+    bool isNight = false; // (currentHour >= 23 || currentHour < 6);
 
     if (isNight) {
         if (!controllerPtr->isNightSleepActive()) {
