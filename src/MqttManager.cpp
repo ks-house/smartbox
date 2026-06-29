@@ -24,7 +24,8 @@ MqttManager::MqttManager(SmartBoxController& controller)
       m_debugLoggingActive(false),
       m_debugStartTime(0),
       m_wasConnected(false),
-      m_isConnecting(false) {  // BUG-05 fix
+      m_isConnecting(false),  // BUG-05 fix
+      m_connectStartTime(0) {
     g_mqttManagerInstance = this;
 }
 
@@ -69,6 +70,7 @@ void MqttManager::connectToMqtt() {
     if (WifiManager::isConnected() && !m_mqttClient.connected()) {
         RLOG_I("[MQTT] Connecting to MQTT broker...\n");
         m_isConnecting = true;
+        m_connectStartTime = millis();
         m_mqttClient.connect();
     }
 }
@@ -261,6 +263,15 @@ void MqttManager::handleSetConfig(const JsonDocument& doc) {
 }
 
 void MqttManager::update() {
+    // BUG-05 fix: connection timeout guard (15 seconds)
+    if (m_isConnecting && (millis() - m_connectStartTime > 15000)) {
+        RLOG_W("[MQTT] Connection attempt timed out (15s). Resetting connecting flag.\n");
+        m_isConnecting = false;
+        if (m_mqttClient.connected()) {
+            m_mqttClient.disconnect();
+        }
+    }
+
     // BUG-05 fix: only attempt fallback connect if not already connecting/connected
     if (WifiManager::isConnected() && !m_mqttClient.connected() && !m_isConnecting) {
         static unsigned long lastCheck = 0;

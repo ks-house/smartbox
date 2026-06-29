@@ -55,6 +55,8 @@ void SmartBoxController::init() {
 
 
 void SmartBoxController::update() {
+    std::lock_guard<std::recursive_mutex> lock(dataMutex);
+
     // OTA 업데이트 중 — 모든 센서/액추에이터 루프 완전 정지
     if (currentState == STATE_OTA_UPDATING) {
         return;
@@ -66,7 +68,6 @@ void SmartBoxController::update() {
             sensorTimer = hw.getMillis();
             updateDistanceBuffer();
             float filtered = getFilteredDistance();
-            std::lock_guard<std::recursive_mutex> lock(dataMutex);
             currentDistance = filtered;
         }
     }

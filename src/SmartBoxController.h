@@ -114,8 +114,14 @@ public:
       std::lock_guard<std::recursive_mutex> lock(dataMutex);
       return currentState;
   }
-  void setConfig(const BoxConfig &newConfig) { config = newConfig; }
-  BoxConfig getConfig() const { return config; }
+  void setConfig(const BoxConfig &newConfig) { 
+      std::lock_guard<std::recursive_mutex> lock(dataMutex);
+      config = newConfig; 
+  }
+  BoxConfig getConfig() const { 
+      std::lock_guard<std::recursive_mutex> lock(dataMutex);
+      return config; 
+  }
   void registerStateCallback(StateChangeCallback cb) { stateCallback = cb; }
   void setInitialState(State state) { initialState = state; }
 

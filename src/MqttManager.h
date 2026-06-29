@@ -57,6 +57,7 @@ private:
     unsigned long m_debugStartTime;
     bool m_wasConnected;
     bool m_isConnecting;  // BUG-05 fix: prevent duplicate connection attempts
+    unsigned long m_connectStartTime;
 
     static constexpr unsigned long DEBUG_MODE_DURATION_MS = 300000; // 5 minutes
 };
