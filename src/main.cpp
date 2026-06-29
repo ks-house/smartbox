@@ -109,18 +109,17 @@ void setup() {
     // 8. Initialize Auto-OTA scheduler and manager
     AutoOtaManager::init(controller);
 
-    // 9. Initialize InfluxDB telemetry manager
+    // 9. Initialize MQTT Telemetry Manager
     TelemetryManager::init(controller);
 
     // 10. Initialize MQTT Manager
     mqttManager.begin();
 
-    // Register combined log forwarding target (InfluxDB + MQTT)
+    // Register log forwarding target (MQTT)
     RemoteLogger::onWarnError = [](LogLevel level, const char* message) {
-        TelemetryManager::pushLog(level, message);
         mqttManager.publishLog(level, message);
     };
-    Serial.println("[SYSTEM] RemoteLogger WARN/ERROR -> TelemetryManager & MqttManager callback registered.");
+    Serial.println("[SYSTEM] RemoteLogger WARN/ERROR -> MqttManager callback registered.");
 
     // Register state change callback for MQTT instant events & cycle summary
     static unsigned long cycleStartTime = 0;
