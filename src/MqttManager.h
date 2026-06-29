@@ -8,6 +8,10 @@
 #include "RemoteLogger.h"
 
 class SmartBoxController; // Forward declaration
+struct TelemetryData; // Forward declaration
+
+class MqttManager;
+MqttManager* getMqttManagerInstance();
 
 class MqttManager {
 public:
@@ -22,6 +26,16 @@ public:
 
     void publishLog(LogLevel level, const char* message);
     void publishTelemetry();
+    
+    // Batch and Event Telemetry Extensions
+    void publishBatchTelemetry(const TelemetryData* data, int count, const char* batchType);
+    void publishEventState(int prevState, int newState);
+    void publishEventMotion(float distanceCm);
+    void publishEventAlarm(const char* alarmType, float value, const char* message);
+    void publishEventCycle(unsigned long durationMs, float peakCurrent, float startBatt, float endBatt);
+    
+    // Home Assistant MQTT Auto Discovery
+    void publishAutoDiscovery();
     
     bool isConnected() const { return const_cast<AsyncMqttClient&>(m_mqttClient).connected(); }
     bool isDebugLoggingActive() const { return m_debugLoggingActive; }

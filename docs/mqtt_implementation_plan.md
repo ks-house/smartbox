@@ -315,6 +315,74 @@ SmartBox는 야간 절전 모드 진입 시 소비 전력을 최소화해야 합
 }
 ```
 
+### 4.5. MQTT 배치 & 하이브리드 이벤트 토픽 사양 (Batch & Event Specifications)
+전력 소모 최적화 및 실시간 모니터링을 위해 구현된 배치 송신 및 이벤트 토픽 사양입니다.
+
+#### A. 시계열 배치 텔레메트리 토픽 (`smartbox/telemetry/batch`)
+RAM 링 버퍼에 1분 간격으로 축적된 타임스탬프 시계열 샘플 데이터를 주기적(기본 10~15분)으로 일괄 퍼블리시하여 Wi-Fi RF 가동 시간을 극대화하여 아낍니다.
+```json
+{
+  "device": "smartbox_01",
+  "type": "heartbeat",
+  "count": 3,
+  "timestamp": 1246200,
+  "wifi_rssi": -65,
+  "data": [
+    { "ts": 1245000, "batt_v": 12.4 },
+    { "ts": 1245600, "batt_v": 12.3, "dist_cm": 15.2, "curr_ma": 1850.0, "state": "OPENING" },
+    { "ts": 1246200, "batt_v": 12.4 }
+  ]
+}
+```
+
+#### B. 상태 변경 이벤트 토픽 (`smartbox/event/state`) - Instant
+메인 FSM 상태가 변경되는 순간 실시간으로 퍼블리시됩니다 (QoS 1).
+```json
+{
+  "timestamp": 1245600,
+  "prev_state": "IDLE",
+  "new_state": "OPEN_START",
+  "battery_v": 12.4
+}
+```
+
+#### C. 모션 감지 이벤트 토픽 (`smartbox/event/motion`) - Trigger
+거리 측정 결과 100cm 이하 구역에 진입하는 순간 엣지 트리거(Edge Trigger)로 1회 즉시 발행됩니다.
+```json
+{
+  "timestamp": 1245550,
+  "event": "motion_detected",
+  "distance_cm": 42.5
+}
+```
+
+#### D. 긴급 알람 토픽 (`smartbox/event/alarm`) - Critical Instant
+모터 과전류(Stall) 또는 저전압 셧다운 등 하드웨어 보호 및 위험 상황 시 즉시 퍼블리시됩니다 (QoS 1).
+```json
+{
+  "timestamp": 1245800,
+  "alarm": "STALL_OVERCURRENT",
+  "value": 3200.0,
+  "message": "Motor stall / emergency stop triggered",
+  "battery_v": 12.1
+}
+```
+
+#### E. 1회 개폐 사이클 요약 리포트 토픽 (`smartbox/event/cycle`) - Summary
+뚜껑이 열렸다가 닫혀서 다시 `IDLE` 상태로 복귀했을 때 1회 개폐 동작에 대한 통계 요약을 퍼블리시합니다.
+```json
+{
+  "timestamp": 1246100,
+  "duration_ms": 4200,
+  "peak_current_ma": 2100.0,
+  "start_batt_v": 12.4,
+  "end_batt_v": 12.3
+}
+```
+
+### 4.6. Home Assistant MQTT Auto Discovery 지원
+기기가 부팅되어 MQTT 브로커 접속 성공 시 `homeassistant/<component>/smartbox_01/<object_id>/config` 토픽으로 보일러플레이트 자동 등록 메시지를 발행(Retained)합니다. 이에 따라 Home Assistant 사용자 설정 파일(`configuration.yaml`)에 수동 코드를 작성할 필요 없이 HA **[기기 및 서비스]** 메뉴에 `[SmartBox]` 기기로 자동 등록됩니다.
+
 ---
 
 ## 5. 단계별 구현 및 테스트 계획 (Phased Implementation Plan)

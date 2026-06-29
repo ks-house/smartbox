@@ -1,4 +1,5 @@
 #include "TelemetryManager.h"
+#include "MqttManager.h"
 #include "WifiManager.h"
 #include "secrets.h"
 #include <Arduino.h>
@@ -64,7 +65,13 @@ void TelemetryManager::telemetryTaskFunction(void* pvParameters) {
         return;
     }
     
-    Serial.printf("[TELEMETRY-ASYNC] Initializing %s batch transmission to InfluxDB, size: %d\n", payload->type, payload->count);
+    Serial.printf("[TELEMETRY-ASYNC] Initializing %s batch transmission to InfluxDB & MQTT, size: %d\n", payload->type, payload->count);
+
+    // Dispatch MQTT batch telemetry
+    MqttManager* mqtt = getMqttManagerInstance();
+    if (mqtt) {
+        mqtt->publishBatchTelemetry(payload->data, payload->count, payload->type);
+    }
     
     InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN, SECRET_ROOT_CA_CERT);
     

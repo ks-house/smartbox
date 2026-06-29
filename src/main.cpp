@@ -122,6 +122,36 @@ void setup() {
     };
     Serial.println("[SYSTEM] RemoteLogger WARN/ERROR -> TelemetryManager & MqttManager callback registered.");
 
+    // Register state change callback for MQTT instant events & cycle summary
+    static unsigned long cycleStartTime = 0;
+    static float cyclePeakCurrent = 0.0f;
+    static float cycleStartBatt = 0.0f;
+
+    controller.registerStateCallback([](State prev, State next) {
+        MqttManager* mqtt = getMqttManagerInstance();
+        if (mqtt) {
+            mqtt->publishEventState((int)prev, (int)next);
+
+            if (prev == STATE_IDLE && next != STATE_IDLE) {
+                cycleStartTime = millis();
+                cyclePeakCurrent = 0.0f;
+                cycleStartBatt = controller.getBatteryVoltage();
+            }
+            if (next == STATE_IDLE && prev != STATE_IDLE && cycleStartTime > 0) {
+                unsigned long duration = millis() - cycleStartTime;
+                float endBatt = controller.getBatteryVoltage();
+                mqtt->publishEventCycle(duration, cyclePeakCurrent, cycleStartBatt, endBatt);
+                cycleStartTime = 0;
+            }
+
+            if (next == STATE_EMERGENCY_STOP) {
+                mqtt->publishEventAlarm("STALL_OVERCURRENT", controller.getMotorCurrent(), "Motor stall / emergency stop triggered");
+            } else if (next == STATE_BATTERY_LOW_SHUTDOWN) {
+                mqtt->publishEventAlarm("LOW_BATTERY", controller.getBatteryVoltage(), "Critical low battery voltage detected");
+            }
+        }
+    });
+
     // 11. Initialize time-based power management
     PowerManager::init(controller);
 
@@ -188,6 +218,17 @@ void loop() {
 
     // Run core FSM updates
     controller.update();
+
+    // Motion detection edge check (<= 100cm)
+    static float lastDist = 999.0f;
+    float currentDist = controller.getDistance();
+    if (lastDist > 100.0f && currentDist <= 100.0f) {
+        MqttManager* mqtt = getMqttManagerInstance();
+        if (mqtt) {
+            mqtt->publishEventMotion(currentDist);
+        }
+    }
+    lastDist = currentDist;
 
     // Run Wi-Fi manager updates
     WifiManager::update();
