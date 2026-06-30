@@ -13,7 +13,7 @@
 
 SmartBoxController* AutoOtaManager::controllerPtr = nullptr;
 unsigned long AutoOtaManager::lastScheduleCheck = 0;
-int AutoOtaManager::lastOtaCheckDay = -1;
+unsigned long AutoOtaManager::lastOtaRunTime = 0; // 0 = never run
 volatile bool AutoOtaManager::otaForceRequested = false;
 volatile bool AutoOtaManager::otaInProgress = false;
 
@@ -23,7 +23,7 @@ char AutoOtaManager::otaErrorMessage[128] = "";
 void AutoOtaManager::init(SmartBoxController& controller) {
     controllerPtr = &controller;
     lastScheduleCheck = 0;
-    lastOtaCheckDay = -1;
+    lastOtaRunTime = 0;
     otaForceRequested = false;
     otaInProgress = false;
     otaState = OTA_STATE_IDLE;
@@ -63,21 +63,21 @@ void AutoOtaManager::update() {
         return;
     }
     lastScheduleCheck = now;
-    
-    struct tm timeinfo;
-    if (!getLocalTime(&timeinfo, 0)) {
-        // NTP not synchronized yet
-        return;
-    }
-    
-    // Auto-OTA at configured hour or later (catch-up if missed due to sleep/reboot)
-    int scheduledHour = controllerPtr->getConfig().otaHour;
-    if (timeinfo.tm_hour >= scheduledHour) {
-        if (lastOtaCheckDay != timeinfo.tm_mday) {
-            lastOtaCheckDay = timeinfo.tm_mday;
-            Serial.printf("[AUTO-OTA] Scheduled trigger time (%d:00 KST) reached or passed. Running AutoOta...\n", scheduledHour);
-            runOtaProcess(false);
+
+    // Hourly OTA check: run every 1 hour (or immediately on first boot)
+    static constexpr unsigned long OTA_CHECK_INTERVAL_MS = 3600000UL; // 1 hour
+    bool firstRun = (lastOtaRunTime == 0);
+    bool intervalElapsed = (!firstRun && (now - lastOtaRunTime >= OTA_CHECK_INTERVAL_MS));
+
+    if (firstRun || intervalElapsed) {
+        unsigned long elapsedSinceLast = firstRun ? 0 : (now - lastOtaRunTime);
+        lastOtaRunTime = now;
+        if (firstRun) {
+            Serial.println("[AUTO-OTA] First boot: running initial OTA version check...");
+        } else {
+            Serial.printf("[AUTO-OTA] 1-hour interval elapsed (%lu ms). Running AutoOta...\n", elapsedSinceLast);
         }
+        runOtaProcess(false);
     }
 }
 
