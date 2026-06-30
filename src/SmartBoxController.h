@@ -132,6 +132,10 @@ public:
   void stopMaintenanceMode();
   unsigned long getMaintenanceRemainingSeconds() const;
 
+#if __has_include("git_version.h")
+#include "git_version.h"
+#endif
+
 #ifdef FIRMWARE_VERSION_OVERRIDE
   static constexpr const char *FIRMWARE_VERSION = FIRMWARE_VERSION_OVERRIDE;
 #else

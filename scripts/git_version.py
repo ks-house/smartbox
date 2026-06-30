@@ -36,7 +36,19 @@ def get_git_version():
 version = get_git_version()
 print(f"[git_version] Extracted dynamic version: {version}")
 
-# Add the macro definition
-env.Append(CPPDEFINES=[ # type: ignore
-    ("FIRMWARE_VERSION_OVERRIDE", f'\\"{version}\\"')
-])
+# Generate a header file to avoid global CPPDEFINES changes (which triggers full rebuilds)
+proj_dir = env.get("PROJECT_DIR", "") # type: ignore
+out_file = os.path.join(proj_dir, "src", "git_version.h")
+new_content = f'#define FIRMWARE_VERSION_OVERRIDE "{version}"\n'
+
+# Only write if the content actually changed to prevent unnecessary recompilations
+write_file = True
+if os.path.exists(out_file):
+    with open(out_file, "r") as f:
+        if f.read() == new_content:
+            write_file = False
+
+if write_file:
+    with open(out_file, "w") as f:
+        f.write(new_content)
+    print(f"[git_version] Updated src/git_version.h")
