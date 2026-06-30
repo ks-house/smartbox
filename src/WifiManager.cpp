@@ -87,26 +87,62 @@ void WifiManager::handleRoot() {
                   "<title>SmartBox Wi-Fi Setup</title><style>"
                   "body{font-family:sans-serif;background:#121212;color:#eee;padding:20px;text-align:center}"
                   ".card{background:#1e1e1e;max-width:400px;margin:0 auto;padding:20px;border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,0.5)}"
-                  "input{width:100%;padding:10px;margin:8px 0;box-sizing:border-box;border-radius:6px;border:1px solid #444;background:#2a2a2a;color:#fff}"
+                  "input,select{width:100%;padding:10px;margin:8px 0;box-sizing:border-box;border-radius:6px;border:1px solid #444;background:#2a2a2a;color:#fff}"
                   "button{width:100%;padding:12px;background:#00e676;border:none;border-radius:6px;color:#000;font-weight:bold;cursor:pointer;margin-top:10px}"
-                  "#status{margin-top:15px;padding:12px;border-radius:6px;font-size:14px;display:none;}"
+                  ".btn-scan{background:#2196f3;color:#fff;margin-bottom:15px;}"
+                  "#status,#cur-conn{margin-top:15px;padding:12px;border-radius:6px;font-size:14px;display:none;}"
+                  "#cur-conn{background:#333;border:1px solid #555;margin-bottom:15px;text-align:left;}"
                   ".connecting{background:#ff9800;color:#000;}"
                   ".success{background:#4caf50;color:#fff;}"
                   ".failed{background:#f44336;color:#fff;}"
                   "</style></head><body><div class='card'>"
                   "<h2>📶 SmartBox Wi-Fi Setup</h2>"
+                  "<div id='cur-conn'></div>"
                   "<p>Enter your local Wi-Fi router credentials below.</p>"
+                  "<button class='btn-scan' onclick='startScan()' id='btn-scan' type='button'>🔍 Scan Networks</button>"
                   "<form action='/save' method='POST'>"
-                  "<input type='text' name='ssid' placeholder='Wi-Fi Network Name (SSID)' required><br>"
+                  "<div id='net-list' style='display:none;'><select id='ssid-select' onchange='updateSsid()'><option value=''>-- Select a Network --</option></select></div>"
+                  "<input type='text' id='ssid-input' name='ssid' placeholder='Wi-Fi Network Name (SSID)' required><br>"
                   "<input type='password' name='pass' placeholder='Password'><br>"
                   "<button type='submit'>Save & Connect</button>"
                   "</form>"
                   "<div id='status'></div>"
                   "</div>"
                   "<script>"
+                  "function startScan(){"
+                  "var btn=document.getElementById('btn-scan');"
+                  "btn.disabled=true;btn.innerHTML='🔄 Scanning...';"
+                  "fetch('/api/scan-start',{method:'POST'}).then(()=>{pollScan();}).catch(()=>{btn.disabled=false;btn.innerHTML='🔍 Scan Networks';});"
+                  "}"
+                  "function pollScan(){"
+                  "fetch('/api/scan-results').then(r=>r.json()).then(d=>{"
+                  "if(d.status==='scanning') setTimeout(pollScan, 1500);"
+                  "else if(d.status==='done') {"
+                  "var btn=document.getElementById('btn-scan');btn.disabled=false;btn.innerHTML='🔍 Scan Networks';"
+                  "var sel=document.getElementById('ssid-select');"
+                  "sel.innerHTML='<option value=\"\">-- Select a Network --</option>';"
+                  "d.networks.forEach(n=>{"
+                  "var opt=document.createElement('option');"
+                  "opt.value=n.ssid; opt.textContent=n.ssid+' ('+n.rssi+'dBm)';"
+                  "sel.appendChild(opt);"
+                  "});"
+                  "document.getElementById('net-list').style.display='block';"
+                  "} else {"
+                  "var btn=document.getElementById('btn-scan');btn.disabled=false;btn.innerHTML='❌ Scan Failed. Try Again.';"
+                  "}"
+                  "});"
+                  "}"
+                  "function updateSsid(){"
+                  "var sel=document.getElementById('ssid-select');"
+                  "if(sel.value) document.getElementById('ssid-input').value=sel.value;"
+                  "}"
                   "function checkStatus(){"
                   "fetch('/api/wifi-status').then(r=>r.json()).then(d=>{"
                   "var el=document.getElementById('status');"
+                  "var conn=document.getElementById('cur-conn');"
+                  "if(d.status==='success' && d.ip && d.ip.length > 0){"
+                  "conn.style.display='block';conn.innerHTML='✅ <b>Currently Connected</b><br>SSID: '+d.ssid+'<br>IP: '+d.ip;"
+                  "}"
                   "if(d.status==='connecting'){"
                   "el.style.display='block';el.className='connecting';el.innerHTML='🔄 Connecting to '+d.ssid+'...';"
                   "}else if(d.status==='success'){"
@@ -116,7 +152,7 @@ void WifiManager::handleRoot() {
                   "}"
                   "});"
                   "}"
-                  "setInterval(checkStatus, 1500);checkStatus();"
+                  "setInterval(checkStatus, 2500);checkStatus();"
                   "</script></body></html>";
     webServer.send(200, "text/html", html);
 }
@@ -164,6 +200,24 @@ void WifiManager::handleStatus() {
     webServer.send(200, "application/json", json);
 }
 
+void WifiManager::handleScanStart() {
+    startScan();
+    webServer.send(200, "application/json", "{\"status\":\"scanning\"}");
+}
+
+void WifiManager::handleScanResults() {
+    int status = getScanStatus();
+    if (status == WIFI_SCAN_RUNNING) {
+        webServer.send(200, "application/json", "{\"status\":\"scanning\"}");
+    } else if (status >= 0) {
+        String results = getScanResultsJson();
+        String json = "{\"status\":\"done\",\"networks\":" + results + "}";
+        webServer.send(200, "application/json", json);
+    } else {
+        webServer.send(200, "application/json", "{\"status\":\"error\"}");
+    }
+}
+
 void WifiManager::init(const char* apSsid, const char* apPass, const char* staSsid, const char* staPass) {
     WiFi.onEvent(onWiFiEvent);
     bootTime = millis();
@@ -193,6 +247,8 @@ void WifiManager::init(const char* apSsid, const char* apPass, const char* staSs
     webServer.on("/", HTTP_GET, handleRoot);
     webServer.on("/save", HTTP_POST, handleSave);
     webServer.on("/api/wifi-status", HTTP_GET, handleStatus);
+    webServer.on("/api/scan-start", HTTP_POST, handleScanStart);
+    webServer.on("/api/scan-results", HTTP_GET, handleScanResults);
     webServer.onNotFound(handleRoot);
     webServer.begin();
     Serial.println("[WIFI] Provisioning WebServer & Captive Portal started on port 80.");

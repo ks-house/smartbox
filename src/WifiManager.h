@@ -34,6 +34,8 @@ private:
     static void handleRoot();
     static void handleSave();
     static void handleStatus();
+    static void handleScanStart();
+    static void handleScanResults();
 
 public:
     static void init(const char* apSsid, const char* apPass, const char* staSsid = nullptr, const char* staPass = nullptr);
