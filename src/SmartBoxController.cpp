@@ -1,4 +1,5 @@
 #include "SmartBoxController.h"
+#include "AutoOtaManager.h"
 
 // Fixed pin assignments as per AGENTS.md
 static const int RELAY_MAIN_PIN = 6;
@@ -80,8 +81,14 @@ void SmartBoxController::update() {
     }
     
     // Battery low voltage 3-second guard filter
+    // OTA BYPASS: TLS 핸드셰이크 중 순간 전압 강하를 배터리 방전으로 오인하지 않도록,
+    // OTA 진행 중에는 저전압 감지 루틴 전체를 건너뜁니다.
     static unsigned long lowVoltGuardStart = 0;
-    if (batteryVoltage < config.voltageShutdownLimit && currentState != STATE_BATTERY_LOW_SHUTDOWN) {
+    if (AutoOtaManager::isOtaInProgress()) {
+        // OTA 통신 구간: 타이머를 리셋하여 OTA 종료 후 즉시 셧다운이 트리거되지 않도록 방어
+        lowVoltGuardStart = 0;
+        Serial.println("[BATTERY] Low-voltage guard bypassed: OTA in progress (transient voltage drop expected).");
+    } else if (batteryVoltage < config.voltageShutdownLimit && currentState != STATE_BATTERY_LOW_SHUTDOWN) {
         if (lowVoltGuardStart == 0) {
             lowVoltGuardStart = hw.getMillis();
         } else if (hw.getMillis() - lowVoltGuardStart >= 3000) {
