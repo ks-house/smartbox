@@ -2,7 +2,7 @@
 #define MQTT_MANAGER_H
 
 #include <Arduino.h>
-#include <AsyncMqttClient.h>
+#include <PsychicMqttClient.h>
 #include <Ticker.h>
 #include <ArduinoJson.h>
 #include "RemoteLogger.h"
@@ -21,7 +21,6 @@ public:
     void begin();
     void update(); // Non-blocking state update and timer checks
 
-
     void publishLog(LogLevel level, const char* message);
     void publishTelemetry();
     
@@ -35,28 +34,28 @@ public:
     // Home Assistant MQTT Auto Discovery
     void publishAutoDiscovery();
     
-    bool isConnected() { return m_mqttClient.connected(); }  // BUG-10 fix: removed const_cast anti-pattern
+    bool isConnected() { return m_mqttClient.connected(); }
     bool isDebugLoggingActive() const { return m_debugLoggingActive; }
 
 private:
     void connectToMqtt();
     void onMqttConnect(bool sessionPresent);
-    void onMqttDisconnect(AsyncMqttClientDisconnectReason reason);
-    void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total);
+    void onMqttDisconnect();
+    void onMqttMessage(char* topic, char* payload, int retain, int qos, bool dup);
     void handleCommand(const JsonDocument& doc);
     void handleSetConfig(const JsonDocument& doc);
 
     static const char* stateToString(int state);
 
     SmartBoxController& m_controller;
-    AsyncMqttClient m_mqttClient;
+    PsychicMqttClient m_mqttClient;
     Ticker m_reconnectTimer;
     Ticker m_rebootTimer;
 
     bool m_debugLoggingActive;
     unsigned long m_debugStartTime;
     bool m_wasConnected;
-    bool m_isConnecting;  // BUG-05 fix: prevent duplicate connection attempts
+    bool m_isConnecting;
     unsigned long m_connectStartTime;
 
     static constexpr unsigned long DEBUG_MODE_DURATION_MS = 300000; // 5 minutes

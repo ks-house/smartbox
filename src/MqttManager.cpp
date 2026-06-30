@@ -24,62 +24,71 @@ MqttManager::MqttManager(SmartBoxController& controller)
       m_debugLoggingActive(false),
       m_debugStartTime(0),
       m_wasConnected(false),
-      m_isConnecting(false),  // BUG-05 fix
+      m_isConnecting(false),
       m_connectStartTime(0) {
     g_mqttManagerInstance = this;
 }
 
 void MqttManager::begin() {
-    m_mqttClient.setServer(SECRET_MQTT_HOST, SECRET_MQTT_PORT);
-    m_mqttClient.setCredentials(SECRET_MQTT_USER, SECRET_MQTT_PASS);
-    
-#if ASYNC_TCP_SSL_ENABLED
-    m_mqttClient.setSecure(true);
-#endif
+    m_mqttClient.setClientId("ESP32C6_SMARTBOX_01");
+    m_mqttClient.setBufferSize(2048); // Handle large auto-discovery payloads
+    m_mqttClient.setAutoReconnect(true); // Automatically reconnect via ESP-IDF background task
+    m_mqttClient.setKeepAlive(60);
 
     // Set Will (Last Will and Testament) message
-    static const char* willPayload = "{\"status\":\"offline\",\"device_id\":\"ESP32C6_SMARTBOX_01\"}";
-    m_mqttClient.setWill("smartbox/status", 1, true, willPayload, strlen(willPayload));
+    const char* willPayload = "{\"status\":\"offline\",\"device_id\":\"ESP32C6_SMARTBOX_01\"}";
+    m_mqttClient.setWill("smartbox/status", 1, true, willPayload);
 
-    // Register AsyncMqttClient callbacks
+    if (strlen(SECRET_MQTT_USER) > 0) {
+        m_mqttClient.setCredentials(SECRET_MQTT_USER, SECRET_MQTT_PASS);
+    }
+
+    // Set TLS Root CA Certificate
+    m_mqttClient.setCACert(SECRET_ROOT_CA_CERT, strlen(SECRET_ROOT_CA_CERT));
+
+    // Server URI config (mqtts:// prefix enforces TLS connection in PsychicMqttClient)
+    String serverUri = String("mqtts://") + SECRET_MQTT_HOST + ":" + SECRET_MQTT_PORT;
+    m_mqttClient.setServer(serverUri.c_str());
+
+    // Register event callbacks using C++ lambda capture
     m_mqttClient.onConnect([this](bool sessionPresent) {
         this->onMqttConnect(sessionPresent);
     });
 
-    m_mqttClient.onDisconnect([this](AsyncMqttClientDisconnectReason reason) {
-        this->onMqttDisconnect(reason);
+    m_mqttClient.onDisconnect([this](bool sessionPresent) {
+        this->onMqttDisconnect();
     });
 
-    m_mqttClient.onMessage([this](char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
-        this->onMqttMessage(topic, payload, properties, len, index, total);
+    m_mqttClient.onMessage([this](char* topic, char* payload, int retain, int qos, bool dup) {
+        this->onMqttMessage(topic, payload, retain, qos, dup);
     });
 
     // Register callback into RemoteLogger for log forwarding
     RemoteLogger::onWarnError = globalLogForwardCallback;
 
-    RLOG_I("[MQTT] Manager initialized for %s:%d\n", SECRET_MQTT_HOST, SECRET_MQTT_PORT);
+    RLOG_I("[MQTT] Manager initialized for MQTTS %s:%d (Async)\n", SECRET_MQTT_HOST, SECRET_MQTT_PORT);
 }
 
 void MqttManager::connectToMqtt() {
-    // BUG-05 fix: prevent duplicate connection attempts
+    // Prevent duplicate connection attempts
     if (m_isConnecting) {
         RLOG_D("[MQTT] Connection already in progress, skipping.\n");
         return;
     }
 
     if (WifiManager::isConnected() && !m_mqttClient.connected()) {
-        RLOG_I("[MQTT] Connecting to MQTT broker...\n");
+        RLOG_I("[MQTT] Connecting to Secure MQTT broker (Async)...\n");
         m_isConnecting = true;
         m_connectStartTime = millis();
-        m_mqttClient.connect();
+        m_mqttClient.connect(); // Starts async connection procedure in background task
     }
 }
 
 void MqttManager::onMqttConnect(bool sessionPresent) {
-    RLOG_I("[MQTT] Connected to broker successfully! Session present: %d\n", sessionPresent);
+    RLOG_I("[MQTT] Connected to secure broker successfully! Session: %d\n", sessionPresent);
     m_reconnectTimer.detach();
     m_wasConnected = true;
-    m_isConnecting = false;  // BUG-05 fix
+    m_isConnecting = false;
 
     // Subscribe to command topic
     m_mqttClient.subscribe("smartbox/command", 1);
@@ -100,11 +109,13 @@ void MqttManager::onMqttConnect(bool sessionPresent) {
     publishAutoDiscovery();
 }
 
-void MqttManager::onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
-    RLOG_W("[MQTT] Disconnected from MQTT broker. Reason: %d\n", static_cast<int>(reason));
+void MqttManager::onMqttDisconnect() {
+    RLOG_W("[MQTT] Disconnected from MQTT broker.\n");
     m_wasConnected = false;
-    m_isConnecting = false;  // BUG-05 fix: clear connecting flag on disconnect
+    m_isConnecting = false;
 
+    // PsychicMqttClient handles auto reconnection in the background.
+    // However, if we need to force reconnect immediately under certain conditions:
     if (WifiManager::isConnected()) {
         m_reconnectTimer.once(5.0f, +[](MqttManager* instance) {
             instance->connectToMqtt();
@@ -112,16 +123,12 @@ void MqttManager::onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
     }
 }
 
-void MqttManager::onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
-    char message[len + 1];
-    memcpy(message, payload, len);
-    message[len] = '\0';
-
-    RLOG_I("[MQTT] Message arrived [%s]: %s\n", topic, message);
+void MqttManager::onMqttMessage(char* topic, char* payload, int retain, int qos, bool dup) {
+    RLOG_I("[MQTT] Message arrived [%s]: %s\n", topic, payload);
 
     if (strcmp(topic, "smartbox/command") == 0) {
         JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, message);
+        DeserializationError error = deserializeJson(doc, payload);
         if (error) {
             RLOG_E("[MQTT] JSON parse failed: %s\n", error.c_str());
             return;
@@ -263,16 +270,13 @@ void MqttManager::handleSetConfig(const JsonDocument& doc) {
 }
 
 void MqttManager::update() {
-    // BUG-05 fix: connection timeout guard (15 seconds)
+    // Connection timeout guard (15 seconds)
     if (m_isConnecting && (millis() - m_connectStartTime > 15000)) {
-        RLOG_W("[MQTT] Connection attempt timed out (15s). Resetting connecting flag.\n");
+        RLOG_W("[MQTT] Connection attempt timed out (15s).\n");
         m_isConnecting = false;
-        if (m_mqttClient.connected()) {
-            m_mqttClient.disconnect();
-        }
     }
 
-    // BUG-05 fix: only attempt fallback connect if not already connecting/connected
+    // Fallback check: Trigger connection attempt if wifi is connected but MQTT is not
     if (WifiManager::isConnected() && !m_mqttClient.connected() && !m_isConnecting) {
         static unsigned long lastCheck = 0;
         if (millis() - lastCheck > 10000) {
