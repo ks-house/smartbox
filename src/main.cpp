@@ -7,8 +7,8 @@
 #include "AutoOtaManager.h"
 #include "TelemetryManager.h"
 #include "PowerManager.h"
-#include "RemoteLogger.h"
 #include "MqttManager.h"
+#include "secrets.h"
 
 #ifndef NATIVE_BUILD
 #include <esp_task_wdt.h>

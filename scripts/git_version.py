@@ -1,13 +1,13 @@
 import subprocess
 import os
 
-Import("env")
+Import("env") # type: ignore
 
 def get_git_version():
     base_version = "0.1.0"
     try:
         # Try to read base version from src/SmartBoxController.h
-        proj_dir = env.get("PROJECT_DIR", "")
+        proj_dir = env.get("PROJECT_DIR", "") # type: ignore
         header_path = os.path.join(proj_dir, "src", "SmartBoxController.h")
         if os.path.exists(header_path):
             with open(header_path, "r", encoding="utf-8") as f:
@@ -37,6 +37,6 @@ version = get_git_version()
 print(f"[git_version] Extracted dynamic version: {version}")
 
 # Add the macro definition
-env.Append(CPPDEFINES=[
+env.Append(CPPDEFINES=[ # type: ignore
     ("FIRMWARE_VERSION_OVERRIDE", f'\\"{version}\\"')
 ])
