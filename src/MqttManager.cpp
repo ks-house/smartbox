@@ -43,12 +43,14 @@ void MqttManager::begin() {
         m_mqttClient.setCredentials(SECRET_MQTT_USER, SECRET_MQTT_PASS);
     }
 
-    // Set TLS Root CA Certificate
-    m_mqttClient.setCACert(SECRET_ROOT_CA_CERT, strlen(SECRET_ROOT_CA_CERT));
+    // Set TLS Root CA Certificate (Length 0 tells esp-mqtt it's a null-terminated PEM string)
+    m_mqttClient.setCACert(SECRET_ROOT_CA_CERT);
 
     // Server URI config (mqtts:// prefix enforces TLS connection in PsychicMqttClient)
-    String serverUri = String("mqtts://") + SECRET_MQTT_HOST + ":" + SECRET_MQTT_PORT;
-    m_mqttClient.setServer(serverUri.c_str());
+    // We must store it in a member variable (m_serverUri) because PsychicMqttClient 
+    // only stores the pointer and esp_mqtt_client_start is called asynchronously later.
+    m_serverUri = String("mqtts://") + SECRET_MQTT_HOST + ":" + SECRET_MQTT_PORT;
+    m_mqttClient.setServer(m_serverUri.c_str());
 
     // Register event callbacks using C++ lambda capture
     m_mqttClient.onConnect([this](bool sessionPresent) {

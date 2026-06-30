@@ -57,6 +57,7 @@ private:
     bool m_wasConnected;
     bool m_isConnecting;
     unsigned long m_connectStartTime;
+    String m_serverUri;
 
     static constexpr unsigned long DEBUG_MODE_DURATION_MS = 300000; // 5 minutes
 };
