@@ -570,4 +570,26 @@ void MqttManager::publishAutoDiscovery() {
         doc["device_class"] = "motion";
         pubConfig("binary_sensor", "motion", doc);
     }
+
+    // 4. Configuration (Number Inputs)
+    struct NumberDef { const char* id; const char* name; const char* key; int min; int max; int step; const char* icon; };
+    NumberDef numbers[] = {
+        {"config_dist", "[SmartBox] 설정: 감지 거리 (cm)", "dist", 5, 150, 1, "mdi:ruler-square"},
+        {"config_wait", "[SmartBox] 설정: 열림 유지 시간 (ms)", "wait", 1000, 60000, 500, "mdi:timer-cog"},
+        {"config_stall", "[SmartBox] 설정: 모터 제한 전류 (mA)", "stall", 500, 10000, 100, "mdi:current-dc"},
+        {"config_ota_hour", "[SmartBox] 설정: 자동 업데이트 (시)", "otaHour", 0, 23, 1, "mdi:clock-outline"},
+        {"config_tel_int", "[SmartBox] 설정: 데이터 전송 주기 (분)", "telInterval", 1, 1440, 1, "mdi:transmit"}
+    };
+
+    for (const auto& n : numbers) {
+        JsonDocument doc = createDiscoveryDoc(n.name, n.id, "number");
+        doc["command_topic"] = "smartbox/command";
+        doc["command_template"] = String("{\"command\": \"set_config\", \"key\": \"") + n.key + "\", \"value\": {{ value }}}";
+        doc["min"] = n.min;
+        doc["max"] = n.max;
+        doc["step"] = n.step;
+        doc["optimistic"] = true;
+        doc["icon"] = n.icon;
+        pubConfig("number", n.id, doc);
+    }
 }
