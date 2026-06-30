@@ -332,6 +332,7 @@ void SmartBoxController::forceClose() {
 }
 
 void SmartBoxController::resetEmergency() {
+    std::lock_guard<std::recursive_mutex> lock(dataMutex);
     if (currentState == STATE_EMERGENCY_STOP) {
         currentState = STATE_IDLE;
         isCooldown = true;

@@ -136,7 +136,7 @@ ESP32-C6 보드와 각 모듈은 아래의 확정된 GPIO 번호에 정밀하게
 * **※ 비상 상태 전이 (Any state ➔ EMERGENCY_STOP):** 구동 중 모터 전류가 `config.currentStallLimit`(기본 3000mA)을 초과하면 즉시 강제 전이됩니다. 500ms 인러시 전류 구간 이후 3회 연속 초과 시 `forceAllRelaysOff()` 후 전이합니다.
 * **※ 배터리 저전압 셧다운 (Any state ➔ BATTERY_LOW_SHUTDOWN):** 배터리가 11.3V 이하로 3초 이상 유지되면 즉시 뚜껑을 강제 개방한 후 릴레이 전원을 영구 차단합니다.
 * **※ HTTPS NAS Pull 무선 펌웨어 업데이트 (Any state ➔ OTA_UPDATING):** 원격 제어 및 NAS로부터 펌웨어 업데이트 요청을 수집하면 즉시 모든 릴레이를 차단(INPUT/고임피던스)하고 FSM 및 루프를 동결합니다.
-* **※ 야간 절전 모드 (Night Sleep Mode):** NTP 시간 동기화 이후, 심야 시간대(23:00 ~ 06:00 KST)에 진입하면 불필요한 Wi-Fi 송수신 및 MQTT Ping 트래픽을 차단하기 위해 Disconnect 후 절전 모드로 진입합니다.
+* **※ Proactive Reboot (매일 04:00 AM):** NTP 동기화 후 새벽 4시 FSM이 IDLE 상태일 때 안전하게 자동 재부팅합니다. (하루 1일 1회 실행 보장)
 
 ### 🌐 모던 MQTT 단일 파이프라인 & Home Assistant Auto Discovery
 1. **MQTT 단일 파이프라인 통합 (Single Pipeline):**
@@ -177,3 +177,14 @@ ESP32-C6 보드와 각 모듈은 아래의 확정된 GPIO 번호에 정밀하게
 * **메인 소스코드:** [main.cpp](../src/main.cpp)
 * **MQTT 아키텍처 명세:** [mqtt_implementation_plan.md](mqtt_implementation_plan.md)
 * **릴레이 분석 리포트:** [26061301_릴레이연결_report.md](../reports/26061301_릴레이연결_report.md)
+
+---
+
+## 8. 추가 개선 사항 (TODO-LIST)
+
+향후 개발 및 사용성 강화를 위해 다음 항목들을 검토하고 구현할 예정입니다.
+
+- [ ] **[FEAT-1] `set_config` 동적 제어 매개변수 확장:** MQTT 명령으로 `cooldownTime`, `maxHoldTime`, `emergencyRecoveryTime` 값을 동적으로 변경할 수 있도록 `handleSetConfig()` 확장이 필요합니다.
+- [ ] **[FEAT-4] 다중 콜백 등록 구조 개선:** 현재 `SmartBoxController`의 상태 변경 콜백은 단일 포인터로 관리되어, 여러 콜백을 등록하면 덮어써지는 구조적 한계가 있습니다. 이를 `std::vector<StateChangeCallback>` 기반의 콜백 체인으로 리팩토링하여 모듈화를 향상시킬 필요가 있습니다.
+- [ ] **[FEAT-5] 상태 정보 조회 명령 (`get_info`) 추가:** `smartbox/command` 토픽을 통해 펌웨어 버전, 현재 Wi-Fi RSSI, OTA 상태, 구동 시간 등의 상세 정보를 수동으로 요청하고 조회할 수 있는 기능이 필요합니다.
+- [ ] **[FEAT-6] 미사용 레거시 함수 정리:** 야간 절전 기능(Night Sleep Mode) 삭제로 인해 더 이상 사용되지 않는 `TelemetryManager::notifySleepEnd()` 등의 데드 코드를 클린업해야 합니다.

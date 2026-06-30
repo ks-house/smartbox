@@ -344,6 +344,8 @@ void MqttManager::publishTelemetry() {
     JsonDocument doc;
     doc["timestamp"] = millis();
     doc["fsm_state"] = stateToString(static_cast<int>(m_controller.getCurrentState()));
+    doc["battery_v"] = m_controller.getBatteryVoltage();       // FEAT-2: 배터리 전압 추가
+    doc["motor_current_ma"] = m_controller.getMotorCurrent(); // FEAT-2: 모터 전류 추가
     doc["distance_cm"] = m_controller.getDistance();
     doc["wifi_rssi"] = WiFi.RSSI();
     doc["free_heap"] = ESP.getFreeHeap();

@@ -20,22 +20,8 @@ static Esp32Hardware hardware(4, 5);
 static SmartBoxController controller(hardware);
 static MqttManager mqttManager(controller);
 
-// Callback to dispatch state changes asynchronously
-static void onStateChanged(State prevState, State newState) {
-    // OTA 모드 진입 시 lid state 변경하지 않음 (OTA 중 플래시 쓰기 방지)
-    if (newState == STATE_OTA_UPDATING) {
-        Serial.println("[SYSTEM] OTA mode entered. All background routines suspended.");
-        return;
-    }
-    
-
-    // Save logical lid state in Preferences based on transition
-    if (newState == STATE_HOLD || newState == STATE_OPENING || newState == STATE_BATTERY_LOW_SHUTDOWN || newState == STATE_STARTUP_OPEN) {
-        ConfigManager::saveLidState(true);
-    } else if (newState == STATE_IDLE || newState == STATE_CLOSING) {
-        ConfigManager::saveLidState(false);
-    }
-}
+// NOTE: 이 함수는 사용 안 함. 모든 상태 변경 콜백은 setup()의 단일 통합 람다로 처리됩니다.
+// (이전 버전과의 주석 호환성 유지용)
 
 #ifndef NATIVE_BUILD
 static void NetworkTask(void* pvParameters) {
@@ -90,8 +76,59 @@ void setup() {
         controller.setInitialState(STATE_STARTUP_OPEN);
     }
 
-    // 3. Register state change callback
-    controller.registerStateCallback(onStateChanged);
+    // 3. Register unified state change callback (BUG-F fix: single lambda merges NVS + MQTT callbacks)
+    //    이전에 onStateChanged()와 MQTT 람다를 분리 등록하면 두 번째 등록이 첫 번째를 덮어썼음.
+    //    NVS 저장 + MQTT 이벤트를 하나의 람다로 통합하여 안전하게 처리합니다.
+    static unsigned long cycleStartTime = 0;
+    static float cyclePeakCurrent = 0.0f;
+    static float cycleStartBatt = 0.0f;
+
+    controller.registerStateCallback([](State prev, State next) {
+        // --- Part 1: NVS 뚜껑 상태 영구 저장 (구 onStateChanged 기능) ---
+        // OTA 모드 진입 시 플래시 쓰기 방지
+        if (next == STATE_OTA_UPDATING) {
+            Serial.println("[SYSTEM] OTA mode entered. All background routines suspended.");
+        } else {
+            // 논리적 뚜껑 상태를 Preferences에 저장
+            if (next == STATE_HOLD || next == STATE_OPENING ||
+                next == STATE_BATTERY_LOW_SHUTDOWN || next == STATE_STARTUP_OPEN) {
+                ConfigManager::saveLidState(true);
+            } else if (next == STATE_IDLE || next == STATE_CLOSING) {
+                ConfigManager::saveLidState(false);
+            }
+        }
+
+        // --- Part 2: MQTT 실시간 이벤트 발행 ---
+        MqttManager* mqtt = getMqttManagerInstance();
+        if (mqtt) {
+            mqtt->publishEventState((int)prev, (int)next);
+
+            // 개폐 사이클 시작: IDLE → non-IDLE 전환
+            if (prev == STATE_IDLE && next != STATE_IDLE) {
+                cycleStartTime = millis();
+                cyclePeakCurrent = 0.0f;
+                cycleStartBatt = controller.getBatteryVoltage();
+            }
+            // NOTE-01 fix: 구동 중 피크 전류 샘플링
+            if (next == STATE_OPENING || next == STATE_CLOSING) {
+                float cur = controller.getMotorCurrent();
+                if (cur > cyclePeakCurrent) cyclePeakCurrent = cur;
+            }
+            // 개폐 사이클 완료: non-IDLE → IDLE 전환 시 요약 발행
+            if (next == STATE_IDLE && prev != STATE_IDLE && cycleStartTime > 0) {
+                unsigned long duration = millis() - cycleStartTime;
+                float endBatt = controller.getBatteryVoltage();
+                mqtt->publishEventCycle(duration, cyclePeakCurrent, cycleStartBatt, endBatt);
+                cycleStartTime = 0;
+            }
+            // 알람 이벤트 발행
+            if (next == STATE_EMERGENCY_STOP) {
+                mqtt->publishEventAlarm("STALL_OVERCURRENT", controller.getMotorCurrent(), "Motor stall / emergency stop triggered");
+            } else if (next == STATE_BATTERY_LOW_SHUTDOWN) {
+                mqtt->publishEventAlarm("LOW_BATTERY", controller.getBatteryVoltage(), "Critical low battery voltage detected");
+            }
+        }
+    });
 
     // 4. Initialize core state machine
     controller.init();
@@ -110,46 +147,7 @@ void setup() {
 
     // 10. Initialize MQTT Manager
     mqttManager.begin();
-
-    // BUG-03 fix: Callback is already registered inside MqttManager::begin().
-    // Duplicate lambda removed to prevent overwrite.
     Serial.println("[SYSTEM] RemoteLogger WARN/ERROR -> MqttManager callback registered.");
-
-    // Register state change callback for MQTT instant events & cycle summary
-    // NOTE-01 fix: cyclePeakCurrent is now tracked via a shared atomic to get real values
-    static unsigned long cycleStartTime = 0;
-    static float cyclePeakCurrent = 0.0f;
-    static float cycleStartBatt = 0.0f;
-
-    controller.registerStateCallback([](State prev, State next) {
-        MqttManager* mqtt = getMqttManagerInstance();
-        if (mqtt) {
-            mqtt->publishEventState((int)prev, (int)next);
-
-            if (prev == STATE_IDLE && next != STATE_IDLE) {
-                cycleStartTime = millis();
-                cyclePeakCurrent = 0.0f;
-                cycleStartBatt = controller.getBatteryVoltage();
-            }
-            // NOTE-01 fix: sample peak current during active states
-            if (next == STATE_OPENING || next == STATE_CLOSING) {
-                float cur = controller.getMotorCurrent();
-                if (cur > cyclePeakCurrent) cyclePeakCurrent = cur;
-            }
-            if (next == STATE_IDLE && prev != STATE_IDLE && cycleStartTime > 0) {
-                unsigned long duration = millis() - cycleStartTime;
-                float endBatt = controller.getBatteryVoltage();
-                mqtt->publishEventCycle(duration, cyclePeakCurrent, cycleStartBatt, endBatt);
-                cycleStartTime = 0;
-            }
-
-            if (next == STATE_EMERGENCY_STOP) {
-                mqtt->publishEventAlarm("STALL_OVERCURRENT", controller.getMotorCurrent(), "Motor stall / emergency stop triggered");
-            } else if (next == STATE_BATTERY_LOW_SHUTDOWN) {
-                mqtt->publishEventAlarm("LOW_BATTERY", controller.getBatteryVoltage(), "Critical low battery voltage detected");
-            }
-        }
-    });
 
     // 11. Initialize time-based power management
     PowerManager::init(controller);
