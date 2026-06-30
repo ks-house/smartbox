@@ -1,5 +1,14 @@
 #include "SmartBoxController.h"
+
+// AutoOtaManager uses Arduino 'String' type which is unavailable in native/test builds.
+// In native builds, OTA is never active, so isOtaInProgress() is stubbed to false.
+#ifndef NATIVE_BUILD
 #include "AutoOtaManager.h"
+#else
+struct AutoOtaManager {
+    static bool isOtaInProgress() { return false; }
+};
+#endif
 
 // Fixed pin assignments as per AGENTS.md
 static const int RELAY_MAIN_PIN = 6;
