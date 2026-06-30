@@ -109,6 +109,10 @@ void MqttManager::onMqttConnect(bool sessionPresent) {
 
     // Publish Home Assistant MQTT Auto Discovery Configs
     publishAutoDiscovery();
+
+    // Force publish current state so Home Assistant syncs immediately after reconnect or reboot
+    int currentFsmState = static_cast<int>(m_controller.getCurrentState());
+    publishEventState(currentFsmState, currentFsmState);
 }
 
 void MqttManager::onMqttDisconnect() {
