@@ -33,6 +33,7 @@ public:
     
     // Home Assistant MQTT Auto Discovery
     void publishAutoDiscovery();
+    void publishConfigState();
     
     bool isConnected() { return m_mqttClient.connected(); }
     bool isDebugLoggingActive() const { return m_debugLoggingActive; }

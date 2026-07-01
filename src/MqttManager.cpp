@@ -109,6 +109,7 @@ void MqttManager::onMqttConnect(bool sessionPresent) {
 
     // Publish Home Assistant MQTT Auto Discovery Configs
     publishAutoDiscovery();
+    publishConfigState();
 
     // Force publish current state so Home Assistant syncs immediately after reconnect or reboot
     int currentFsmState = static_cast<int>(m_controller.getCurrentState());
@@ -272,6 +273,7 @@ void MqttManager::handleSetConfig(const JsonDocument& doc) {
         ConfigManager::saveConfig(cfg);
         RLOG_I("%s\n", logBuf);
         publishLog(LogLevel::INFO, logBuf);
+        publishConfigState();
     }
 }
 
@@ -342,6 +344,20 @@ const char* MqttManager::stateToString(int state) {
         case STATE_MAINTENANCE: return "MAINTENANCE";
         default: return "UNKNOWN";
     }
+}
+
+void MqttManager::publishConfigState() {
+    if (!m_mqttClient.connected()) return;
+    BoxConfig cfg = m_controller.getConfig();
+    JsonDocument doc;
+    doc["dist"] = String(cfg.distThreshold, 1);
+    doc["wait"] = String(cfg.waitTime);
+    doc["stall"] = String(cfg.currentStallLimit, 0);
+    doc["otaHour"] = String(cfg.otaHour);
+    doc["telInterval"] = String(cfg.telemetryIntervalMin);
+    String output;
+    serializeJson(doc, output);
+    m_mqttClient.publish("smartbox/config/state", 1, true, output.c_str());
 }
 
 void MqttManager::publishTelemetry() {
@@ -571,25 +587,29 @@ void MqttManager::publishAutoDiscovery() {
         pubConfig("binary_sensor", "motion", doc);
     }
 
-    // 4. Configuration (Number Inputs)
-    struct NumberDef { const char* id; const char* name; const char* key; int min; int max; int step; const char* icon; };
-    NumberDef numbers[] = {
-        {"config_dist", "[SmartBox] 설정: 감지 거리 (cm)", "dist", 5, 150, 1, "mdi:ruler-square"},
-        {"config_wait", "[SmartBox] 설정: 열림 유지 시간 (ms)", "wait", 1000, 60000, 500, "mdi:timer-cog"},
-        {"config_stall", "[SmartBox] 설정: 모터 제한 전류 (mA)", "stall", 500, 10000, 100, "mdi:current-dc"},
-        {"config_ota_hour", "[SmartBox] 설정: 자동 업데이트 (시)", "otaHour", 0, 23, 1, "mdi:clock-outline"},
-        {"config_tel_int", "[SmartBox] 설정: 데이터 전송 주기 (분)", "telInterval", 1, 1440, 1, "mdi:transmit"}
+    // 4. Configuration (Select Presets)
+    struct SelectDef { const char* id; const char* name; const char* key; const char* options[6]; int optCount; const char* icon; };
+    SelectDef selects[] = {
+        {"config_dist", "[SmartBox] 추천 설정: 감지 거리 (cm)", "dist", {"10.0", "30.0", "50.0", "80.0", "100.0"}, 5, "mdi:ruler-square"},
+        {"config_wait", "[SmartBox] 추천 설정: 열림 유지 (ms)", "wait", {"3000", "5000", "10000", "20000", "30000"}, 5, "mdi:timer-cog"},
+        {"config_stall", "[SmartBox] 추천 설정: 모터 제한 (mA)", "stall", {"1500", "3000", "5000", "8000", "10000"}, 5, "mdi:current-dc"},
+        {"config_ota_hour", "[SmartBox] 추천 설정: 자동 OTA (시)", "otaHour", {"2", "3", "4", "5", "19"}, 5, "mdi:clock-outline"},
+        {"config_tel_int", "[SmartBox] 추천 설정: 데이터 전송 (분)", "telInterval", {"1", "5", "10", "30", "60"}, 5, "mdi:transmit"}
     };
 
-    for (const auto& n : numbers) {
-        JsonDocument doc = createDiscoveryDoc(n.name, n.id, "number");
+    for (const auto& s : selects) {
+        JsonDocument doc = createDiscoveryDoc(s.name, s.id, "select");
         doc["command_topic"] = "smartbox/command";
-        doc["command_template"] = String("{\"command\": \"set_config\", \"key\": \"") + n.key + "\", \"value\": {{ value }}}";
-        doc["min"] = n.min;
-        doc["max"] = n.max;
-        doc["step"] = n.step;
-        doc["optimistic"] = true;
-        doc["icon"] = n.icon;
-        pubConfig("number", n.id, doc);
+        doc["command_template"] = String("{\"command\": \"set_config\", \"key\": \"") + s.key + "\", \"value\": {{ value }}}";
+        doc["state_topic"] = "smartbox/config/state";
+        doc["value_template"] = String("{{ value_json.") + s.key + " }}";
+
+        JsonArray opts = doc["options"].to<JsonArray>();
+        for (int i = 0; i < s.optCount; i++) {
+            opts.add(s.options[i]);
+        }
+
+        doc["icon"] = s.icon;
+        pubConfig("select", s.id, doc);
     }
 }
