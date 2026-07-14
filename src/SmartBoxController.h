@@ -84,6 +84,7 @@ private:
   unsigned long holdStartTime;
   bool sensorDeadlockFlag;
   unsigned long deadlockClearStartTime;
+  unsigned long postCloseBlindStartTime; // 문 닫힘 직후 기구물 안정화 블라인드 타이머
   // BUG-02 fix: stall counters as member vars to prevent cross-entry accumulation
   int openStallCount;
   int closeStallCount;

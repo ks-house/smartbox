@@ -22,7 +22,7 @@ SmartBoxController::SmartBoxController(HardwareInterface& hardware)
       cooldownTimer(0), isCooldown(false), distanceHistoryIdx(0), lastDetectStartTime(0), stateCallback(nullptr),
       batteryVoltage(12.0f), motorCurrent(0.0f), currentDistance(999.0f), relaysIsolated(false),
       initialState(STATE_IDLE), maintenanceRequested(false),
-      holdStartTime(0), sensorDeadlockFlag(false), deadlockClearStartTime(0),
+      holdStartTime(0), sensorDeadlockFlag(false), deadlockClearStartTime(0), postCloseBlindStartTime(0),
       openStallCount(0), closeStallCount(0) {
     for (int i = 0; i < 5; i++) {
         distanceHistory[i] = 999.0f;
@@ -55,6 +55,7 @@ void SmartBoxController::init() {
     holdStartTime = 0;
     sensorDeadlockFlag = false;
     deadlockClearStartTime = 0;
+    postCloseBlindStartTime = 0;
     openStallCount = 0;
     closeStallCount = 0;
     
@@ -134,7 +135,7 @@ void SmartBoxController::update() {
             }
             break;
 
-        case STATE_IDLE:
+        case STATE_IDLE: {
             setRelayStates(false, false, false);
             
             // Self-healing: Path must be clean CONTINUOUSLY for 10 seconds to clear deadlock
@@ -153,24 +154,34 @@ void SmartBoxController::update() {
                 deadlockClearStartTime = 0;
             }
             
-            if (currentDistance > 2.0f && currentDistance < config.distThreshold && !isCooldown) { 
-                // 2.0f 이하의 초근접 값은 센서 결로/오류(0.0 등)이므로 무시
-                if (!sensorDeadlockFlag) {
-                    if (lastDetectStartTime == 0) {
-                        lastDetectStartTime = hw.getMillis();
-                    } else if (hw.getMillis() - lastDetectStartTime >= config.debounceDelay) {
-                        Serial.printf("[SENSOR] Human approach detected: %.1f cm for %lu ms. Starting opening.\n",
-                                      currentDistance, hw.getMillis() - lastDetectStartTime);
+            // 3초(3000ms) 블라인드 타임 (문 닫힘 직후 기구물 안정화 대기)
+            bool isBlindTime = (postCloseBlindStartTime != 0) && (hw.getMillis() - postCloseBlindStartTime < 3000);
+            
+            if (isBlindTime) {
+                // 블라인드 타임 중에는 센서 감지 타이머를 계속 초기화하여 재개방 차단
+                lastDetectStartTime = 0;
+            } else {
+                if (currentDistance > 2.0f && currentDistance < config.distThreshold && !isCooldown) { 
+                    // 2.0f 이하의 초근접 값은 센서 결로/오류(0.0 등)이므로 무시
+                    if (!sensorDeadlockFlag) {
+                        if (lastDetectStartTime == 0) {
+                            lastDetectStartTime = hw.getMillis();
+                        } else if (hw.getMillis() - lastDetectStartTime >= config.debounceDelay) {
+                            Serial.printf("[SENSOR] Human approach detected: %.1f cm for %lu ms. Starting opening.\n",
+                                          currentDistance, hw.getMillis() - lastDetectStartTime);
+                            lastDetectStartTime = 0;
+                            transitionTo(STATE_OPEN_START);
+                        }
+                    } else {
                         lastDetectStartTime = 0;
-                        transitionTo(STATE_OPEN_START);
                     }
                 } else {
                     lastDetectStartTime = 0;
                 }
-            } else {
-                lastDetectStartTime = 0;
             }
             break;
+        }
+
             
         case STATE_OPEN_START:
             Serial.println("[STATE] Opening Started. Toggling H-Bridge.");
@@ -278,6 +289,8 @@ void SmartBoxController::update() {
                 setRelayStates(false, false, false);
                 isCooldown = true;
                 cooldownTimer = hw.getMillis();
+                postCloseBlindStartTime = hw.getMillis(); // 블라인드 타임 시작 (기구물 안정화)
+                Serial.println("[SENSOR] Post-close blind time started. Ignoring sensor for 3000ms.");
                 transitionTo(STATE_IDLE);
             }
             break;

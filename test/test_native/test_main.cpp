@@ -612,6 +612,57 @@ void test_sensor_deadlock_prevention(void) {
     TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
 }
 
+void test_post_close_blind_time(void) {
+    MockHardware hw;
+    SmartBoxController controller(hw);
+    controller.init();
+
+    // 1. Trigger open (30cm, 15 ticks * 50ms = 750ms > debounceDelay 300ms)
+    hw.setDistanceCm(30.0f);
+    for (int i = 0; i < 15; ++i) {
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
+
+    // 2. Complete opening -> STATE_HOLD
+    hw.advanceMillis(3800);
+    controller.update();
+    TEST_ASSERT_EQUAL(STATE_HOLD, controller.getCurrentState());
+
+    // 3. Human moves away (80cm) -> closing starts after waitTime (10s)
+    hw.setDistanceCm(80.0f);
+    for (int i = 0; i < 200; ++i) {
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    TEST_ASSERT_EQUAL(STATE_CLOSE_START, controller.getCurrentState());
+
+    // 4. Complete closing -> STATE_IDLE (postCloseBlindStartTime set here)
+    controller.update(); // CLOSE_START -> CLOSING
+    hw.setDistanceCm(30.0f); // lid bounce reading during close
+    hw.advanceMillis(3800);  // actuatorTime elapsed
+    controller.update();     // CLOSING -> STATE_IDLE
+    TEST_ASSERT_EQUAL(STATE_IDLE, controller.getCurrentState());
+
+    // 5. BLIND TIME: sensor at 30cm (lid bounce), must NOT re-open within 3s
+    for (int i = 0; i < 58; ++i) { // 2.9s (58 * 50ms)
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    TEST_ASSERT_EQUAL(STATE_IDLE, controller.getCurrentState()); // still blocked
+
+    // 6. AFTER BLIND TIME: advance past 3s, then verify normal re-open works
+    hw.advanceMillis(200); // total ~3.1s -> blind time expired
+    controller.update();
+    hw.setDistanceCm(30.0f);
+    for (int i = 0; i < 15; ++i) { // 750ms > debounceDelay(300ms)
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState()); // re-open OK after blind time
+}
+
 #ifdef NATIVE_BUILD
 int main(int argc, char **argv) {
     UNITY_BEGIN();
@@ -625,6 +676,7 @@ int main(int argc, char **argv) {
     RUN_TEST(test_startup_open_flow);
     RUN_TEST(test_ota_state_isolation);
     RUN_TEST(test_maintenance_mode);
+    RUN_TEST(test_post_close_blind_time);
     RUN_TEST(test_telemetry_interval_config);
     RUN_TEST(test_sensor_deadlock_prevention);
     return UNITY_END();
@@ -645,6 +697,7 @@ void setup() {
     RUN_TEST(test_startup_open_flow);
     RUN_TEST(test_ota_state_isolation);
     RUN_TEST(test_maintenance_mode);
+    RUN_TEST(test_post_close_blind_time);
     RUN_TEST(test_telemetry_interval_config);
     RUN_TEST(test_sensor_deadlock_prevention);
     UNITY_END();
