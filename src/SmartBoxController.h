@@ -83,6 +83,7 @@ private:
   bool maintenanceRequested;
   unsigned long holdStartTime;
   bool sensorDeadlockFlag;
+  unsigned long deadlockClearStartTime;
   // BUG-02 fix: stall counters as member vars to prevent cross-entry accumulation
   int openStallCount;
   int closeStallCount;

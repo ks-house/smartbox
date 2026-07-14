@@ -54,6 +54,9 @@ void ConfigManager::loadConfig(BoxConfig& config) {
     if (config.maxHoldTime < 5000) {
         config.maxHoldTime = 180000;
     }
+    if (config.debounceDelay < 1000) {
+        config.debounceDelay = 1000; // 가짜 모션 방지를 위해 최소 1초 유지
+    }
 
     Serial.printf("[CONFIG] Active parameters: dist=%.1f, act=%lu, wait=%lu, volt=%.1f, stall=%.1f, ota_hour=%d, tel_int=%d, max_hold=%lu\n",
                   config.distThreshold, config.actuatorTime, config.waitTime, 

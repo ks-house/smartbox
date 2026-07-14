@@ -22,7 +22,7 @@ SmartBoxController::SmartBoxController(HardwareInterface& hardware)
       cooldownTimer(0), isCooldown(false), distanceHistoryIdx(0), lastDetectStartTime(0), stateCallback(nullptr),
       batteryVoltage(12.0f), motorCurrent(0.0f), currentDistance(999.0f), relaysIsolated(false),
       initialState(STATE_IDLE), maintenanceRequested(false),
-      holdStartTime(0), sensorDeadlockFlag(false),
+      holdStartTime(0), sensorDeadlockFlag(false), deadlockClearStartTime(0),
       openStallCount(0), closeStallCount(0) {
     for (int i = 0; i < 5; i++) {
         distanceHistory[i] = 999.0f;
@@ -54,6 +54,7 @@ void SmartBoxController::init() {
     maintenanceRequested = false;
     holdStartTime = 0;
     sensorDeadlockFlag = false;
+    deadlockClearStartTime = 0;
     openStallCount = 0;
     closeStallCount = 0;
     
@@ -136,15 +137,24 @@ void SmartBoxController::update() {
         case STATE_IDLE:
             setRelayStates(false, false, false);
             
-            // Self-healing: if the sensor is clear, reset the deadlock flag
+            // Self-healing: Path must be clean CONTINUOUSLY for 10 seconds to clear deadlock
             if (currentDistance > config.distThreshold) {
                 if (sensorDeadlockFlag) {
-                    Serial.printf("[SENSOR] Deadlock cleared. Path is clean: %.1f cm. Self-healing active.\n", currentDistance);
-                    sensorDeadlockFlag = false;
+                    if (deadlockClearStartTime == 0) {
+                        deadlockClearStartTime = hw.getMillis();
+                    } else if (hw.getMillis() - deadlockClearStartTime >= 10000) {
+                        Serial.printf("[SENSOR] Deadlock cleared. Path consistently clean for 10s: %.1f cm. Self-healing active.\n", currentDistance);
+                        sensorDeadlockFlag = false;
+                        deadlockClearStartTime = 0;
+                    }
                 }
+            } else {
+                // 거리가 다시 임계치 아래로 떨어지면(노이즈 발생) 데드락 해제 타이머 초기화
+                deadlockClearStartTime = 0;
             }
             
-            if (currentDistance > 0.0f && currentDistance < config.distThreshold && !isCooldown) {
+            if (currentDistance > 2.0f && currentDistance < config.distThreshold && !isCooldown) { 
+                // 2.0f 이하의 초근접 값은 센서 결로/오류(0.0 등)이므로 무시
                 if (!sensorDeadlockFlag) {
                     if (lastDetectStartTime == 0) {
                         lastDetectStartTime = hw.getMillis();
