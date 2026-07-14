@@ -631,19 +631,27 @@ void test_post_close_blind_time(void) {
     TEST_ASSERT_EQUAL(STATE_HOLD, controller.getCurrentState());
 
     // 3. Human moves away (80cm) -> closing starts after waitTime (10s)
+    //    NOTE: median filter takes ~2 ticks (100ms) to shift from 30cm to 80cm,
+    //    during which stateTimer is reset. Use 205 ticks to guarantee >= 10000ms
+    //    since the last timer reset (205 * 50ms = 10250ms > 10000ms + 100ms margin).
     hw.setDistanceCm(80.0f);
-    for (int i = 0; i < 200; ++i) {
+    for (int i = 0; i < 205; ++i) {
         hw.advanceMillis(50);
         controller.update();
     }
     TEST_ASSERT_EQUAL(STATE_CLOSE_START, controller.getCurrentState());
 
     // 4. Complete closing -> STATE_IDLE (postCloseBlindStartTime set here)
+    //    Keep sensor at 80cm during CLOSING to avoid triggering Safety Reopen logic.
+    //    Set to 30cm AFTER STATE_IDLE is entered to simulate lid bounce.
     controller.update(); // CLOSE_START -> CLOSING
-    hw.setDistanceCm(30.0f); // lid bounce reading during close
+    // hw.setDistanceCm stays at 80.0f (safe: above threshold, no safety reopen triggered)
     hw.advanceMillis(3800);  // actuatorTime elapsed
     controller.update();     // CLOSING -> STATE_IDLE
     TEST_ASSERT_EQUAL(STATE_IDLE, controller.getCurrentState());
+
+    // Now simulate lid bounce (sensor reads 30cm due to mechanical oscillation)
+    hw.setDistanceCm(30.0f);
 
     // 5. BLIND TIME: sensor at 30cm (lid bounce), must NOT re-open within 3s
     for (int i = 0; i < 58; ++i) { // 2.9s (58 * 50ms)
@@ -662,6 +670,7 @@ void test_post_close_blind_time(void) {
     }
     TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState()); // re-open OK after blind time
 }
+
 
 #ifdef NATIVE_BUILD
 int main(int argc, char **argv) {
