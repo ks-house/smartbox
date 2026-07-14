@@ -632,23 +632,26 @@ void test_post_close_blind_time(void) {
 
     // 3. Human moves away (80cm) -> closing starts after waitTime (10s)
     //    NOTE: median filter takes ~2 ticks (100ms) to shift from 30cm to 80cm,
-    //    during which stateTimer is reset. Use 205 ticks to guarantee >= 10000ms
-    //    since the last timer reset (205 * 50ms = 10250ms > 10000ms + 100ms margin).
+    //    during which stateTimer is reset.
+    //    - Tick 202: HOLD -> STATE_CLOSE_START
+    //    - Tick 203: STATE_CLOSE_START -> STATE_CLOSING (immediate in same loop)
+    //    - Ticks 204-205: STATE_CLOSING
+    //    So after 205 ticks the FSM is in STATE_CLOSING, not STATE_CLOSE_START.
     hw.setDistanceCm(80.0f);
     for (int i = 0; i < 205; ++i) {
         hw.advanceMillis(50);
         controller.update();
     }
-    TEST_ASSERT_EQUAL(STATE_CLOSE_START, controller.getCurrentState());
+    TEST_ASSERT_EQUAL(STATE_CLOSING, controller.getCurrentState()); // already past CLOSE_START
 
     // 4. Complete closing -> STATE_IDLE (postCloseBlindStartTime set here)
-    //    Keep sensor at 80cm during CLOSING to avoid triggering Safety Reopen logic.
+    //    Sensor stays at 80cm during CLOSING to avoid triggering Safety Reopen logic.
     //    Set to 30cm AFTER STATE_IDLE is entered to simulate lid bounce.
-    controller.update(); // CLOSE_START -> CLOSING
-    // hw.setDistanceCm stays at 80.0f (safe: above threshold, no safety reopen triggered)
-    hw.advanceMillis(3800);  // actuatorTime elapsed
+    // (already in STATE_CLOSING — no extra update() needed)
+    hw.advanceMillis(3800);  // actuatorTime elapsed (stateTimer was reset at tick 203 entry)
     controller.update();     // CLOSING -> STATE_IDLE
     TEST_ASSERT_EQUAL(STATE_IDLE, controller.getCurrentState());
+
 
     // Now simulate lid bounce (sensor reads 30cm due to mechanical oscillation)
     hw.setDistanceCm(30.0f);
