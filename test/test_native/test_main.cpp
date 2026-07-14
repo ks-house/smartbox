@@ -575,15 +575,29 @@ void test_sensor_deadlock_prevention(void) {
     TEST_ASSERT_TRUE(controller.getSensorDeadlockFlag());
     
     // 3. Self-healing: clear path (sensor at 80cm)
+    //    NEW LOGIC: flag must NOT clear until path is clean for 10 CONTINUOUS seconds.
     hw.setDistanceCm(80.0f);
-    // Need at least 3 updates for the 5-sample median filter to register the new distance
-    for (int i = 0; i < 3; ++i) {
+    
+    // After only 5 updates (~250ms), deadlock flag must still be SET (not enough time)
+    for (int i = 0; i < 5; ++i) {
         hw.advanceMillis(50);
         controller.update();
     }
+    TEST_ASSERT_TRUE(controller.getSensorDeadlockFlag()); // flag must persist
     
-    // Deadlock flag should be cleared
-    TEST_ASSERT_FALSE(controller.getSensorDeadlockFlag());
+    // Advance 9 more seconds (total ~9.25s clean) - still should NOT be cleared
+    for (int i = 0; i < 180; ++i) {
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    TEST_ASSERT_TRUE(controller.getSensorDeadlockFlag()); // still not cleared
+    
+    // Advance 1 more second (total > 10s clean) - NOW the flag must be cleared
+    for (int i = 0; i < 20; ++i) {
+        hw.advanceMillis(50);
+        controller.update();
+    }
+    TEST_ASSERT_FALSE(controller.getSensorDeadlockFlag()); // flag must be cleared after 10s
     
     // Advance remaining cooldown time to clear the cooldown state
     hw.advanceMillis(2000);
