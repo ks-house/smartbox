@@ -123,14 +123,12 @@ void SmartBoxController::update() {
     
     switch (currentState) {
         case STATE_STARTUP_OPEN:
+            // [FIX-1] 부팅 시 뚜껑 상태 불확실 → 500ms 안정화 후 항상 닫힘 위치로 홈(Homing)
+            // 이전: 사람 감지 시 OPENING 없이 HOLD로 직행(IDLE→HOLD 처럼 보이는 문제)
+            // 변경: STARTUP_OPEN → CLOSE_START → CLOSING → IDLE 경로로 정상 사이클 진입
             setRelayStates(false, false, false);
-            if (currentDistance > 0 && currentDistance < config.distThreshold && !isCooldown) {
-                Serial.printf("[SENSOR] Startup open: Human approach detected: %.1f cm. Starting 10s wait to close.\n", currentDistance);
-                transitionTo(STATE_HOLD);
-            }
-            // Timeout guard: auto-close after 30 seconds if no human approaches
-            if (hw.getMillis() - stateTimer >= 30000) {
-                Serial.println("[STATE] STATE_STARTUP_OPEN timeout (30s). No approach detected. Auto-closing.");
+            if (hw.getMillis() - stateTimer >= 500) {
+                Serial.println("[STATE] STARTUP_OPEN: Homing to closed position after 500ms stabilization.");
                 transitionTo(STATE_CLOSE_START);
             }
             break;
@@ -184,12 +182,19 @@ void SmartBoxController::update() {
 
             
         case STATE_OPEN_START:
-            Serial.println("[STATE] Opening Started. Toggling H-Bridge.");
-            setRelayStates(true, true, false); // Main ON, Forward (A=ON, B=OFF)
+            // [FIX-2] 릴레이 설정 코드를 OPENING 진입 첫 틱으로 이동
+            // 이전: setRelayStates()의 200ms 블로킹이 stateTimer 리셋 전에 소비되어 타이머 기준점 왜곡
+            // 변경: transitionTo()로 stateTimer를 먼저 리셋한 뒤, OPENING 첫 틱에서 릴레이 설정
+            Serial.println("[STATE] OPEN_START -> Delegating relay setup to OPENING entry.");
             transitionTo(STATE_OPENING);
             break;
             
         case STATE_OPENING: {
+            // [FIX-2] 진입 첫 50ms 이내: 릴레이 설정 (stateTimer 기준 0ms 시점에서 모터 시작 보장)
+            if (hw.getMillis() - stateTimer < 50) {
+                setRelayStates(true, true, false); // Main ON, Forward (A=ON, B=OFF)
+                Serial.println("[STATE] Opening Started. Toggling H-Bridge.");
+            }
             // Bypass motor inrush current for the first 500ms (dual actuator startup)
             if (hw.getMillis() - stateTimer > 500) {
                 if (motorCurrent > config.currentStallLimit) {
@@ -212,6 +217,13 @@ void SmartBoxController::update() {
                 openStallCount = 0; // Reset at inrush bypass window start
             }
             if (hw.getMillis() - stateTimer >= config.actuatorTime) {
+                // [FIX-2] 최소 체류 가드: actuatorTime의 10% 미만이면 비정상 — 전환 차단
+                const unsigned long minOpenTime = config.actuatorTime / 10; // 기본 380ms
+                if (hw.getMillis() - stateTimer < minOpenTime) {
+                    Serial.printf("[WARN] OPENING completed too fast (%lu ms < %lu ms min). Check actuatorTime config.\n",
+                                  hw.getMillis() - stateTimer, minOpenTime);
+                    break;
+                }
                 Serial.println("[STATE] Opening completed.");
                 openStallCount = 0;
                 setRelayStates(false, false, false);
