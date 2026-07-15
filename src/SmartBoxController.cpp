@@ -23,7 +23,7 @@ SmartBoxController::SmartBoxController(HardwareInterface& hardware)
       batteryVoltage(12.0f), motorCurrent(0.0f), currentDistance(999.0f), relaysIsolated(false),
       initialState(STATE_IDLE), maintenanceRequested(false),
       holdStartTime(0), sensorDeadlockFlag(false), deadlockClearStartTime(0), postCloseBlindStartTime(0),
-      openStallCount(0), closeStallCount(0) {
+      openStallCount(0), closeStallCount(0), openingRelayStarted(false) {
     for (int i = 0; i < 5; i++) {
         distanceHistory[i] = 999.0f;
     }
@@ -58,6 +58,7 @@ void SmartBoxController::init() {
     postCloseBlindStartTime = 0;
     openStallCount = 0;
     closeStallCount = 0;
+    openingRelayStarted = false;
     
     // Fill median filter buffer
     for (int i = 0; i < 5; i++) {
@@ -190,10 +191,12 @@ void SmartBoxController::update() {
             break;
             
         case STATE_OPENING: {
-            // [FIX-2] 진입 첫 50ms 이내: 릴레이 설정 (stateTimer 기준 0ms 시점에서 모터 시작 보장)
-            if (hw.getMillis() - stateTimer < 50) {
+            // [FIX-2] one-shot 플래그: OPENING 진입 후 딱 한 번만 릴레이 설정
+            // 시간 기반(< 50ms) 대신 플래그를 사용하여 폴링 주기에 무관하게 정확히 동작
+            if (!openingRelayStarted) {
                 setRelayStates(true, true, false); // Main ON, Forward (A=ON, B=OFF)
                 Serial.println("[STATE] Opening Started. Toggling H-Bridge.");
+                openingRelayStarted = true;
             }
             // Bypass motor inrush current for the first 500ms (dual actuator startup)
             if (hw.getMillis() - stateTimer > 500) {
@@ -391,6 +394,8 @@ void SmartBoxController::transitionTo(State newState) {
         // BUG-02 fix: reset stall counters on every state transition
         openStallCount = 0;
         closeStallCount = 0;
+        // FIX-2: reset one-shot relay flag on every state transition
+        openingRelayStarted = false;
     }
     
     if (stateCallback != nullptr) {

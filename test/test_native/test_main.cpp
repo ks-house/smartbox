@@ -360,29 +360,33 @@ void test_startup_open_flow(void) {
     TEST_ASSERT_EQUAL(HIGH, hw.getPinValue(RELAY_DIR_A_PIN));
     TEST_ASSERT_EQUAL(HIGH, hw.getPinValue(RELAY_DIR_B_PIN));
     
-    // Simulate no human approach (80cm)
-    hw.setDistanceCm(80.0f);
-    for (int i = 0; i < 5; ++i) {
+    // [FIX-1] STARTUP_OPEN now homes to CLOSE_START after 500ms stabilization,
+    // regardless of human detection. Simulate 400ms (< 500ms): must stay in STARTUP_OPEN.
+    hw.setDistanceCm(30.0f); // Human present — should no longer trigger HOLD
+    for (int i = 0; i < 8; ++i) {
         hw.advanceMillis(50);
         controller.update();
     }
-    
-    // State should still be STARTUP_OPEN
+    // 400ms elapsed — still in STARTUP_OPEN (500ms not yet reached)
     TEST_ASSERT_EQUAL(STATE_STARTUP_OPEN, controller.getCurrentState());
     
-    // Simulate human approach (30cm)
-    hw.setDistanceCm(30.0f);
-    for (int i = 0; i < 5; ++i) {
+    // Advance past 500ms threshold (2 more ticks = 100ms → total 500ms)
+    for (int i = 0; i < 2; ++i) {
         hw.advanceMillis(50);
         controller.update();
     }
+    // 500ms elapsed — must transition to CLOSE_START (homing sequence)
+    TEST_ASSERT_EQUAL(STATE_CLOSE_START, controller.getCurrentState());
     
-    // State should transition to STATE_HOLD
-    TEST_ASSERT_EQUAL(STATE_HOLD, controller.getCurrentState());
+    // One more update: CLOSE_START -> CLOSING
+    hw.advanceMillis(50);
+    controller.update();
+    TEST_ASSERT_EQUAL(STATE_CLOSING, controller.getCurrentState());
     
-    // Relays should still be off/isolated in STATE_HOLD
-    TEST_ASSERT_EQUAL(INPUT, hw.getPinMode(RELAY_MAIN_PIN));
+    // Relays should be active during CLOSING (Main=OUTPUT/LOW, DIR_B=LOW)
+    TEST_ASSERT_EQUAL(OUTPUT, hw.getPinMode(RELAY_MAIN_PIN));
 }
+
 
 void test_ota_state_isolation(void) {
     MockHardware hw;

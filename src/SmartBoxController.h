@@ -88,6 +88,8 @@ private:
   // BUG-02 fix: stall counters as member vars to prevent cross-entry accumulation
   int openStallCount;
   int closeStallCount;
+  // FIX-2: one-shot flag — relay is set exactly once on first OPENING tick
+  bool openingRelayStarted;
   mutable std::recursive_mutex dataMutex;
 
   void updateDistanceBuffer();
