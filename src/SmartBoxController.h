@@ -90,6 +90,9 @@ private:
   int closeStallCount;
   // FIX-2: one-shot flag — relay is set exactly once on first OPENING tick
   bool openingRelayStarted;
+  // Relay direction state cache (was static local in setRelayStates — caused test pollution)
+  bool lastDirOpen;
+  bool lastDirClose;
   mutable std::recursive_mutex dataMutex;
 
   void updateDistanceBuffer();
