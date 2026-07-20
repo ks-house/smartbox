@@ -588,13 +588,16 @@ void MqttManager::publishAutoDiscovery() {
     }
 
     // 4. Configuration (Select Presets)
+    // BUG-S1 fix: otaHour options include "0" (midnight default) to prevent "Unknown" state
+    // BUG-S2 fix: optimistic=true added so HA UI reflects selection immediately without
+    //             waiting for state feedback from smartbox/config/state
     struct SelectDef { const char* id; const char* name; const char* key; const char* options[6]; int optCount; const char* icon; };
     SelectDef selects[] = {
-        {"config_dist", "[SmartBox] 추천 설정: 감지 거리 (cm)", "dist", {"10.0", "30.0", "50.0", "80.0", "100.0"}, 5, "mdi:ruler-square"},
-        {"config_wait", "[SmartBox] 추천 설정: 열림 유지 (ms)", "wait", {"3000", "5000", "10000", "20000", "30000"}, 5, "mdi:timer-cog"},
-        {"config_stall", "[SmartBox] 추천 설정: 모터 제한 (mA)", "stall", {"1500", "3000", "5000", "8000", "10000"}, 5, "mdi:current-dc"},
-        {"config_ota_hour", "[SmartBox] 추천 설정: 자동 OTA (시)", "otaHour", {"2", "3", "4", "5", "19"}, 5, "mdi:clock-outline"},
-        {"config_tel_int", "[SmartBox] 추천 설정: 데이터 전송 (분)", "telInterval", {"1", "5", "10", "30", "60"}, 5, "mdi:transmit"}
+        {"config_dist",     "[SmartBox] 추천 설정: 감지 거리 (cm)",      "dist",       {"10.0", "30.0", "50.0", "80.0", "100.0"},   5, "mdi:ruler-square"},
+        {"config_wait",     "[SmartBox] 추천 설정: 열림 유지 (ms)",       "wait",       {"3000", "5000", "10000", "20000", "30000"},  5, "mdi:timer-cog"},
+        {"config_stall",    "[SmartBox] 추천 설정: 모터 제한 (mA)",       "stall",      {"1500", "3000", "5000", "8000", "10000"},   5, "mdi:current-dc"},
+        {"config_ota_hour", "[SmartBox] 추천 설정: 자동 OTA (시)",        "otaHour",    {"0", "2", "3", "4", "5", "19"},             6, "mdi:clock-outline"},
+        {"config_tel_int",  "[SmartBox] 추천 설정: 데이터 전송 (분)",     "telInterval", {"1", "5", "10", "30", "60"},              5, "mdi:transmit"}
     };
 
     for (const auto& s : selects) {
@@ -603,6 +606,7 @@ void MqttManager::publishAutoDiscovery() {
         doc["command_template"] = String("{\"command\": \"set_config\", \"key\": \"") + s.key + "\", \"value\": {{ value }}}";
         doc["state_topic"] = "smartbox/config/state";
         doc["value_template"] = String("{{ value_json.") + s.key + " }}";
+        doc["optimistic"] = true;  // BUG-S2 fix: reflect selection immediately in HA UI
 
         JsonArray opts = doc["options"].to<JsonArray>();
         for (int i = 0; i < s.optCount; i++) {
