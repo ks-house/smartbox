@@ -64,20 +64,35 @@ void AutoOtaManager::update() {
     }
     lastScheduleCheck = now;
 
-    // Hourly OTA check: run every 1 hour (or immediately on first boot)
-    static constexpr unsigned long OTA_CHECK_INTERVAL_MS = 3600000UL; // 1 hour
-    bool firstRun = (lastOtaRunTime == 0);
-    bool intervalElapsed = (!firstRun && (now - lastOtaRunTime >= OTA_CHECK_INTERVAL_MS));
-
-    if (firstRun || intervalElapsed) {
-        unsigned long elapsedSinceLast = firstRun ? 0 : (now - lastOtaRunTime);
+    // --- First-boot check: always run OTA version check once after bootup ---
+    if (lastOtaRunTime == 0) {
         lastOtaRunTime = now;
-        if (firstRun) {
-            Serial.println("[AUTO-OTA] First boot: running initial OTA version check...");
-        } else {
-            Serial.printf("[AUTO-OTA] 1-hour interval elapsed (%lu ms). Running AutoOta...\n", elapsedSinceLast);
-        }
+        Serial.println("[AUTO-OTA] First boot: running initial OTA version check...");
         runOtaProcess(false);
+        return;
+    }
+
+    // --- Scheduled daily OTA: run at config.otaHour (NTP-based, once per day) ---
+    // BUG-O1 fix: config.otaHour was stored but never used in scheduling.
+    // Now we read NTP time and trigger OTA when currentHour == config.otaHour,
+    // using a per-day guard (lastOtaRunDay) to ensure exactly 1 run per day.
+    struct tm timeinfo;
+    if (!getLocalTime(&timeinfo, 0)) {
+        // NTP not yet synchronized, skip
+        return;
+    }
+
+    int configuredOtaHour = controllerPtr->getConfig().otaHour;
+    if (timeinfo.tm_hour == configuredOtaHour) {
+        // Use day-of-year as guard to run only once per calendar day
+        static int lastOtaRunDay = -1;
+        if (lastOtaRunDay != timeinfo.tm_yday) {
+            lastOtaRunDay = timeinfo.tm_yday;
+            lastOtaRunTime = now;
+            Serial.printf("[AUTO-OTA] Scheduled daily OTA check at %02d:00 (config.otaHour=%d, day=%d).\n",
+                          configuredOtaHour, configuredOtaHour, timeinfo.tm_yday);
+            runOtaProcess(false);
+        }
     }
 }
 

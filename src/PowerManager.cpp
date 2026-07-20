@@ -38,9 +38,15 @@ void PowerManager::update() {
 
     int currentHour = timeinfo.tm_hour;
 
-    // Proactive daily reboot scheduling at 04:00 AM
-    // Only reboots when FSM is in IDLE and motor is stopped to ensure safety
-    if (currentHour == 4 && controllerPtr->getCurrentState() == STATE_IDLE && !controllerPtr->isMotorRunning()) {
+    // Proactive daily reboot scheduled 1 hour AFTER config.otaHour.
+    // Design rationale: OTA check runs at config.otaHour (AutoOtaManager).
+    //   - If OTA update found → ESP.restart() is called inside runOtaProcess()
+    //   - If up-to-date     → returns to IDLE, PowerManager reboots 1 hour later
+    // Keeping 1 hour gap prevents a race condition where PowerManager would reboot
+    // the device before AutoOtaManager has a chance to start the OTA process.
+    // The +1 offset also guarantees OTA has finished (typical OTA < 5 minutes).
+    int rebootHour = (controllerPtr->getConfig().otaHour + 1) % 24;
+    if (currentHour == rebootHour && controllerPtr->getCurrentState() == STATE_IDLE && !controllerPtr->isMotorRunning()) {
 #ifndef NATIVE_BUILD
         Preferences prefs;
         if (prefs.begin("smartbox", false)) {
@@ -48,7 +54,8 @@ void PowerManager::update() {
             if (lastRebootDay != timeinfo.tm_yday) {
                 prefs.putInt("reboot_day", timeinfo.tm_yday);
                 prefs.end();
-                Serial.printf("[POWER] Proactive scheduled reboot (04:00 AM, day of year: %d). Restarting...\n", timeinfo.tm_yday);
+                Serial.printf("[POWER] Daily maintenance reboot at %02d:00 (otaHour+1, day=%d). Restarting...\n",
+                              rebootHour, timeinfo.tm_yday);
                 delay(500);
                 ESP.restart();
             }
