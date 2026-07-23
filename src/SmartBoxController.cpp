@@ -127,13 +127,12 @@ void SmartBoxController::update() {
     
     switch (currentState) {
         case STATE_STARTUP_OPEN:
-            // [FIX-1] 부팅 시 뚜껑 상태 불확실 → 500ms 안정화 후 항상 닫힘 위치로 홈(Homing)
-            // 이전: 사람 감지 시 OPENING 없이 HOLD로 직행(IDLE→HOLD 처럼 보이는 문제)
-            // 변경: STARTUP_OPEN → CLOSE_START → CLOSING → IDLE 경로로 정상 사이클 진입
+            // [FIX-1] 부팅 시 캘리브레이션: 500ms 안정화 후 전체 사이클 수행
+            // 변경: STARTUP_OPEN → OPEN_START → OPENING → HOLD → CLOSE_START → CLOSING → IDLE
             setRelayStates(false, false, false);
             if (hw.getMillis() - stateTimer >= 500) {
-                Serial.println("[STATE] STARTUP_OPEN: Homing to closed position after 500ms stabilization.");
-                transitionTo(STATE_CLOSE_START);
+                Serial.println("[STATE] STARTUP_OPEN: Starting calibration sequence (Open -> Hold -> Close) after 500ms stabilization.");
+                transitionTo(STATE_OPEN_START);
             }
             break;
 
@@ -204,12 +203,12 @@ void SmartBoxController::update() {
                     Serial.printf("[WARN] Stall candidate OPEN (%d/3): %.1f mA (Limit: %.1f mA)\n",
                                   openStallCount, motorCurrent, config.currentStallLimit);
                     if (openStallCount >= 3) {
-                        Serial.println("[INFO] Motor reached physical OPEN limit (Stall detected).");
+                        Serial.println("[WARN] MOTOR STALL DETECTED DURING OPEN! (Physical open limit or blockage).");
                         Serial.printf("[DIAGNOSTIC] Time Elapsed: %lu ms, Batt: %.2f V, Dist: %.1f cm\n",
                                       hw.getMillis() - stateTimer, batteryVoltage, currentDistance);
                         openStallCount = 0;
                         forceAllRelaysOff(); // 모터 정지
-                        transitionTo(STATE_HOLD); // 강제 종료가 아닌 열림 유지 상태로 정상 전이
+                        transitionTo(STATE_EMERGENCY_STOP); // 열림 유지 대신 에러 상태(EMERGENCY_STOP)로 전환
                         break;
                     }
                 } else {

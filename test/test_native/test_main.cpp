@@ -142,10 +142,10 @@ void test_stall_current_detection(void) {
     controller.update();
     TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
     
-    // Sample 3: exceeding threshold -> MUST transition to STATE_HOLD (normal physical limit reached during open)
+    // Sample 3: exceeding threshold -> MUST transition to STATE_EMERGENCY_STOP (normal physical limit reached during open)
     hw.setMotorCurrent(4000.0f);
     controller.update();
-    TEST_ASSERT_EQUAL(STATE_HOLD, controller.getCurrentState());
+    TEST_ASSERT_EQUAL(STATE_EMERGENCY_STOP, controller.getCurrentState());
     
     // All relays must be isolated to INPUT (high-impedance) for safety
     TEST_ASSERT_EQUAL(INPUT, hw.getPinMode(RELAY_MAIN_PIN));
@@ -360,9 +360,9 @@ void test_startup_open_flow(void) {
     TEST_ASSERT_EQUAL(HIGH, hw.getPinValue(RELAY_DIR_A_PIN));
     TEST_ASSERT_EQUAL(HIGH, hw.getPinValue(RELAY_DIR_B_PIN));
     
-    // [FIX-1] STARTUP_OPEN now homes to CLOSE_START after 500ms stabilization,
-    // regardless of human detection. Simulate 400ms (< 500ms): must stay in STARTUP_OPEN.
-    hw.setDistanceCm(30.0f); // Human present — should no longer trigger HOLD
+    // [FIX-1] STARTUP_OPEN now performs full calibration (OPEN_START -> OPENING -> HOLD -> CLOSE_START -> CLOSING -> IDLE)
+    // after 500ms stabilization, regardless of human detection. Simulate 400ms (< 500ms): must stay in STARTUP_OPEN.
+    hw.setDistanceCm(30.0f); // Human present — should no longer trigger HOLD prematurely
     for (int i = 0; i < 8; ++i) {
         hw.advanceMillis(50);
         controller.update();
@@ -375,15 +375,15 @@ void test_startup_open_flow(void) {
         hw.advanceMillis(50);
         controller.update();
     }
-    // 500ms elapsed — must transition to CLOSE_START (homing sequence)
-    TEST_ASSERT_EQUAL(STATE_CLOSE_START, controller.getCurrentState());
+    // 500ms elapsed — must transition to OPEN_START (calibration sequence)
+    TEST_ASSERT_EQUAL(STATE_OPEN_START, controller.getCurrentState());
     
-    // One more update: CLOSE_START -> CLOSING
+    // One more update: OPEN_START -> OPENING
     hw.advanceMillis(50);
     controller.update();
-    TEST_ASSERT_EQUAL(STATE_CLOSING, controller.getCurrentState());
+    TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
     
-    // Relays should be active during CLOSING (Main=OUTPUT/LOW, DIR_B=LOW)
+    // Relays should be active during OPENING (Main=OUTPUT/LOW, DIR_A=LOW)
     TEST_ASSERT_EQUAL(OUTPUT, hw.getPinMode(RELAY_MAIN_PIN));
 }
 
