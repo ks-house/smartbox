@@ -347,15 +347,23 @@ void SmartBoxController::update() {
 }
 
 void SmartBoxController::forceOpen() {
+    std::lock_guard<std::recursive_mutex> lock(dataMutex);
     if (currentState != STATE_BATTERY_LOW_SHUTDOWN && currentState != STATE_EMERGENCY_STOP) {
+        sensorDeadlockFlag = false;
+        isCooldown = false;
+        deadlockClearStartTime = 0;
         transitionTo(STATE_OPEN_START);
     }
 }
 
 void SmartBoxController::forceClose() {
+    std::lock_guard<std::recursive_mutex> lock(dataMutex);
     if (currentState != STATE_BATTERY_LOW_SHUTDOWN && currentState != STATE_EMERGENCY_STOP) {
         if (currentState != STATE_IDLE && currentState != STATE_CLOSING && currentState != STATE_CLOSE_START) {
             maintenanceRequested = false;
+            sensorDeadlockFlag = false;
+            isCooldown = false;
+            deadlockClearStartTime = 0;
             transitionTo(STATE_CLOSE_START);
         }
     }
