@@ -24,7 +24,7 @@ SmartBoxController::SmartBoxController(HardwareInterface& hardware)
       initialState(STATE_IDLE), maintenanceRequested(false),
       holdStartTime(0), sensorDeadlockFlag(false), deadlockClearStartTime(0), postCloseBlindStartTime(0),
       openStallCount(0), closeStallCount(0), openingRelayStarted(false),
-      lastDirOpen(false), lastDirClose(false) {
+      lastDirOpen(false), lastDirClose(false), isCalibrationPhase(false) {
     for (int i = 0; i < 5; i++) {
         distanceHistory[i] = 999.0f;
     }
@@ -62,6 +62,7 @@ void SmartBoxController::init() {
     openingRelayStarted = false;
     lastDirOpen = false;
     lastDirClose = false;
+    isCalibrationPhase = false;
     
     // Fill median filter buffer
     for (int i = 0; i < 5; i++) {
@@ -129,17 +130,23 @@ void SmartBoxController::update() {
         case STATE_STARTUP_OPEN:
             // [FIX-1] 부팅 시 뚜껑 상태 불확실 → 500ms 안정화 후 항상 닫힘 위치로 홈(Homing)
             // 이전: 사람 감지 시 OPENING 없이 HOLD로 직행(IDLE→HOLD 처럼 보이는 문제)
-            // 변경: STARTUP_OPEN → CLOSE_START → CLOSING → IDLE 경로로 정상 사이클 진입
+            // 변경: STARTUP_OPEN → OPEN_START로 이동하여 완전 캘리브레이션 1회 수행
             setRelayStates(false, false, false);
             if (hw.getMillis() - stateTimer >= 500) {
-                Serial.println("[STATE] STARTUP_OPEN: Homing to closed position after 500ms stabilization.");
-                transitionTo(STATE_CLOSE_START);
+                Serial.println("[STATE] STARTUP_OPEN: Starting calibration phase (OPEN -> HOLD -> CLOSE).");
+                isCalibrationPhase = true;
+                transitionTo(STATE_OPEN_START);
             }
             break;
 
         case STATE_IDLE: {
             setRelayStates(false, false, false);
             
+            if (isCalibrationPhase) {
+                Serial.println("[STATE] Calibration phase complete. Resuming normal operation.");
+                isCalibrationPhase = false;
+            }
+
             // Self-healing: Path must be clean CONTINUOUSLY for 10 seconds to clear deadlock
             if (currentDistance > config.distThreshold) {
                 if (sensorDeadlockFlag) {
@@ -242,7 +249,7 @@ void SmartBoxController::update() {
             }
             
             // If human is still detected within the threshold, reset the timer to keep the lid open
-            if (currentDistance > 0.0f && currentDistance < config.distThreshold) {
+            if (!isCalibrationPhase && currentDistance > 0.0f && currentDistance < config.distThreshold) {
                 stateTimer = hw.getMillis();
             }
             
@@ -281,8 +288,8 @@ void SmartBoxController::update() {
             } else {
                 closeStallCount = 0; // Reset at inrush bypass window start
             }
-            // Safety reopen if human is detected during close (bypassed if sensor is deadlocked)
-            if (currentDistance > 0 && currentDistance < config.distThreshold && !sensorDeadlockFlag) {
+            // Safety reopen if human is detected during close (bypassed if sensor is deadlocked or during calibration)
+            if (!isCalibrationPhase && currentDistance > 0 && currentDistance < config.distThreshold && !sensorDeadlockFlag) {
                 Serial.printf("[SAFETY] Human re-approach during closing: %.1f cm! Reopening.\n", currentDistance);
                 closeStallCount = 0;
                 setRelayStates(false, false, false);

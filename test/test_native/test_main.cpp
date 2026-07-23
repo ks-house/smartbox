@@ -375,15 +375,15 @@ void test_startup_open_flow(void) {
         hw.advanceMillis(50);
         controller.update();
     }
-    // 500ms elapsed — must transition to CLOSE_START (homing sequence)
-    TEST_ASSERT_EQUAL(STATE_CLOSE_START, controller.getCurrentState());
+    // 500ms elapsed — must transition to OPEN_START (calibration sequence)
+    TEST_ASSERT_EQUAL(STATE_OPEN_START, controller.getCurrentState());
     
-    // One more update: CLOSE_START -> CLOSING
+    // One more update: OPEN_START -> OPENING
     hw.advanceMillis(50);
     controller.update();
-    TEST_ASSERT_EQUAL(STATE_CLOSING, controller.getCurrentState());
+    TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
     
-    // Relays should be active during CLOSING (Main=OUTPUT/LOW, DIR_B=LOW)
+    // Relays should be active during OPENING (Main=OUTPUT/LOW, DIR_A=LOW)
     TEST_ASSERT_EQUAL(OUTPUT, hw.getPinMode(RELAY_MAIN_PIN));
 }
 
