@@ -93,6 +93,8 @@ private:
   // Relay direction state cache (was static local in setRelayStates — caused test pollution)
   bool lastDirOpen;
   bool lastDirClose;
+  // Calibration flag to enforce one-time complete open/hold/close cycle on boot
+  bool isCalibrationPhase;
   mutable std::recursive_mutex dataMutex;
 
   void updateDistanceBuffer();
