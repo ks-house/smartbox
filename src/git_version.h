@@ -1,0 +1,1 @@
+#define FIRMWARE_VERSION_OVERRIDE "0.1.0-g100925a-dirty"

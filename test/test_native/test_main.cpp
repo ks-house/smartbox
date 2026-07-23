@@ -142,10 +142,10 @@ void test_stall_current_detection(void) {
     controller.update();
     TEST_ASSERT_EQUAL(STATE_OPENING, controller.getCurrentState());
     
-    // Sample 3: exceeding threshold -> MUST transition to EMERGENCY_STOP (anti-pinch protection active)
+    // Sample 3: exceeding threshold -> MUST transition to STATE_HOLD (normal physical limit reached during open)
     hw.setMotorCurrent(4000.0f);
     controller.update();
-    TEST_ASSERT_EQUAL(STATE_EMERGENCY_STOP, controller.getCurrentState());
+    TEST_ASSERT_EQUAL(STATE_HOLD, controller.getCurrentState());
     
     // All relays must be isolated to INPUT (high-impedance) for safety
     TEST_ASSERT_EQUAL(INPUT, hw.getPinMode(RELAY_MAIN_PIN));

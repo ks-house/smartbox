@@ -204,12 +204,12 @@ void SmartBoxController::update() {
                     Serial.printf("[WARN] Stall candidate OPEN (%d/3): %.1f mA (Limit: %.1f mA)\n",
                                   openStallCount, motorCurrent, config.currentStallLimit);
                     if (openStallCount >= 3) {
-                        Serial.printf("[WARN] MOTOR STALL DETECTED DURING OPEN! Current: %.1f mA (Limit: %.1f mA)\n", motorCurrent, config.currentStallLimit);
+                        Serial.println("[INFO] Motor reached physical OPEN limit (Stall detected).");
                         Serial.printf("[DIAGNOSTIC] Time Elapsed: %lu ms, Batt: %.2f V, Dist: %.1f cm\n",
                                       hw.getMillis() - stateTimer, batteryVoltage, currentDistance);
                         openStallCount = 0;
-                        forceAllRelaysOff();
-                        transitionTo(STATE_EMERGENCY_STOP);
+                        forceAllRelaysOff(); // 모터 정지
+                        transitionTo(STATE_HOLD); // 강제 종료가 아닌 열림 유지 상태로 정상 전이
                         break;
                     }
                 } else {
