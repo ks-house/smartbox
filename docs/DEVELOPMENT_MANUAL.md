@@ -1,7 +1,10 @@
-# SmartBox 조립 및 개발 매뉴얼 (최신 아키텍처 개편본)
+# SmartBox 조립 및 개발 매뉴얼
 
-> **문서 버전:** 최신 커밋 기준 (2026-07-20)  
-> **펌웨어 기준 브랜치:** main (dbcfff6)
+> **문서 기준:** 2026-08-12 코드 감사
+>
+> **펌웨어 기준:** `main` commit `9f2facb`
+>
+> **상태:** 현재형 매뉴얼. 구현·검증·현장 배포는 [프로젝트 상태](../wiki/project_status.md)에서 분리해 확인합니다.
 
 본 문서는 ESP32-C6 기반 스마트 자동 수거함 시스템의 하드웨어 스펙, 물리 결선 가이드, 안전 설계 규칙 및 소프트웨어 논블로킹 상태 머신(FSM), MQTT 기반 모던 IoT 통합 아키텍처 사양을 규정하는 개발자 공식 가이드라인입니다.
 
@@ -96,9 +99,9 @@ ESP32-C6 보드와 각 모듈은 아래의 확정된 GPIO 번호에 정밀하게
 | SmartBoxController.cpp/.h | 핵심 FSM 엔진. 11개 상태 전이, 릴레이 인터락, 센서 읽기 |
 | WifiManager.cpp/.h | Wi-Fi AP+STA 듀얼 모드, Captive Portal, 5분 온디맨드 프로비저닝 |
 | MqttManager.cpp/.h | MQTTS over TLS, Home Assistant Auto Discovery, 원격 명령 처리 |
-| AutoOtaManager.cpp/.h | HTTPS NAS 기반 OTA. 1시간 주기 자동 버전 확인 및 업데이트 |
+| AutoOtaManager.cpp/.h | HTTPS NAS 기반 OTA. 부팅 1회 + `otaHour` 시각 일 1회 버전 확인 및 업데이트 |
 | TelemetryManager.cpp/.h | 배치 텔레메트리. 모터 구동 중 500ms 샘플링 + 1분 주기 heartbeat |
-| PowerManager.cpp/.h | NTP 기반 매일 04:00 AM 자동 안전 재부팅 |
+| PowerManager.cpp/.h | NTP 기반 `(otaHour + 1) % 24` 시각의 일 1회 안전 재부팅 |
 | ConfigManager.cpp/.h | Preferences NVS 기반 설정/Wi-Fi/뚜껑상태 영구 저장 |
 | RemoteLogger.cpp/.h | WARN/ERROR 이상 로그 MQTT 자동 전달 |
 | Esp32Hardware.cpp/.h | HardwareInterface 구현체 (INA219, 초음파, GPIO) |
@@ -122,7 +125,7 @@ ESP32-C6 보드와 각 모듈은 아래의 확정된 GPIO 번호에 정밀하게
                        |  initRelays + loadLidState
                        v
                     IDLE  <-----------------------------+
-                       |  Human < distThreshold (300ms)  |
+                       |  Human < distThreshold (effective minimum 1000ms)  |
                        v                               |
                  OPEN_START                            |
                        |  setRelayStates(Main ON, Dir-A ON)  |
@@ -147,7 +150,7 @@ ESP32-C6 보드와 각 모듈은 아래의 확정된 GPIO 번호에 정밀하게
 * **BATTERY_LOW_SHUTDOWN:** 11.3V 이하 3초 -> 강제 개방 -> 릴레이 영구 격리
 * **OTA_UPDATING:** 펌웨어 업데이트 중 -> 전 릴레이 차단, FSM 동결
 * **MAINTENANCE:** 5분 정비 모드 -> 자동 닫힘
-* **STARTUP_OPEN:** NVS에서 열림 상태 복원 -> CLOSE_START 홈밍
+* **STARTUP_OPEN:** NVS가 이전 상태를 open으로 기록한 부팅에서 500ms 안정화 후 OPEN_START로 진입하여 open/hold/close 보정 사이클 수행
 
 ### 5.4. 주요 설계 결정사항
 
@@ -205,12 +208,14 @@ SmartBoxController는 std::recursive_mutex dataMutex로 배터리 전압, 모터
 | smartbox/log | 0 | N | WARN/ERROR 수준 원격 로그 |
 | homeassistant/\*/smartbox_01/\*/config | 1 | Y | HA Auto Discovery 설정 패킷 |
 
-### 7.2. Home Assistant Auto Discovery 엔티티 (총 16개)
+### 7.2. Home Assistant Auto Discovery 엔티티 (총 20개)
 
 * **Buttons (7개):** force_open, force_close, reset_emergency, trigger_ota, reboot, debug_on, maint_start
 * **Sensors (6개):** state, battery_v, cycle_duration, peak_current, distance, wifi_rssi
 * **Binary Sensors (2개):** status (connectivity), motion
 * **Selects (5개):** config_dist, config_wait, config_stall, config_ota_hour, config_tel_int
+
+> 현재 code array의 합계는 7 + 6 + 2 + 5 = 20개입니다. MQTT publish 또는 Home Assistant 표시만으로 relay 물리 동작 완료를 판정하지 않습니다.
 
 ---
 
@@ -254,6 +259,8 @@ SmartBoxController는 std::recursive_mutex dataMutex로 배터리 전압, 모터
 
 더미 값이 적힌 include/secrets.h.example을 참고하여 설정하십시오.
 
+현재 command topic에는 firmware 자체의 서명·nonce·replay 검증이 없습니다. broker authentication, topic ACL과 network boundary를 필수 운영 통제로 취급하십시오.
+
 ---
 
 ## 10. 추가 개선 사항 (TODO-LIST)
@@ -271,4 +278,5 @@ SmartBoxController는 std::recursive_mutex dataMutex로 배터리 전압, 모터
 * **사용자 매뉴얼:** [USER_MANUAL.md](USER_MANUAL.md)
 * **배선 가이드:** [WIRING_GUIDE.md](WIRING_GUIDE.md)
 * **하드웨어 부품 목록:** [HARDWARE_BOM.md](../HARDWARE_BOM.md)
-* **MQTT 아키텍처 명세:** [mqtt_implementation_plan.md](mqtt_implementation_plan.md)
+* **초기 MQTT 제안 snapshot:** [mqtt_implementation_plan.md](mqtt_implementation_plan.md)
+* **현재 아키텍처 및 신뢰 경계:** [architecture.md](../wiki/architecture.md)

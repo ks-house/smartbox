@@ -1,83 +1,93 @@
-# 🚀 SmartBox: High-Availability Autonomous SmartBox Controller
+# SmartBox
 
-![Platform](https://img.shields.io/badge/Platform-PlatformIO-orange.svg)
-![Framework](https://img.shields.io/badge/Framework-Arduino-blue.svg)
-![Board](https://img.shields.io/badge/Board-ESP32--C6-red.svg)
-![MQTT](https://img.shields.io/badge/Protocol-MQTTS%20TLS-green.svg)
-![License](https://img.shields.io/badge/License-MIT-green.svg)
+ESP32-C6, AJ-SR04T, INA219, Active-Low relay와 12 V linear actuator 두 개를 사용하는 자동 수거함 뚜껑 controller다. 현재 checkout의 기준과 남은 검증 항목은 [wiki/project_status.md](wiki/project_status.md), 전체 문서 지도는 [wiki/index.md](wiki/index.md)를 따른다.
 
-**SmartBox**는 단순한 토이 프로젝트가 아닌, **엔터프라이즈 IoT 수준의 고가용성 및 자율 운영 설계**가 적용된 차세대 스마트 수거함 컨트롤러입니다. 
-초음파 센서로 사용자의 접근을 이중 필터링하여 감지하고, 이중 릴레이와 선형 액추에이터(Linear Actuator)를 제어하여 무거운 수거함 뚜껑을 완벽하게 통제합니다. 최저 전력 소모, 실시간 텔레메트리 관제, 자율 무선 펌웨어 업데이트 등 어떠한 가혹한 실외 환경에서도 시스템이 다운되지 않도록 다중 안전장치가 설계되어 있습니다.
+> Repository baseline: `main` commit `9f2facb` (2026-07-23)
+>
+> 저장소에 구현된 기능은 실기기 검증 또는 현장 배포 완료를 자동으로 뜻하지 않는다.
 
----
+## 현재 구현
 
-## ✨ 핵심 기능 (Enterprise IoT Features)
+- 11-state non-blocking FSM과 Active-Low relay interlock.
+- 거리 5-sample median, debounce, 3초 post-close blind time, 최대 HOLD와 sensor deadlock self-healing.
+- INA219 전압/전류 감시, open/close stall 처리, 11.3 V 기본 저전압 보호.
+- 부팅 5분 captive portal과 저장된 STA 자동 재연결.
+- PsychicMqttClient 기반 MQTTS, Root CA, LWT, 원격 command/config, Home Assistant discovery 20개.
+- 30초 live telemetry, motor-event batch, 1분 heartbeat sample과 설정 주기 batch.
+- 부팅 1회 + 설정한 `otaHour` 일 1회 HTTPS OTA 확인, pre-OTA relay isolation.
+- `(otaHour + 1) % 24` 시각의 일 1회 proactive reboot.
+- native FSM tests와 main push target build/SFTP deployment workflow.
 
-* **비동기 FSM 및 하드웨어 인터락 (Hardware Interlock)**
-  * **이중 노이즈 필터링:** 5샘플 중간값(Median Filter) 기반의 센서 노이즈 처리로 오작동을 차단합니다.
-  * **협착 방지(Anti-Pinch) 긴급 정지:** 구동 중 INA219 전력 센서를 통해 모터 실속(Stall) 전류를 감시하며, 3000mA 초과 시 3회 연속 감지되면 즉각 비상 정지(Emergency Stop) 상태로 전이합니다.
-  * **이중 릴레이 안전망:** 방향 릴레이 전환 시 발생 가능한 쇼트를 막기 위해, 1채널 릴레이로 메인 12V 전원을 먼저 컷오프하는 하드웨어 및 소프트웨어 인터락을 강제합니다.
+## 안전 불변조건
 
-* **모던 MQTTS over TLS & Home Assistant 통합**
-  * **단일 통신 파이프라인 (Single Pipeline):** 무거운 InfluxDB 및 레거시 웹 서버를 완전 철거하고 MQTTS over TLS (포트 4883) 단 하나로 통신을 단일화하여 전력과 메모리 자원을 극대화하여 아꼈습니다.
-  * **Home Assistant MQTT Auto Discovery:** 펌웨어가 부팅 시 자기소개(Discovery) 패킷을 발행하여, 사용자가 Home Assistant 설정 파일(`configuration.yaml`)에 코드를 적을 필요 없이 클릭 한 번으로 `[SmartBox]` 기기 및 11개 엔티티가 자동 등록됩니다.
+현재 relay는 Active-Low다. 논리적 open 방향과 close 방향을 동시에 활성화하면 안 된다.
 
-* **자율 운영 및 무인 OTA (Over-The-Air)**
-  * **매일 심야 무인 업데이트:** 지정된 HTTPS NAS(Network Attached Storage) 서버에 배포된 `version.json` 매니페스트를 자동으로 Pull 방식으로 폴링하여, 펌웨어 버전의 차이가 있을 때만 백그라운드 OTA를 안전하게 수행합니다.
-  * **Pre-OTA Hardware Isolation:** 업데이트 개시 즉시 모든 릴레이 전원을 물리적 고임피던스(INPUT)로 완전 격리하여 업데이트 도중의 노이즈로 인한 쇼트 화재를 원천 봉쇄합니다.
+| 상태 | Main GPIO 6 | Direction A GPIO 7 | Direction B GPIO 8 |
+|---|---|---|---|
+| open | OUTPUT LOW | LOW | HIGH |
+| close | OUTPUT LOW | HIGH | LOW |
+| neutral | INPUT | HIGH | HIGH |
+| full isolation | INPUT | INPUT | INPUT |
 
-* **시계열 배치 텔레메트리 및 하이브리드 이벤트**
-  * **RAM Ring Buffer 배치 전송:** 배터리 전압 및 상태 데이터를 1분 간격으로 RAM 버퍼에 모았다가 일괄 전송하여 Wi-Fi RF 가동 소모 전력을 90% 이상 아낍니다.
-  * **실시간 알람 및 개폐 사이클 요약:** 과전류/저전압 즉시 알람 발행, 100cm 모션 감지 엣지 트리거 및 1회 개폐 동작 완료 시 피크 전류와 동작 시간을 담은 요약 리포트를 발행합니다.
+방향을 바꿀 때는 `Main OFF/INPUT → 100 ms → 방향 변경 → 100 ms → Main ON/LOW` 순서를 보존한다. 상세 계약은 [AGENTS.md](AGENTS.md)와 [개발 매뉴얼](docs/DEVELOPMENT_MANUAL.md)을 따른다.
 
-* **극저전력 및 고가용성 확보 (High-Availability)**
-  * **Proactive Reboot (매일 04:00 AM):** NTP 동기화된 시각 기준으로 매일 새벽 4시 FSM이 IDLE 상태일 때 안전하게 자동 재부팅하여 메모리 단편화 및 장기간 운영 중 발생할 수 있는 상태 누적 문제를 예방합니다.
-  * **하드웨어 Watchdog (TWDT):** 10초 타임아웃의 듀얼 코어 Task Watchdog Timer(TWDT)가 상시 가동되어, 통신 지연이나 프리징 시 자가 복구합니다.
-  * **저전압 셧다운 방어 (`STATE_BATTERY_LOW_SHUTDOWN`):** 배터리가 11.3V 이하로 3초 이상 지속될 경우 남은 전력으로 수거함을 완전 개방시킨 뒤 영구 슬립에 진입하여 관리자의 정비(배터리 교체)를 용이하게 합니다.
+## Hardware
 
----
+| 기능 | 연결 |
+|---|---|
+| AJ-SR04T TRIG / ECHO | GPIO 4 / GPIO 5 |
+| Main / direction A / direction B relay | GPIO 6 / GPIO 7 / GPIO 8 |
+| INA219 SDA / SCL | GPIO 22 / GPIO 23 |
+| MCU | ESP32-C6-DevKitC-1, 16 MB flash |
 
-## 🛠️ 하드웨어 사양 (Hardware Specifications)
+AJ-SR04T ECHO가 5 V logic을 출력하는 구성이라면 ESP32-C6 GPIO 5에 직접 연결하지 말고 3.3 V 입력 보호를 적용한다. 실제 배선은 [docs/WIRING_GUIDE.md](docs/WIRING_GUIDE.md), 부품은 [HARDWARE_BOM.md](HARDWARE_BOM.md)를 확인한다.
 
-상세한 하드웨어 부품 목록 및 튜닝 값은 [HARDWARE_BOM.md](HARDWARE_BOM.md)를 참고하세요. 안정적인 구동을 위해 제어부(5V)와 구동부(12V)의 전원을 완전히 분리하여 설계했습니다.
+## Build
 
-* **제어부 (Controller):** `ESP32-C6-DevKitC-1` (16MB Flash, 160MHz) - 최신 Wi-Fi 6 지원
-* **센서부 (Sensors):** `AJ-SR04T` 방수 초음파 거리 센서, `INA219` 직류 전압/전류 모니터링 모듈
-* **구동부 (Actuators):** 12V 100N 리니어 액추에이터 x 2 (병렬), 1채널 릴레이(전원 차단용), 2채널 릴레이(정/역 방향 전환용)
-* **전원부 (Power):** 12V 7Ah 밀폐형 연납축전지, 30W 태양광 패널 및 PWM 충전 컨트롤러, LM2596 강압 모듈
+PowerShell 예시:
 
----
+```powershell
+Copy-Item include/secrets.h.example include/secrets.h
+pio test -e native
+pio run -e esp32-c6-devkitc-1
+```
 
-## 🔌 핀 맵핑 및 결선 가이드 (Wiring Diagram)
+`include/secrets.h`에는 실제 Wi-Fi, AP, MQTT, HTTPS endpoint와 Root CA를 넣으며 Git에 포함하지 않는다. target build는 `default_16MB.csv` partition을 사용한다.
 
-🚨 **경고:** 제어용 5V와 모터용 12V 선이 절대 혼재되지 않도록 극도로 주의하십시오. 12V가 ESP32 핀에 혼입되는 순간 보드가 즉시 소손됩니다.
+PlatformIO가 PATH에 없다면 설치 위치의 실행 파일로 같은 명령을 실행한다. build 성공은 flash, relay polarity, physical load, OTA reboot/health 검증을 대신하지 않는다.
 
-| ESP32-C6 핀 | 부품 핀 | 설명 및 인터락 역할 |
-| :---: | :---: | :--- |
-| `5V (VBUS)` | 센서/릴레이 `VCC` | 5V 전원 공통 공급 |
-| `GND` | 센서/릴레이 `GND` | 접지 공통 연결 |
-| `GPIO 4` | AJ-SR04T `Trig` | 초음파 발신 트리거 |
-| `GPIO 5` | AJ-SR04T `Echo` | 초음파 수신 에코 |
-| `GPIO 6` | 1-Ch Relay `IN` | **[STEP 1 안전망]** 메인 전원(12V) 통과/차단 제어 |
-| `GPIO 7` | 2-Ch Relay `IN1` | **[STEP 2 방향]** 모터 정회전 (뚜껑 열기) |
-| `GPIO 8` | 2-Ch Relay `IN2` | **[STEP 2 방향]** 모터 역회전 (뚜껑 닫기) |
-| `GPIO 22` | INA219 `SDA` | 전류 모니터 I2C 데이터 라인 |
-| `GPIO 23` | INA219 `SCL` | 전류 모니터 I2C 클럭 라인 |
+## Runtime architecture
 
----
+```text
+AJ-SR04T / INA219
+  → SmartBoxController FSM
+  → relay safety interlock
+  → dual actuator
 
-## ⚙️ 소프트웨어 환경 및 펌웨어 빌드
+Wi-Fi AP/STA
+  → MQTTS
+  → Home Assistant / operator command
 
-이 프로젝트는 최신 칩셋인 ESP32-C6를 지원하고, 비동기 네트워크 처리를 최적화하기 위해 커스텀 저장소(`pioarduino`) 아두이노 프레임워크를 기반으로 합니다.
+NetworkTask
+  → AutoOtaManager + TelemetryManager + MqttManager
+```
 
-### 빌드 및 업로드 방법
-1. 저장소를 클론하고 VS Code 또는 Antigravity IDE의 PlatformIO 환경에서 프로젝트를 엽니다.
-2. **보안 설정 (Secrets Setup):**
-   - `include/secrets.h.example` 파일을 복사하여 `include/secrets.h`를 만듭니다.
-   - 내부 설정 파일에 로컬 SoftAP 비밀번호, Wi-Fi 정보, MQTT 접속 정보, HTTPS NAS 대상 루트 CA 인증서를 기입합니다.
-   - *이 파일은 `.gitignore`에 등록되어 외부 저장소로 절대 푸시되지 않습니다.*
-3. ESP32-C6 보드를 PC와 연결합니다. (2개의 USB 포트가 있다면 **`CH343 (UART)`** 포트에 연결하십시오.)
-4. PlatformIO에서 `esp32-c6-devkitc-1` 환경으로 컴파일 및 펌웨어 플래싱을 진행합니다. (포트번호는 자동 감지됩니다.)
+자세한 FSM, topics, command, OTA와 신뢰 경계는 [wiki/architecture.md](wiki/architecture.md)에 있다.
 
-### 🌐 CI/CD 파이프라인 연동
-GitHub Actions를 통한 자동 배포 파이프라인이 포함되어 있습니다. `.github/workflows/deploy.yml`는 Push 발생 시 네이티브 로직 테스트를 수행하고, 성공 시 ESP32-C6 타겟 바이너리를 빌드하여 Synology NAS 서버로 SFTP 자동 배포합니다. 이 과정에서 필요한 멀티라인 Root CA 등의 보안 변수들은 GitHub Secrets를 통해 동적으로 주입됩니다.
+## OTA와 배포 경계
+
+OTA는 HTTPS Root CA 검증과 firmware flashing 전 relay isolation을 수행한다. 다만 현재 코드에서 signed artifact, dual-slot rollback 선택, post-reboot health mark는 확인되지 않는다. `HTTP_UPDATE_OK` 또는 SFTP upload만으로 현장 업데이트 완료라고 기록하지 않는다.
+
+GitHub Actions는 `main` push에서 native test → target build → `firmware.bin`/`version.json` 생성 → SFTP 배포를 수행한다. 운영 환경의 승인과 복구 정책은 CI 성공과 별개다.
+
+## Documentation
+
+- [Wiki index](wiki/index.md)
+- [Current status](wiki/project_status.md)
+- [Architecture](wiki/architecture.md)
+- [User manual](docs/USER_MANUAL.md)
+- [Development manual](docs/DEVELOPMENT_MANUAL.md)
+- [Wiring guide](docs/WIRING_GUIDE.md)
+- [Knowledge management](wiki/knowledge_management.md)
+
+`reports/`와 `prompts/`는 시점별 역사 자료다. 완료된 plan/task/walkthrough 문서보다 현재 wiki와 source를 우선한다.

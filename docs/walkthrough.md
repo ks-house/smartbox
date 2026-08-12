@@ -1,4 +1,14 @@
+---
+title: Telemetry alignment walkthrough snapshot
+type: test
+project: smartbox
+status: superseded
+updated: 2026-08-12
+---
+
 # Telemetry Timestamp Alignment, Data Filtering, and Version Bump Walkthrough
+
+> **Superseded snapshot:** 과거 InfluxDB 직접 전송 구현과 0.1.0 작업 결과를 보존한 문서입니다. 현재 MQTT-only 구조는 [architecture.md](../wiki/architecture.md)를 따릅니다.
 
 This document summarizes the changes applied to align telemetry data points with their true historical sampling times, filter specific fields according to user rules, bump the firmware version to 0.1.0, and update the repository documentation.
 
@@ -6,11 +16,11 @@ This document summarizes the changes applied to align telemetry data points with
 
 ### Telemetry System
 
-#### [TelemetryManager.h](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/src/TelemetryManager.h)
+#### [TelemetryManager.h](../src/TelemetryManager.h)
 - Added `wifi_rssi` (`int`) to `TelemetryData` struct to track signal strength.
 - Added `uploadStartMillis` (`unsigned long`) and `currentEpochMs` (`uint64_t`) parameters to `BatchPayload` struct.
 
-#### [TelemetryManager.cpp](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/src/TelemetryManager.cpp)
+#### [TelemetryManager.cpp](../src/TelemetryManager.cpp)
 1. **Timestamp Alignment:**
    - Configured InfluxDB client with millisecond write precision:
      ```cpp
@@ -29,17 +39,17 @@ This document summarizes the changes applied to align telemetry data points with
 
 ### Version Configuration
 
-#### [SmartBoxController.h](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/src/SmartBoxController.h)
+#### [SmartBoxController.h](../src/SmartBoxController.h)
 - Bumped `FIRMWARE_VERSION` definition from `"0.0.1"` to `"0.1.0"`.
 
-#### [git_version.py](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/scripts/git_version.py)
+#### [git_version.py](../scripts/git_version.py)
 - Bumped the fallback `base_version` string to `"0.1.0"` to match.
 
 ### Repository Documentation
 - Overwrote the repository-wide files in `docs/` with the current plan, task list, and walkthrough:
-  - [docs/implementation_plan.md](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/docs/implementation_plan.md)
-  - [docs/task.md](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/docs/task.md)
-  - [docs/walkthrough.md](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/docs/walkthrough.md)
+  - [docs/implementation_plan.md](implementation_plan.md)
+  - [docs/task.md](task.md)
+  - [docs/walkthrough.md](walkthrough.md)
 
 ## Verification
 

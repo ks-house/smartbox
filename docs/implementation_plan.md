@@ -1,4 +1,14 @@
+---
+title: Telemetry alignment implementation plan snapshot
+type: proposal
+project: smartbox
+status: superseded
+updated: 2026-08-12
+---
+
 # Telemetry Timestamp Alignment, Field Filtering, and Version Bump to 0.1.0 Plan
+
+> **Superseded snapshot:** 완료된 0.1.0 시점 작업 계획입니다. 현재 상태는 [project_status.md](../wiki/project_status.md)를 따릅니다.
 
 This plan implements conditional field filtering and absolute timestamp alignment for InfluxDB telemetry, and bumps the firmware version to 0.1.0.
 
@@ -6,11 +16,11 @@ This plan implements conditional field filtering and absolute timestamp alignmen
 
 ### Telemetry System
 
-#### [MODIFY] [TelemetryManager.h](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/src/TelemetryManager.h)
+#### [MODIFY] [TelemetryManager.h](../src/TelemetryManager.h)
 - Add `wifi_rssi` (`int`) to `TelemetryData` struct to capture WiFi signal strength.
 - Add `uploadStartMillis` (`unsigned long`) and `currentEpochMs` (`uint64_t`) to `BatchPayload` struct.
 
-#### [MODIFY] [TelemetryManager.cpp](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/src/TelemetryManager.cpp)
+#### [MODIFY] [TelemetryManager.cpp](../src/TelemetryManager.cpp)
 - **Field Filtering at Sampling Time:**
   - Record `distance_cm` only if `<= 100.0f`. Otherwise, set to `-1.0f` (sentinel).
   - Record `wifi_rssi` using `WiFi.RSSI()`.
@@ -27,17 +37,17 @@ This plan implements conditional field filtering and absolute timestamp alignmen
 
 ### Version Configuration
 
-#### [MODIFY] [SmartBoxController.h](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/src/SmartBoxController.h)
+#### [MODIFY] [SmartBoxController.h](../src/SmartBoxController.h)
 - Bump default `FIRMWARE_VERSION` from `"0.0.1"` to `"0.1.0"`.
 
-#### [MODIFY] [git_version.py](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/scripts/git_version.py)
+#### [MODIFY] [git_version.py](../scripts/git_version.py)
 - Bump fallback `base_version` to `"0.1.0"`.
 
 ### Repository Documentation
 
-#### [MODIFY] [implementation_plan.md](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/docs/implementation_plan.md)
-#### [MODIFY] [task.md](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/docs/task.md)
-#### [MODIFY] [walkthrough.md](file:///c:/Users/shcat/Documents/PlatformIO/Projects/smartbox/docs/walkthrough.md)
+#### [MODIFY] [implementation_plan.md](implementation_plan.md)
+#### [MODIFY] [task.md](task.md)
+#### [MODIFY] [walkthrough.md](walkthrough.md)
 - Overwrite previous docs with the plans, tasks, and walkthrough files corresponding to the current version `0.1.0` release.
 
 ## Verification Plan
