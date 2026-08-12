@@ -25,3 +25,8 @@ scripts/*.log
 # Hardcoded credentials configuration
 include/secrets.h
 
+# Obsidian personal UI state
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache/
+.trash/

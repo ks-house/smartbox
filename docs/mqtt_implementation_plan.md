@@ -1,4 +1,14 @@
+---
+title: SmartBox MQTT implementation plan snapshot
+type: proposal
+project: smartbox
+status: superseded
+updated: 2026-08-12
+---
+
 # SmartBox MQTT 연동 기능 (MqttManager) 아키텍처 설계 문서
+
+> **Superseded snapshot:** 이 문서는 초기 AsyncMqttClient 제안과 당시 구현 기록입니다. 현재 코드는 PsychicMqttClient를 사용하므로 [현재 아키텍처](../wiki/architecture.md)와 source를 우선하십시오.
 
 **문서버전:** v1.0  
 **작성일자:** 2026-06-28  
