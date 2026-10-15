@@ -15,6 +15,14 @@ IMAGE = "nginx@sha256:892bb2152464f0c5d8972593a5f5afaf8054552580b699d95f8ff4af08
 @unittest.skipUnless(os.getenv("RUN_NGINX_ORIGIN_INTEGRATION") == "1",
                      "set RUN_NGINX_ORIGIN_INTEGRATION=1 for isolated nginx")
 class NginxOriginTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # Pull completion is separate from nginx's bounded startup deadline.
+        result = subprocess.run(["docker", "pull", IMAGE], capture_output=True,
+                                text=True, timeout=120)
+        if result.returncode:
+            raise RuntimeError("pinned nginx fixture download failed: " + result.stderr[-1000:])
+
     def test_real_head_get_encoded_paths_and_spoofed_header_policy(self):
         spec = importlib.util.spec_from_file_location(
             "origin_guard", ROOT/"ops/install_ota_origin_guard.py")

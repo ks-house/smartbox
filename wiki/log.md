@@ -39,3 +39,7 @@ source_of_truth: true
 
 - Owner reran hash-pinned guard05 with interactive sudo. Exact private receipt confirms full native nginx config validation,28 Unix-socket allow/refuse cases, local strict-TLS firmware/version checks and two root-owned include installation. Original generated Web Station files remain intact. Credentials unchanged; external refusal is explicitly not yet verified.
 - Candidate CI gains manual verify-origin as a read-only default; privileged publication requires main push or explicit publish-firmware, plus successful native/origin gates. No real firmware/credential publication has occurred during this candidate work.
+
+## [2026-10-16] fix | Separate cold fixture download from nginx startup
+
+- First PR6 hosted native cases passed, then real-nginx fixture reached its5s process-start deadline while Docker was still downloading the pinned image. Added an explicit bounded image pull before fixture startup; no production code/route changes. Rerun the six local origin tests and exact-head hosted checks.
