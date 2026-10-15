@@ -280,3 +280,16 @@ SmartBoxController는 std::recursive_mutex dataMutex로 배터리 전압, 모터
 * **하드웨어 부품 목록:** [HARDWARE_BOM.md](../HARDWARE_BOM.md)
 * **초기 MQTT 제안 snapshot:** [mqtt_implementation_plan.md](mqtt_implementation_plan.md)
 * **현재 아키텍처 및 신뢰 경계:** [architecture.md](../wiki/architecture.md)
+
+## MQTT migration and credential-bearing OTA publication
+
+The combined broker migration candidate is described in
+[the migration runbook](../wiki/mqtt_broker_migration.md). Keep relay/FSM/OTA
+isolation and16MB partitions unchanged. The pinned pioarduino platform matches
+the last successful operating build; use the standard native and ESP32-C6 build
+commands. PR builds use placeholder credentials and never deploy.
+
+The protected firmware origin must pass external anonymous HEAD/GET refusal
+before a main-push build can publish real MQTT credentials. Confirm the installed
+device's local HTTPS download/recovery route separately. The NAS guard installer
+validates a private plan by default; --apply is a distinct operator action.

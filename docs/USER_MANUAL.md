@@ -153,3 +153,13 @@ Home Assistant UI에서 드롭다운 선택만으로 설정값을 변경할 수 
 * **하드웨어 부품 목록:** [HARDWARE_BOM.md](../HARDWARE_BOM.md)
 * **메인 소스코드:** [main.cpp](../src/main.cpp)
 * **현재 프로젝트 상태:** [project_status.md](../wiki/project_status.md)
+
+## Shared broker authentication migration
+
+SmartBox and its telemetry collector are being prepared for separate MQTT
+accounts. Device update and collector reconnect are not yet confirmed.
+Once the planned firmware-origin protection is installed, direct firmware
+downloads are limited to the configured home LAN/Tailscale route, while the
+SmartBox's existing HTTPS updater remains available on that route.
+This is independent from the Smart Key APK update path.
+See [current migration status](../wiki/mqtt_broker_migration.md).
