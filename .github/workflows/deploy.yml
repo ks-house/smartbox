@@ -50,7 +50,10 @@ jobs:
 
   verify_ota_origin:
     name: Verify public firmware refusal before credential-bearing publication
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: >-
+      github.event_name != 'pull_request' &&
+      (github.ref == 'refs/heads/main' ||
+       (github.event_name == 'workflow_dispatch' && inputs.operation == 'verify-origin'))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

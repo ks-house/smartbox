@@ -43,3 +43,7 @@ source_of_truth: true
 ## [2026-10-16] fix | Separate cold fixture download from nginx startup
 
 - First PR6 hosted native cases passed, then real-nginx fixture reached its5s process-start deadline while Docker was still downloading the pinned image. Added an explicit bounded image pull before fixture startup; no production code/route changes. Rerun the six local origin tests and exact-head hosted checks.
+
+## [2026-10-16] test | Allow read-only external origin probe before merge
+
+- Manual verify-origin may run from the reviewed candidate ref and exposes only the configured URL to anonymous HEAD/GET checks. Privileged firmware build/publication remains main-only and explicit operation gated; PR/default feature probes cannot deploy or read device passwords. This permits independent external refusal evidence before credential rotation or main merge.
