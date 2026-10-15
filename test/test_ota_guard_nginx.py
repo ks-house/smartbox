@@ -45,6 +45,25 @@ class NginxOriginTest(unittest.TestCase):
             finally:
                 subprocess.run(["docker", "rm", "-f", name], capture_output=True, timeout=30)
 
+    def test_additional_device_lan_preserves_public_refusal(self):
+        spec = importlib.util.spec_from_file_location(
+            "origin_guard", ROOT/"ops/install_ota_origin_guard.py")
+        module = importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory(prefix="smartbox-nginx-lan-") as tmp:
+            work = Path(tmp);name = "smartbox-nginx-" + uuid.uuid4().hex[:12]
+            wrapper = work/"nginx-wrapper"
+            args = ["docker","run","--rm","--name",name,"--network","none",
+                    "--user",str(os.getuid())+":"+str(os.getgid()),"-v",tmp+":"+tmp,
+                    "--entrypoint","nginx",IMAGE]
+            wrapper.write_text("#!/bin/sh\nexec "+shlex.join(args)+' "$@"\n')
+            wrapper.chmod(0o700);module.NGINX=str(wrapper)
+            try:
+                self.assertEqual(30,module.fixture({"allowed_cidrs":
+                    ["127.0.0.1/32","::1/128","192.168.10.0/24",
+                     "100.64.0.0/10","192.168.23.0/24"]},work))
+            finally:
+                subprocess.run(["docker","rm","-f",name],capture_output=True,timeout=30)
+
     def test_relative_includes_need_original_main_config_directory(self):
         with tempfile.TemporaryDirectory(prefix="smartbox-nginx-prefix-") as tmp:
             path = Path(tmp)/"candidate.conf"

@@ -293,3 +293,12 @@ The protected firmware origin must pass external anonymous HEAD/GET refusal
 before a main-push build can publish real MQTT credentials. Confirm the installed
 device's local HTTPS download/recovery route separately. The NAS guard installer
 validates a private plan by default; --apply is a distinct operator action.
+
+
+### Installed OTA origin range maintenance
+
+Use the pinned administrator-only updater in
+[the broker migration runbook](../wiki/mqtt_broker_migration.md) when a verified
+device LAN differs from the initial origin guard. Public downloads must remain
+denied and the path guard/TLS/relay/partition contracts remain intact. Source and
+isolated checks do not establish a successful installed-device download.

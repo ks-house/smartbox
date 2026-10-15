@@ -76,3 +76,38 @@ successful operating build, retaining Arduino3.3.11 and16MB OTA partitions.
   fixture executes28 HTTP policy cases and the config-prefix RED/GREEN regression.
 - NAS retry: exact receipt confirms full config valid/28 cases/local strict-TLS paths and guard installation. External refusal and actual device download remain pending.
 - No new credentials, device firmware, actuator command or broker cutover yet.
+
+
+## 2026-10-16 coordinated rollout and device-network correction
+
+PR6 is merged as5e5e334 and main publication38823428021 succeeded.
+Independent external origin probe38823150167 passed. Private artifact readback
+matches the new device principal/password, while the previous firmware/version
+are preserved privately. One OTA request after fresh IDLE telemetry did not yield
+a new-version reconnect within180s. A non-effecting unknown-command probe received
+the expected device warning, confirming command reception. The installed CA
+verifies current OTA HTTPS/MQTT TLS and the compiled version URL serves the new
+manifest; the actual device HTTP failure remains unobserved.
+
+The owner confirms SmartBox uses the same network as Smart Gatekeeper. Its
+reported LAN differs from the original NAS-side allowlist. The matching Target
+successfully installed signed/encrypted2.1.525 and reported boot911/VALID/IDLE/OFF.
+This is a lead for the SmartBox-only private firmware path, not proof of a
+specific rejection response.
+
+ops/update_ota_origin_guard.py prepares a controlled extension of the installed
+guard. It accepts exactly one additional RFC1918 IPv4 /24 or narrower range,
+pins both installed guard hashes and the broker gateway's origin binding, and
+preserves the path guard, existing ranges and every unrelated routing include.
+It validates the complete nginx tree from the original config directory and
+runs isolated actual HTTP cases before activation. Failed post-check restores
+the exact old geo/config bytes and reloads once. Successful activation updates
+only the geo hash in the restricted gateway's origin binding; no broker/client
+credential or account change occurs. Administrator code is delivered as captured
+immutable interpreter arguments, not executed from a mutable NAS staging file.
+
+Actual NAS range update, external refusal recheck and installed SmartBox health
+remain pending. The six fixed broker maintenance commands intentionally do not
+grant nginx configuration authority. This one-time operator-authenticated range
+correction does not broaden SSH/sudo privileges. Broker cutover stays blocked
+until this device is prepared. Track the operating gap in GitHub issue7.
