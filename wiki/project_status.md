@@ -82,3 +82,10 @@ IDLE
 4. OTA artifact identity, 실패 rollback, reboot 후 version/health 확인 절차를 추가한다.
 5. 원격 `force_open`, `force_close`, `reset_emergency`, `trigger_ota`의 인증·권한 경계를 운영 환경에서 확인한다.
 6. main push 자동 SFTP 배포의 승인·복구·보존 정책을 문서화한다.
+
+## 2026-10-16 combined broker migration candidate
+
+- Owner includes SmartBox/Telegraf in the shared broker authentication transition. Current device telemetry is observed; named client compatibility and broker cutover remain pending.
+- Candidate adds a private OTA origin guard and external anonymous HEAD/GET refusal gate before credential-bearing publication. An initial NAS pre-validation failed before activation; absence of both guard files verified. Relative-config-prefix regression is reproduced/fixed; native NAS retry remains pending.
+- Floating platform HEAD failed with Core6.1.19; pin to last-successful operating platform dd01e49 restores target build. Native13, placeholder C6 build and six origin tests with actual nginx pass.
+- No new operating credentials, firmware/actuator commands or broker activation. See [migration](mqtt_broker_migration.md).

@@ -52,3 +52,7 @@ source_of_truth: true
 - GPIO 4/5/8 부팅 특성과 현재 relay/sensor 회로의 전원 투입 동작은 실물에서 재검증해야 한다.
 - AJ-SR04T ECHO의 ESP32-C6 3.3 V 입력 보호 방식이 배선 문서에 명시되어 있으나 현장 장착 증거는 별도 필요하다.
 - OTA는 TLS와 16 MB 파티션을 사용하지만 signed artifact, dual-slot health confirmation, rollback 증거는 현재 코드에서 확인되지 않는다.
+
+## Broker migration follow-up
+
+- [mqtt_broker_migration.md](mqtt_broker_migration.md): combined named-principal migration, private OTA origin guard, publication refusal gate and remaining device acceptance.

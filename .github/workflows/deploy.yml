@@ -3,6 +3,19 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Read-only origin verification or authorized firmware publication
+        type: choice
+        required: true
+        default: verify-origin
+        options: [verify-origin, publish-firmware]
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -28,9 +41,35 @@ jobs:
       - name: Run Native Unit Tests
         run: pio test -e native
 
+      - name: Verify OTA origin gate behavior
+        run: RUN_NGINX_ORIGIN_INTEGRATION=1 python -m unittest discover -s test -p 'test_ota*.py' -v
+
+      - name: Validate target build without production secrets
+        if: github.event_name == 'pull_request'
+        run: pio run -e esp32-c6-devkitc-1 -j 4
+
+  verify_ota_origin:
+    name: Verify public firmware refusal before credential-bearing publication
+    if: >-
+      github.event_name != 'pull_request' &&
+      (github.ref == 'refs/heads/main' ||
+       (github.event_name == 'workflow_dispatch' && inputs.operation == 'verify-origin'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Verify anonymous HEAD and GET are denied from outside the LAN
+        env:
+          SECRET_FIRMWARE_URL: ${{ secrets.SECRET_FIRMWARE_URL }}
+        run: python3 scripts/verify_private_ota_origin.py
+
   build_and_deploy:
     name: Build and Deploy Firmware
-    needs: test
+    needs: [test, verify_ota_origin]
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' && inputs.operation == 'publish-firmware'))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -39,7 +78,14 @@ jobs:
       - name: Create secrets.h from GitHub Secrets
         env:
           SECRET_ROOT_CA_CERT: ${{ secrets.SECRET_ROOT_CA_CERT }}
+          SECRET_MQTT_USER: ${{ secrets.SECRET_MQTT_USER }}
+          SECRET_MQTT_PASS: ${{ secrets.SECRET_MQTT_PASS }}
         run: |
+          set -euo pipefail
+          [[ "$SECRET_MQTT_USER" =~ ^[A-Za-z0-9_-]{1,64}$ ]] || { echo "Invalid MQTT principal"; exit 1; }
+          [[ "$SECRET_MQTT_PASS" =~ ^[A-Za-z0-9_-]{16,128}$ ]] || { echo "Invalid MQTT credential"; exit 1; }
+          test "$SECRET_MQTT_USER" != "your_mqtt_user"
+
           cat <<'HEREDOC' > include/secrets.h
           #ifndef SECRETS_H
           #define SECRETS_H
@@ -54,8 +100,8 @@ jobs:
           #define SECRET_FIRMWARE_URL "${{ secrets.SECRET_FIRMWARE_URL }}"
           #define SECRET_MQTT_HOST "${{ secrets.SECRET_MQTT_HOST }}"
           #define SECRET_MQTT_PORT ${{ secrets.SECRET_MQTT_PORT }}
-          #define SECRET_MQTT_USER "${{ secrets.SECRET_MQTT_USER }}"
-          #define SECRET_MQTT_PASS "${{ secrets.SECRET_MQTT_PASS }}"
+          #define SECRET_MQTT_USER "$SECRET_MQTT_USER"
+          #define SECRET_MQTT_PASS "$SECRET_MQTT_PASS"
           EOF
 
           # Append multi-line Root CA cert using env variable (safe for PEM newlines)
