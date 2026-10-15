@@ -62,3 +62,8 @@ source_of_truth: true
 - Python12 PASS, including real nginx additional-LAN30 HTTP cases, existing28 HTTP cases, original-directory regression, stale binding refusal and exact postcheck rollback. Native/target gates follow. Actual NAS application/device HTTP result remains pending; no broker cutover or actuator command.
 
 - Final local native13 PASS and ESP32-C6 target build PASS after documentation changes; generated git_version bytes restored. Final Python12 PASS after enforcing root-only backup/include parent ownership. Prepared immutable source/plan operator launcher update-ota-network.sh with private failure receipt; no NAS apply or privilege broadening yet.
+
+## [2026-10-16] compile | Merge guarded device-network updater and rollout evidence
+
+- SmartBoxPR8 merged after exact-head hosted native/origin/target CI38826365345 PASS; source-only updater and private immutable operator launcher are ready. Gatekeeper evidencePR440 mergedc8cb880 after trusted-policy PASS. Both repositories have no open PR at this checkpoint.
+- Native13, Python12 and ESP32-C6 local gates PASS. Administrator application of update-ota-network.sh remains pending because nginx lies outside the six fixed broker commands. No broker cutover or second SmartBox OTA request before that protected route changes and is verified.
