@@ -69,7 +69,7 @@ def render(origin, body, auth_file=AUTH_FILE, runtime=RUNTIME,
         if not str(path).startswith("/") or re.search(r"[\s;{}\"\']", str(path)):
             raise ValueError("safe absolute policy paths required")
     http = guard.render(origin, address=peer)[0]
-    http += "geo "+peer+" $smartbox_ota_bootstrap_allowed {\n default 0;\n"
+    http += "map "+peer+" $smartbox_ota_bootstrap_allowed {\n default 0;\n"
     http += " include "+str(runtime/"peer.*.conf")+";\n}\n"
     http += "map $msec $smartbox_ota_bootstrap_time_valid {\n default 0;\n include "+str(runtime/"time.*.conf")+";\n}\n"
     http += ('map "$smartbox_ota_origin_allowed:$smartbox_ota_bootstrap_allowed:$smartbox_ota_bootstrap_time_valid" '
@@ -123,7 +123,7 @@ def bootstrap_entry(peer):
     address = ipaddress.ip_address(peer)
     if address.version != 4 or not address.is_global or address.is_multicast:
         raise ValueError("one global IPv4 /32 only")
-    return str(address)+"/32 1;\n"
+    return str(address)+" 1;\n"
 
 
 def bootstrap_time_entry(start_epoch, seconds=300):
@@ -161,8 +161,9 @@ def fixture(origin, work, identity, auth_file, worker_user=None, bootstrap_peer=
     os.chmod(str(upstream_socket),0o660)
     if worker_user:os.chown(str(upstream_socket),0,gid)
     thread = threading.Thread(target=upstream.serve_forever,daemon=True);thread.start()
-    runtime = work/"runtime";runtime.mkdir(mode=0o700)
+    runtime = work/"runtime"
     if bootstrap_peer:
+        runtime.mkdir(mode=0o700)
         guard.create(runtime/"peer.test.conf",bootstrap_entry(bootstrap_peer))
         guard.create(runtime/"time.test.conf",bootstrap_time_entry(int(time.time())-(600 if bootstrap_expired else 0)))
     body = " proxy_pass http://smartbox_auth_fixture;\n"

@@ -27,13 +27,14 @@ class OtaAuthPolicyTest(unittest.TestCase):
                                    " proxy_pass http://127.0.0.1:80;\n")
         self.assertIn("$realip_remote_addr",http)
         self.assertNotIn("$http_x_forwarded_for",http)
+        self.assertIn("map $realip_remote_addr $smartbox_ota_bootstrap_allowed",http)
         self.assertEqual(2,server.count('proxy_set_header Authorization "";'))
         self.assertIn("location = /firmware.bin",server);self.assertIn("location = /version.json",server)
         with self.assertRaises(ValueError):m.render({"allowed_cidrs":[]},'',peer="$http_x_forwarded_for")
         with self.assertRaises(ValueError):m.render({"allowed_cidrs":[]},'',auth_file=Path("/bad;path"))
     def test_public_exception_is_one_ipv4_host_and_trace_bound(self):
         m=load()
-        self.assertEqual("8.8.8.8/32 1;\n",m.bootstrap_entry("8.8.8.8"))
+        self.assertEqual("8.8.8.8 1;\n",m.bootstrap_entry("8.8.8.8"))
         for address in ("192.168.23.1","127.0.0.1","100.90.1.2","2001:4860:4860::8888","8.8.8.0/24"):
             with self.subTest(address=address),self.assertRaises(ValueError):m.bootstrap_entry(address)
         with tempfile.TemporaryDirectory() as tmp:

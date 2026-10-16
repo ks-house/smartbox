@@ -334,3 +334,8 @@ requires a separate explicit public-source decision; it sends no device command.
 Same-public-IP users can download during an authorized window, so use a private
 onsite route when that source cannot be trusted. Firmware download, install,
 reboot, fresh idle and an authenticated remote check are distinct acceptance.
+
+
+### Authenticated OTA installer compatibility (2026-10-16)
+
+The measured NAS candidate failed before policy activation when the volatile bootstrap directory was absent. The single-public-peer gate now uses an exact-address nginx map, whose optional include tolerates absent runtime files. The closed fixture must exercise that initial state. The approved single-host, maximum300s bootstrap scope is unchanged; source validation does not prove NAS application or device installation.
