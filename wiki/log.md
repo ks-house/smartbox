@@ -128,3 +128,8 @@ source_of_truth: true
 - PR11 exact-head35f40e0 hosted38850280716 SUCCESS including native/origin/C6; merged5549f53 under unchanged administrator update-lock policy. Both repositories openPR0. Main publication38850708755 is live; no new artifact/install claim.
 - Session01 actual cleanup/one late agent GET retained privately; zero device OTA requests, no LAN repair or broker/credential change. Updated immutable source/plan session02 uses a fresh report key and capture_ready gate; operator authentication requested once because nginx is outside fixed broker authority.
 - Local22/13/C6 and links/whitespace PASS; primary wiki/hardware evidence append-only updated. HA HTTP200/Backend ready12 postcheck PASS; HA automatic restart/named-account/fresh MQTT acceptance and328 cutover remain pending.
+
+
+- Main capture-gate publication38850708755 SUCCESS at5549f53. Strict-TLS Tailscale readback0.1.0-g5549f53 matches staged MQTT provisioning and diagnostic fields;1397376B/SHA256c7a97148c122b293ef2a1e04273732f0b6db925e181f21d6138553ad624ca4e2 preserved privately. Previous7612 publication metadata retained before updating expected version.
+- Post-publication outside probe38851138739 SUCCESS with build/deploy skipped. Broker key-only readback remains dedbac762b24a73c91af719eb0a6611f41e177d75b63b20e6949cafe5e216df0 and both anonymous directivestrue. No device OTA or operating credential cutover this turn.
+- Current ordinary operator master is absent; updated session02 execution/readback is not confirmed. One fresh authenticated invocation is requested; do not assume execution from elapsed time, bypass sudo/key limits or claim installed-device acceptance. Both repositories openPR0; SmartBox issue7 checkpoint updated in place.
