@@ -1,5 +1,10 @@
 """Opt-in actual nginx HTTP policy and config-prefix regressions; no NAS access."""
 import importlib.util
+import http.client
+import json
+import socket
+import sys
+import time
 import os
 from pathlib import Path
 import shlex
@@ -63,6 +68,76 @@ class NginxOriginTest(unittest.TestCase):
                      "100.64.0.0/10","192.168.23.0/24"]},work))
             finally:
                 subprocess.run(["docker","rm","-f",name],capture_output=True,timeout=30)
+
+    def test_conditional_trace_records_real_status_and_omits_other_paths_queries(self):
+        for module_name in ("install_ota_origin_guard","update_ota_origin_guard","observe_ota_origin"):
+            spec=importlib.util.spec_from_file_location(module_name,ROOT/"ops"/(module_name+".py"))
+            module=importlib.util.module_from_spec(spec);sys.modules[module_name]=module;spec.loader.exec_module(module)
+        trace=module
+        with tempfile.TemporaryDirectory(prefix="smartbox-trace-") as tmp:
+            work=Path(tmp);name="smartbox-trace-"+uuid.uuid4().hex[:12]
+            sock=work/"http.sock";log=work/"requests.jsonl"
+            config=("pid "+str(work/"nginx.pid")+";\nerror_log "+str(work/"error.log")+";\n"
+              "events {} http {\naccess_log off;\n"+
+              "".join(key+" "+str(work/name)+";\n" for key,name in [
+                  ("client_body_temp_path","client-temp"),("proxy_temp_path","proxy-temp"),
+                  ("fastcgi_temp_path","fastcgi-temp"),("uwsgi_temp_path","uwsgi-temp"),
+                  ("scgi_temp_path","scgi-temp")])+
+              "geo $arg_client $allowed { default 0; 192.168.10.0/24 1; }\n"
+              'map "$uri:$allowed" $rejected { default 0; "/firmware.bin:0" 1; }\n'+
+              trace.http_config(peer="$arg_client")+
+              "server { listen unix:"+str(sock)+";\n"+trace.server_config(log)+
+              'if ($rejected) { return 403; }\nlocation / { return 200 "fixture"; }\n}}\n')
+            path=work/"nginx.conf";path.write_text(config)
+            args=["docker","run","--rm","--name",name,"--network","none",
+                  "--user",str(os.getuid())+":"+str(os.getgid()),"-v",tmp+":"+tmp,
+                  "--entrypoint","nginx",IMAGE,"-p",tmp+"/","-c",str(path),"-g","daemon off;"]
+            process=subprocess.Popen(args,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
+            class UnixHTTP(http.client.HTTPConnection):
+                def connect(self):
+                    self.sock=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
+                    self.sock.settimeout(3);self.sock.connect(str(sock))
+            try:
+                until=time.monotonic()+10
+                while not sock.exists() and time.monotonic()<until:
+                    if process.poll() is not None:raise RuntimeError(process.stderr.read().decode()[-1000:])
+                    time.sleep(0.05)
+                self.assertTrue(sock.exists())
+                cases=[("/version.json?client=192.168.23.27&token=NEVER_LOG",200,"ESP32HTTPClient"),
+                       ("/firmware.bin?client=192.168.23.27",403,"ESP32-http-Update"),
+                       ("/firmware.bin?client=203.0.113.9",403,'ESP32-http-Update"escaped'),
+                       ("/firmware/target.sgkenc?token=NEVER_LOG",200,"ESP32HTTPClient"),
+                       ("/mobile/app.apk?token=NEVER_LOG",200,"fixture")]
+                for uri,expected,agent in cases:
+                    client=UnixHTTP("fixture",timeout=3)
+                    client.request("GET",uri,headers={"User-Agent":agent,"X-Forwarded-For":"192.168.23.27"})
+                    response=client.getresponse();response.read();client.close()
+                    self.assertEqual(expected,response.status)
+                until=time.monotonic()+3
+                while (not log.exists() or len(log.read_text().splitlines())<3) and time.monotonic()<until:
+                    time.sleep(0.05)
+                rows=trace.read_records(log)
+                self.assertEqual(3,len(rows))
+                self.assertNotIn("NEVER_LOG",log.read_text())
+                self.assertEqual("192.168.23.0/24",trace.repair_candidate(
+                    rows,["192.168.10.0/24","192.168.23.0/24"],["192.168.10.0/24"]))
+                self.assertTrue(all(row["uri"] in ("/version.json","/firmware.bin") for row in rows))
+                self.assertTrue(any(row["peer"]=="203.0.113.9" for row in rows))
+            finally:
+                subprocess.run(["docker","rm","-f",name],capture_output=True,timeout=30)
+                if process.poll() is None:process.terminate()
+                process.communicate(timeout=15)
+
+    def test_trace_loaders_are_harmless_after_volatile_files_disappear(self):
+        with tempfile.TemporaryDirectory(prefix="smartbox-trace-reboot-") as tmp:
+            path=Path(tmp)/"nginx.conf"
+            path.write_text("events {} http { access_log off; include "+tmp+
+                "/missing-runtime/http.*.conf; server { listen 127.0.0.1:8080; include "+
+                tmp+"/missing-runtime/server.*.conf; return 204; } }")
+            result=subprocess.run(["docker","run","--rm","--network","none",
+                "-v",tmp+":"+tmp,"--entrypoint","nginx",IMAGE,"-t","-c",str(path)],
+                capture_output=True,text=True,timeout=30)
+            self.assertEqual(0,result.returncode,result.stderr)
 
     def test_relative_includes_need_original_main_config_directory(self):
         with tempfile.TemporaryDirectory(prefix="smartbox-nginx-prefix-") as tmp:

@@ -76,3 +76,30 @@ source_of_truth: true
 - Existing native OTA relay-isolation tests and required target build will be rerun; no redundant implementation-mirroring tests added for metadata-only fields. Installed failure/recovery and physical gates remain open. The pending immutable nginx operator launcher is unchanged.
 
 - Local native13, Python12 (including real nginx) and target build PASS. Replaced deprecated volatile increment with equivalent explicit read/add/write and final target build passes without that warning. Generated version-header bytes restored. Actual emitted fields on the installed device remain unverified until protected OTA route application and installation.
+
+
+## [2026-10-16] code | Merge bounded SmartBox OTA remote diagnostics
+
+- SmartBoxPR9/d5fd84b passes exact-head hosted CI38827586073 (native/origin/target) and mergesb41387e. Main publication38828134589 is queued/live; runtime diagnostic emission is not yet claimed. Existing private-network update launcher source/plan remain unchanged.
+- Earlier range-updater main06cd5e0 publication38826769704 completes SUCCESS. Strict-TLS private readback matches version0.1.0-g06cd5e0 and staged MQTT provisioning; that image intentionally lacks the new diagnostic fields. New publication must be read back separately.
+- Current verified Backend Target health remains525/boot911/IDLE/OFF with advisory VALID, pending0/gapfalse. The ordinary operator master is absent, so nginx application is not confirmed. No second device OTA, broker cutover, arbitrary shell or new administrator prompt.
+
+- Current diagnostic main publisher38828134589 confirmed live againstb41387e; native/origin steps observed separately from firmware publication/installation. No source-only or CI success is treated as an emitted installed-device diagnostic.
+
+
+## [2026-10-16] test | Verify diagnostic publication and preserve installed-device boundary
+
+- Main diagnostic publisher38828134589 SUCCESS atb41387e. Strict-TLS private NAS readback0.1.0-gb41387e has matching staged MQTT provisioning and compiled diagnostic fields; SHA256412d0d6d2186f636c14ce99bba37c4d2d1bd34fcf78decfbcc566b2d26e3b9d9. Independent post-publication external HEAD/GET probe38828916009 PASS; its publication job is skipped.
+- Fresh subscribe-only observation receives retained advertised0.1.0-g632f004 and nonretained IDLE telemetry without ota fields. New device install/emission remains unproved, and the ordinary operator master is absent. No second OTA, physical command or operating broker change was sent.
+- One-time nginx LAN update result is still required before guarded device installation and version-bound broker restaging/cutover. This is an outstanding external dependency, not objective completion; no repeated administrator question or goal pause/completion request.
+
+## [2026-10-16] fix | Measure OTA origin requests after applied LAN correction
+
+- Owner applied the pinned LAN update at01:58UTC; independent receipt guard hashes match. Full config/30 private behavior cases pass; separate outside probe38838309358 succeeds. One post-change OTA request still leaves advertised632f004 with fresh IDLE and no ota object. NAS has two private NIC subnets; actual device HTTP peer/status is not yet observed.
+- Add root-authenticated, hash-bound OTA-only request observation with600s activation wait,150..300s active window, private raw log, redacted reports and exact cleanup/watchdog. Optional repair allows one measured403 ESP32 request on one missing narrow private NAS interface LAN; no public/unknown/ambiguous CIDR or persistent SSH/sudo authority. Reboot-safe optional loaders and actual-nginx query/path/status tests included.
+- HA outage isolated to stopped existing homeassistant container. Starting it restores external/direct HTTP200 and strict-TLS WebSocket101/auth_required; owner confirms phone access. Automatic restart remains disabled and stop cause is not proven. Newly active anonymous HA MQTT must be included before broker cutover.
+- Initial new isolated trace fixture failed on container temp-directory permissions; moved its five cache paths into the test-owned temp directory. Final real-nginx/Python19 PASS before the final report/candidate guard adjustment; rerun plus required native/target builds follow. No trace installed, additional device request, broker cutover or physical acceptance claimed.
+
+- Final local Python19 including five actual-nginx regressions PASS, native13 PASS and ESP32-C6 build PASS (RAM62172B/flash1343626B). Generated version header restored. Captured immutable operator launcher observe-ota-origin.sh prepared privately and syntax/AST checked; no NAS trace activation or additional device command performed.
+
+- Evidence clarification: HA container/HTTP/WebSocket restoration is verified; its prior anonymous MQTT configuration is captured, but a fresh HA-specific MQTT connection is not independently proven. auth_required proves the TLS WebSocket authentication entry, not a completed HA API login. Both remain separate from broker cutover readiness.
