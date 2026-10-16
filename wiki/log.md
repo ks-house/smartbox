@@ -62,3 +62,17 @@ source_of_truth: true
 - Python12 PASS, including real nginx additional-LAN30 HTTP cases, existing28 HTTP cases, original-directory regression, stale binding refusal and exact postcheck rollback. Native/target gates follow. Actual NAS application/device HTTP result remains pending; no broker cutover or actuator command.
 
 - Final local native13 PASS and ESP32-C6 target build PASS after documentation changes; generated git_version bytes restored. Final Python12 PASS after enforcing root-only backup/include parent ownership. Prepared immutable source/plan operator launcher update-ota-network.sh with private failure receipt; no NAS apply or privilege broadening yet.
+
+## [2026-10-16] compile | Merge guarded device-network updater and rollout evidence
+
+- SmartBoxPR8 merged after exact-head hosted native/origin/target CI38826365345 PASS; source-only updater and private immutable operator launcher are ready. Gatekeeper evidencePR440 mergedc8cb880 after trusted-policy PASS. Both repositories have no open PR at this checkpoint.
+- Native13, Python12 and ESP32-C6 local gates PASS. Administrator application of update-ota-network.sh remains pending because nginx lies outside the six fixed broker commands. No broker cutover or second SmartBox OTA request before that protected route changes and is verified.
+
+
+## [2026-10-16] code | Expose bounded last-attempt OTA diagnostics remotely
+
+- Existing OTA failure details are Serial-only, leaving the installed failure stage unobserved. Add advisory phase, boot-local attempt count, manifest HTTP/transport result, raw updater error and queued-request flag to the existing MQTT telemetry object. Do not send URLs, arbitrary error strings or credential data.
+- Reset numeric failure codes per started attempt and preserve its phase/result after IDLE recovery. Scheduling/TLS/version checks/relay isolation/watchdog ordering/partitions remain identical. Synchronous OTA still pauses periodic telemetry; these fields are last-attempt evidence, not download progress or durable reboot history.
+- Existing native OTA relay-isolation tests and required target build will be rerun; no redundant implementation-mirroring tests added for metadata-only fields. Installed failure/recovery and physical gates remain open. The pending immutable nginx operator launcher is unchanged.
+
+- Local native13, Python12 (including real nginx) and target build PASS. Replaced deprecated volatile increment with equivalent explicit read/add/write and final target build passes without that warning. Generated version-header bytes restored. Actual emitted fields on the installed device remain unverified until protected OTA route application and installation.

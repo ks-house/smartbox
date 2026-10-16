@@ -163,3 +163,11 @@ downloads are limited to the configured home LAN/Tailscale route, while the
 SmartBox's existing HTTPS updater remains available on that route.
 This is independent from the Smart Key APK update path.
 See [current migration status](../wiki/mqtt_broker_migration.md).
+
+
+### OTA 원격 진단
+
+MQTT smartbox/telemetry의 ota 항목에서 마지막 OTA 시도의 단계와 결과를 확인할 수 있습니다.
+manifest_http_code는 버전 파일 요청 결과이며 updater_error는 펌웨어 업데이터의 오류 번호입니다.
+상세 필드와 검증 한계는 [브로커 전환 기록](../wiki/mqtt_broker_migration.md)을 참고하세요.
+새 버전 재접속과 대기 상태 확인 전에는 OTA 설치 완료로 판단하지 않습니다.

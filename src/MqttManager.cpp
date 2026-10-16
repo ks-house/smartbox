@@ -371,6 +371,16 @@ void MqttManager::publishTelemetry() {
     doc["distance_cm"] = m_controller.getDistance();
     doc["wifi_rssi"] = WiFi.RSSI();
     doc["free_heap"] = ESP.getFreeHeap();
+    // Bounded numeric diagnostics only; never publish OTA URLs or raw errors.
+    const auto diagnostics = AutoOtaManager::getDiagnostics();
+    JsonObject ota = doc["ota"].to<JsonObject>();
+    ota["state"] = AutoOtaManager::getOtaStateString();
+    ota["phase"] = diagnostics.phase;
+    ota["attempts"] = diagnostics.attempts;
+    ota["manifest_http_code"] = diagnostics.manifestHttpCode;
+    ota["updater_error"] = diagnostics.updaterError;
+    ota["request_pending"] = diagnostics.requestPending;
+
 
     String output;
     serializeJson(doc, output);
