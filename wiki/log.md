@@ -103,3 +103,22 @@ source_of_truth: true
 - Final local Python19 including five actual-nginx regressions PASS, native13 PASS and ESP32-C6 build PASS (RAM62172B/flash1343626B). Generated version header restored. Captured immutable operator launcher observe-ota-origin.sh prepared privately and syntax/AST checked; no NAS trace activation or additional device command performed.
 
 - Evidence clarification: HA container/HTTP/WebSocket restoration is verified; its prior anonymous MQTT configuration is captured, but a fresh HA-specific MQTT connection is not independently proven. auth_required proves the TLS WebSocket authentication entry, not a completed HA API login. Both remain separate from broker cutover readiness.
+
+## [2026-10-16] compile | Merge bounded origin observer after exact-head validation
+
+- PR10 exact-head7137bf2 hosted38844587014 SUCCESS including native/origin/target; merged7612cd40 with existing administrator merge permission under unchanged update-lock policy. Both repositories openPR0. Local final native13/C6 builds PASS; generated version header restored and changed-document links/whitespace PASS.
+- Main publication38844978553 is live; independent outside refusal job passes. Actual new artifact readback is pending. Fresh read-only MQTT still advertises632f004 and sends nonretained telemetry without ota fields. No further OTA or broker cutover.
+- Immutable source/plan operator launcher prepared and requested once because six-command broker key intentionally lacks nginx authority. Before any device request, require active trace and actual local200 records for both OTA paths, terminal publication/readback and fresh safe state. Bounded observer is not yet installed; HA remains restored with restart-policy/MQTT-readiness follow-up441.
+
+
+- Main SmartBox publication38844978553 completesSUCCESS at7612cd40. Independent strict-TLS Tailscale GET readback matches0.1.0-g7612cd4, staged private MQTT provisioning and compiled diagnostic markers; image1397376B/SHA256e47ec307b93030d3b716437ea4d381e06916a48d7983a72b2b4c60be48153a1c preserved privately. Prior published metadata retained before refreshing expected version.
+- Post-publication independent external probe38845548162 completesSUCCESS; its build/deploy job is skipped. Both OTA paths remain available through verified Tailscale TLS while anonymous external firmware HEAD/GET is denied. Device installation is still unconfirmed and no new OTA was sent. Temporary operator session is absent; pending bounded nginx trace requires the requested authenticated invocation. HA restart-policy441, fresh HA MQTT/named-account adoption and328 cutover/rollback remain open.
+
+## [2026-10-16] fix | Require measured capture readiness before device OTA
+
+- Owner ran observer01; pinned waiting report and live worker/watchdog verified. Agent activated trace, but initial local HEAD records were absent, so no device request was sent. A later self-check GET/version200 was captured; exact cause of initial missing HEAD records remains unproved. Normal cleanup finished04:09UTC with trace_cleaned=true, no repair/credentials/broker change.
+- Require successful loopback HEAD log records for both paths before active/capture_ready. Retry admission is bounded15s, failure reports safe rows/log size/stage and cleans, and watchdog budget includes admission/cleanup. Ordinary sudo cache is unavailable; do not broaden the six-command key.
+- Existing Synology403 error_page redirects change uri at log time. Preserve fixed original OTA path labels through immutable-request mapping without serializing queries. Add real nginx HEAD/GET/403-redirect and delayed-admission regressions; loopback/tailnet scopes no longer reported public.
+- Python22 PASS before final failure-summary/scope adjustment. Initial test expectations incorrectly assumed no admission retry and immutable fixture query variables; fixed the fixture to use an immutable peer map and count real probe attempts. Final Python/native/target and links/whitespace gates follow. Installed SmartBox failure and broker cutover remain open.
+
+- Final Python22 with real nginx HEAD/error-redirect/admission cases, native13 and ESP32-C6 build PASS (RAM62172B/flash1343626B). Generated version header restored. Actual observer01 cleanup receipt retained; zero device OTA requests. New captured operator session02 is prepared only after source validation; source publication and NAS execution remain separate.

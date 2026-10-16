@@ -28,8 +28,10 @@ class OriginTraceTest(unittest.TestCase):
   self.assertIsNone(m.repair_candidate(rows,["192.168.0.0/16"],[]))
  def test_trace_omits_query_tokens_and_untrusted_forwarded_headers(self):
   m=load();text=m.http_config()
-  self.assertIn("$realip_remote_addr",text);self.assertIn('"uri":"$uri"',text)
-  for excluded in ["$request_uri","$args","$http_authorization","$http_x_forwarded_for"]:
+  self.assertIn("$realip_remote_addr",text);self.assertIn('"uri":"$smartbox_ota_trace_path"',text)
+  self.assertEqual(1,text.count("$request_uri"))
+  self.assertNotIn("$request_uri",text.split("log_format",1)[1])
+  for excluded in ["$args","$http_authorization","$http_x_forwarded_for"]:
    self.assertNotIn(excluded,text)
   with self.assertRaises(ValueError):m.http_config("$http_x_forwarded_for")
   with self.assertRaises(ValueError):m.server_config(Path("/tmp/bad;return"))
@@ -41,6 +43,25 @@ class OriginTraceTest(unittest.TestCase):
    rows=m.read_records(p);summary=m.summary(rows,["192.168.23.0/24"])
    self.assertEqual(1,len(rows));self.assertEqual("PUBLIC",summary[0]["peer_scope"])
    self.assertNotIn("203.0.113.1",json.dumps(summary));self.assertNotIn("secret-extra",json.dumps(summary))
+ def test_capture_waits_for_actual_loopback_head_records(self):
+  m=load()
+  rows=[{"peer":"127.0.0.1","uri":uri,"status":200,"method":"HEAD"}
+        for uri in ("/version.json","/firmware.bin")]
+  with patch.object(m.guard,"head_local") as head, patch.object(m,"read_records",side_effect=[[],rows]), patch.object(m.time,"sleep"):
+   result=m.capture_self_check({},Path("unused"),timeout=3)
+  self.assertTrue(result["actual_loopback_log_verified"]);self.assertEqual(4,head.call_count)
+ def test_capture_failure_never_qualifies_get_or_public_records(self):
+  m=load()
+  rows=[{"peer":"203.0.113.1","uri":"/firmware.bin","status":200,"method":"HEAD"},
+        {"peer":"127.0.0.1","uri":"/version.json","status":200,"method":"GET"}]
+  with patch.object(m.guard,"head_local"), patch.object(m,"read_records",return_value=rows), patch.object(m.time,"sleep"), patch.object(m.time,"monotonic",side_effect=[0,0,20]):
+   with self.assertRaises(RuntimeError):m.capture_self_check({},Path("unused"),timeout=15)
+ def test_loopback_scope_is_not_reported_public(self):
+  m=load()
+  row={"peer":"127.0.0.1","uri":"/version.json","status":200,"method":"HEAD"}
+  result=m.summary([row],[])[0]
+  self.assertEqual("LOOPBACK",result["peer_scope"]);self.assertEqual("HEAD",result["method"])
+  self.assertEqual("TAILNET",m.summary([{**row,"peer":"100.95.1.2"}],[])[0]["peer_scope"])
  def test_cleanup_preserves_concurrent_changes_and_is_idempotent(self):
   m=load()
   class File:
