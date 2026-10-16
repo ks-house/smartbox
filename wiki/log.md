@@ -143,3 +143,9 @@ source_of_truth: true
 - No NAS auth install, public exception, broker cutover or extra device command; operator consent/authentication remains required after reviewable source/artifact preparation. Native/C6 final gates follow; relay/FSM/partition/scheduling contracts unchanged.
 
 - Final Python38 PASS includes296 real authenticated-policy HTTP cases across normal/open/expired fixtures, GET/HEAD-only role checks, rollback and input ownership/privacy. Native13 and C6 build PASS (RAM62172B/flash1343884B). Generated version header restored. Fresh distinct256-bit OTA identity stored only in private files and GitHub repository secrets via stdin after auth presence/status checks; no values printed. NAS settings/bootstrap remain unmodified pending approval/authentication.
+
+## [2026-10-16] compile | Merge authenticated OTA after exact-head validation
+
+- PR12 exact-headfa3a7da hosted38866932060 SUCCESS including38 Python/actual-nginx, native13 and C6; merged98e5c52. Source captures/operator proposal match all six merged modules and pass shell/AST/argument-size checks. Fresh distinct OTA identity is registered privately through GitHub stdin; no raw credential output.
+- Read-only16:27 KST MQTT still connected632f004/fresh IDLE. Actual physical lid movement remains untested. NAS HTTP auth policy/public bootstrap and broker cutover are not applied; one proposed field /32 window needs explicit consent plus administrator authentication.
+- Main firmware publication/readback and external refusal are tracked separately from source merge; installed/reboot/authenticated-check acceptance remains pending.
