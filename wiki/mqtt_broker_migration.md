@@ -137,3 +137,47 @@ This is last-attempt advisory state, not continuous download progress or
 persistent crash/power-loss history. A reboot resets it; installation still
 requires new-version reconnect and fresh idle evidence. Installed-device error
 and recovery verification remains open under issue7.
+
+## 2026-10-16 applied route correction and bounded origin trace
+
+The owner applied the device-LAN update at01:58UTC. Independent receipt readback
+matches both pinned guard hashes; the full nginx configuration and30 private
+HTTP cases pass. Independent external probe38838309358 passes after the change.
+Its receipt's external_refusal_verified=false is an explicit local-tool scope
+boundary, superseded only by that separate external probe.
+
+One further OTA request after this verified change still produced only the old
+advertised0.1.0-g632f004 and fresh IDLE telemetry, without the new ota object.
+The observed NAS interfaces have two private LANs; reported device LAN alone
+does not establish the HTTP peer seen by nginx. Do not guess another allowed
+range or repeat OTA solely because the observation window expired.
+
+ops/observe_ota_origin.py adds an operator-authenticated bounded trace for only
+/version.json and /firmware.bin. It verifies the existing routing/guard/gateway
+hash binding and the whole candidate nginx tree, then waits up to600s for an
+owner-readable activation flag. The active observation lasts150..300s. Root-only
+logs omit query strings, authorization and forwarded headers; owner reports
+contain status, URI, ESP32-agent boolean and a network scope, without peer
+addresses or arbitrary agent strings. It sends no device or actuator command.
+
+Optional --repair-private-nas-lan permits one correction only after a real403
+binary request from an ESP32 agent on exactly one missing RFC1918 NAS interface
+LAN with a /24 or narrower mask. Public, unknown, broad and ambiguous ranges
+are rejected. The existing updater performs full nginx/HTTP/rollback checks and
+preserves other routes and the broker binding. This option is explicit, not the
+default. User-agent matching supplements the measured socket peer; it is not
+authentication. Installed-version acceptance and outside refusal remain separate.
+
+Trace includes use volatile runtime files behind optional wildcard loaders.
+Normal/error cleanup removes only exact captured bytes and reloads; a detached
+watchdog retries cleanup after the maximum session lifetime. Missing volatile
+files after reboot leave harmless loaders. Concurrent changes are preserved
+rather than deleted. A root-private raw log is retained as incident evidence.
+The six fixed SSH broker commands are unchanged; this tool needs a one-time
+operator-authenticated invocation and does not grant ongoing nginx privileges.
+
+Home Assistant was independently found stopped, and starting its existing
+container restored direct/external HTTP and authenticated WebSocket entry.
+The owner confirmed phone access. Automatic restart is still disabled; exact
+stop cause and recurrence prevention remain open. HA is now an active anonymous
+MQTT client and must be prepared before broker authentication cutover.

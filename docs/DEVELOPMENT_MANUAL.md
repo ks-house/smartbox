@@ -302,3 +302,14 @@ Use the pinned administrator-only updater in
 device LAN differs from the initial origin guard. Public downloads must remain
 denied and the path guard/TLS/relay/partition contracts remain intact. Source and
 isolated checks do not establish a successful installed-device download.
+
+### Bounded installed-device OTA origin diagnosis
+
+When a verified range correction still leaves the old device installed, use
+[the migration runbook](../wiki/mqtt_broker_migration.md) and
+[the bounded observer](../ops/observe_ota_origin.py) to measure actual HTTP peer
+scope/status before another correction. Observation is the default; one measured
+private NAS LAN repair is an explicit option. Preserve outside firmware refusal,
+captured routing hashes, exact cleanup and all OTA/relay/partition contracts.
+The observer neither grants persistent administrator access nor sends device
+commands. Device installation must still be read back independently.
