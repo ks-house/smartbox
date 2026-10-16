@@ -76,3 +76,12 @@ source_of_truth: true
 - Existing native OTA relay-isolation tests and required target build will be rerun; no redundant implementation-mirroring tests added for metadata-only fields. Installed failure/recovery and physical gates remain open. The pending immutable nginx operator launcher is unchanged.
 
 - Local native13, Python12 (including real nginx) and target build PASS. Replaced deprecated volatile increment with equivalent explicit read/add/write and final target build passes without that warning. Generated version-header bytes restored. Actual emitted fields on the installed device remain unverified until protected OTA route application and installation.
+
+
+## [2026-10-16] code | Merge bounded SmartBox OTA remote diagnostics
+
+- SmartBoxPR9/d5fd84b passes exact-head hosted CI38827586073 (native/origin/target) and mergesb41387e. Main publication38828134589 is queued/live; runtime diagnostic emission is not yet claimed. Existing private-network update launcher source/plan remain unchanged.
+- Earlier range-updater main06cd5e0 publication38826769704 completes SUCCESS. Strict-TLS private readback matches version0.1.0-g06cd5e0 and staged MQTT provisioning; that image intentionally lacks the new diagnostic fields. New publication must be read back separately.
+- Current verified Backend Target health remains525/boot911/IDLE/OFF with advisory VALID, pending0/gapfalse. The ordinary operator master is absent, so nginx application is not confirmed. No second device OTA, broker cutover, arbitrary shell or new administrator prompt.
+
+- Current diagnostic main publisher38828134589 confirmed live againstb41387e; native/origin steps observed separately from firmware publication/installation. No source-only or CI success is treated as an emitted installed-device diagnostic.
