@@ -313,3 +313,9 @@ private NAS LAN repair is an explicit option. Preserve outside firmware refusal,
 captured routing hashes, exact cleanup and all OTA/relay/partition contracts.
 The observer neither grants persistent administrator access nor sends device
 commands. Device installation must still be read back independently.
+
+The observer's active state requires actual successful loopback HEAD log records
+for both OTA paths. Do not trigger the device during waiting_for_agent or
+verifying_capture. A ready session reports capture_ready=true and verified paths.
+Error-page redirects retain only a fixed original OTA path label in the log;
+raw request queries remain excluded.

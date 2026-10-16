@@ -27,13 +27,20 @@ PRIVATE_RANGES = tuple(ipaddress.ip_network(x) for x in
 
 
 def http_config(peer="$realip_remote_addr"):
-    if peer not in ("$realip_remote_addr", "$arg_client"):
+    if peer not in ("$realip_remote_addr", "$fixture_peer"):
         raise ValueError("fixed peer variable required")
-    return ('map $uri $smartbox_ota_trace_enabled {\n'
-            ' default 0;\n /firmware.bin 1;\n /version.json 1;\n}\n'
+    # $uri changes during Synology error_page redirects. Map the immutable
+    # request to fixed path labels, never serialize its raw query string.
+    return ('map $request_uri $smartbox_ota_trace_path {\n'
+            ' default "";\n'
+            ' ~^/firmware[.]bin(?:[?]|$) /firmware.bin;\n'
+            ' ~^/version[.]json(?:[?]|$) /version.json;\n}\n'
+            'map $smartbox_ota_trace_path $smartbox_ota_trace_enabled {\n'
+            ' default 1;\n "" 0;\n}\n'
             'log_format smartbox_ota_trace escape=json '
             '\'{"at":"$msec","peer":"' + peer +
-            '","uri":"$uri","status":$status,"agent":"$http_user_agent"}\';\n')
+            '","uri":"$smartbox_ota_trace_path","method":"$request_method",'
+            '"status":$status,"agent":"$http_user_agent"}\';\n')
 
 
 def server_config(logfile):
@@ -115,11 +122,36 @@ def summary(records, networks):
             continue
         matching = [n for n in networks if peer.version == 4 and peer in ipaddress.ip_network(n)]
         result.append({"at": row.get("at"), "uri": row.get("uri"),
-                       "status": row.get("status"), "esp32_agent":
+                       "status": row.get("status"), "method":
+                       row.get("method") if row.get("method") in ("HEAD", "GET") else "OTHER", "esp32_agent":
                        str(row.get("agent", "")).lower().startswith("esp32"),
-                       "peer_scope": matching[0] if len(matching) == 1 else
+                       "peer_scope": "LOOPBACK" if peer.is_loopback else
+                       "TAILNET" if peer.version == 4 and peer in ipaddress.ip_network("100.64.0.0/10") else
+                       matching[0] if len(matching) == 1 else
                        ("PRIVATE_UNMATCHED" if any(peer.version == n.version and peer in n for n in PRIVATE_RANGES) else "PUBLIC")})
     return result
+
+
+def capture_self_check(origin, logfile, timeout=15):
+    """Do not announce active until real loopback HEADs reach the new log."""
+    deadline = time.monotonic() + timeout
+    required = {"/version.json", "/firmware.bin"}
+    while time.monotonic() < deadline:
+        for uri in sorted(required):
+            guard.head_local(origin, uri)
+        observed = set()
+        for row in read_records(logfile):
+            try:
+                loopback = ipaddress.ip_address(row.get("peer", "")).is_loopback
+            except ValueError:
+                loopback = False
+            if loopback and row.get("method") == "HEAD" and row.get("status") == 200:
+                observed.add(row["uri"])
+        if required.issubset(observed):
+            return {"verified_paths": sorted(required), "method": "HEAD",
+                    "actual_loopback_log_verified": True}
+        time.sleep(0.5)
+    raise RuntimeError("new trace did not record both successful local HEAD paths")
 
 
 def report(path, owner, data):
@@ -230,7 +262,7 @@ def start_trace(update, seconds=300, repair_private=False):
     networks = interface_networks()
     initial = {"state":"waiting_for_agent", "wait_seconds":600, "seconds":seconds,
                "repair_private_enabled":repair_private, "nas_lans":networks,
-               "requests":[], "trace_cleaned":True, "credentials_changed":False,
+               "requests":[], "capture_ready":False, "trace_cleaned":True, "credentials_changed":False,
                "broker_changed":False}
     report(response, owner, initial)
     pid = os.fork()
@@ -245,7 +277,7 @@ def start_trace(update, seconds=300, repair_private=False):
             watchdog = os.fork()
             if watchdog == 0:
                 try:
-                    time.sleep(600+seconds+15)
+                    time.sleep(600+seconds+90)
                     remove_exact(files)
                 finally:
                     os._exit(0)
@@ -279,7 +311,10 @@ def start_trace(update, seconds=300, repair_private=False):
                     for path, content in files:
                         guard.create(path,content);written.append((path,content))
                     guard.run([guard.NGINX,"-t"]);guard.run([guard.NGINX,"-s","reload"])
-                    for uri in ("/version.json","/firmware.bin"):guard.head_local(origin,uri)
+                    state["state"] = "verifying_capture"
+                    report(response,owner,state)
+                    state["capture_check"] = capture_self_check(origin,logfile)
+                    state["capture_ready"] = True
                     installed = True
                 except Exception:
                     remove_exact(written);installed = False;state["trace_cleaned"] = True;raise
@@ -301,7 +336,13 @@ def start_trace(update, seconds=300, repair_private=False):
                     time.sleep(1)
                 state["state"] = "finished"
         except Exception as error:
-            state.update(state="failed",error_type=type(error).__name__)
+            failed_stage = state["state"]
+            state.update(state="failed",failed_stage=failed_stage,error_type=type(error).__name__)
+            try:
+                state["requests"] = summary(read_records(logfile),networks)
+                state["capture_log_bytes"] = logfile.stat().st_size
+            except OSError:
+                state["capture_log_readable"] = False
             guard.create(work/"error.json",json.dumps({"error_type":type(error).__name__,
                          "message":str(error),"failed_query":guard.FAILED_QUERY}))
         finally:

@@ -182,3 +182,26 @@ The owner confirmed phone access. Automatic restart is still disabled; exact
 stop cause and recurrence prevention remain open. HA is running again with previously captured anonymous MQTT configuration;
 verify its actual current MQTT connection and adopt its named account before
 broker authentication cutover.
+
+## Capture admission and Synology error redirects
+
+The first operator trace activated at04:04UTC and cleaned itself at04:09UTC.
+Its initial two local HEAD probes did not appear in the report, while a later
+agent GET of /version.json was recorded200. No device OTA was sent and no LAN
+repair occurred. Actual capture works, but the initial missing records do not
+prove whether reload timing, request handling or another transient caused it.
+
+The observer now enters verifying_capture after reload and retries strict-TLS
+local HEADs within a bounded15s admission window. It announces active only after
+the root-private log contains successful loopback HEADs for both paths; the
+report exposes capture_ready and verified-path evidence. Failure preserves
+redacted captured rows, log size and failed stage, then cleans exact trace files.
+The watchdog budget includes that admission and cleanup time.
+
+Synology's existing403 error_page redirects can change $uri before access
+logging. A map of immutable request URI to fixed /version.json and /firmware.bin
+labels preserves the original OTA path through those redirects; the raw request
+URI/query string is never serialized. The real-nginx regression includes HEAD,
+GET,403 internal redirects, spoofed forwarded headers and query-token omission.
+Reports now distinguish LOOPBACK/TAILNET from public peers. No routing, credential,
+TLS, relay or persistent SSH permission contract is changed.

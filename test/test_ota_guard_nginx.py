@@ -11,6 +11,7 @@ import shlex
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -83,11 +84,13 @@ class NginxOriginTest(unittest.TestCase):
                   ("client_body_temp_path","client-temp"),("proxy_temp_path","proxy-temp"),
                   ("fastcgi_temp_path","fastcgi-temp"),("uwsgi_temp_path","uwsgi-temp"),
                   ("scgi_temp_path","scgi-temp")])+
-              "geo $arg_client $allowed { default 0; 192.168.10.0/24 1; }\n"
+              'map $request_uri $fixture_peer { default ""; ~[?&]client=(?<fixture_ip>[0-9.]+) $fixture_ip; }\n'
+              "geo $fixture_peer $allowed { default 0; 127.0.0.1/32 1; 192.168.10.0/24 1; }\n"
               'map "$uri:$allowed" $rejected { default 0; "/firmware.bin:0" 1; }\n'+
-              trace.http_config(peer="$arg_client")+
+              trace.http_config(peer="$fixture_peer")+
               "server { listen unix:"+str(sock)+";\n"+trace.server_config(log)+
-              'if ($rejected) { return 403; }\nlocation / { return 200 "fixture"; }\n}}\n')
+              'error_page 403 /site-error;\nif ($rejected) { return 403; }\n'
+              'location = /site-error { return 403 "denied"; }\nlocation / { return 200 "fixture"; }\n}}\n')
             path=work/"nginx.conf";path.write_text(config)
             args=["docker","run","--rm","--name",name,"--network","none",
                   "--user",str(os.getuid())+":"+str(os.getgid()),"-v",tmp+":"+tmp,
@@ -103,21 +106,34 @@ class NginxOriginTest(unittest.TestCase):
                     if process.poll() is not None:raise RuntimeError(process.stderr.read().decode()[-1000:])
                     time.sleep(0.05)
                 self.assertTrue(sock.exists())
-                cases=[("/version.json?client=192.168.23.27&token=NEVER_LOG",200,"ESP32HTTPClient"),
-                       ("/firmware.bin?client=192.168.23.27",403,"ESP32-http-Update"),
-                       ("/firmware.bin?client=203.0.113.9",403,'ESP32-http-Update"escaped'),
-                       ("/firmware/target.sgkenc?token=NEVER_LOG",200,"ESP32HTTPClient"),
-                       ("/mobile/app.apk?token=NEVER_LOG",200,"fixture")]
-                for uri,expected,agent in cases:
+                def local_head(plan, uri):
                     client=UnixHTTP("fixture",timeout=3)
-                    client.request("GET",uri,headers={"User-Agent":agent,"X-Forwarded-For":"192.168.23.27"})
+                    client.request("HEAD",uri+"?client=127.0.0.1")
+                    response=client.getresponse();response.read();client.close()
+                    self.assertEqual(200,response.status)
+                    return response.status
+                with patch.object(trace.guard,"head_local",side_effect=local_head) as head_probe:
+                    self.assertTrue(trace.capture_self_check({},log,timeout=3)["actual_loopback_log_verified"])
+                self_head_count=head_probe.call_count
+                cases=[("GET","/version.json?client=192.168.23.27&token=NEVER_LOG",200,"ESP32HTTPClient"),
+                       ("GET","/firmware.bin?client=192.168.23.27",403,"ESP32-http-Update"),
+                       ("GET","/firmware.bin?client=203.0.113.9",403,'ESP32-http-Update"escaped'),
+                       ("HEAD","/version.json?client=192.168.10.2",200,"fixture"),
+                       ("HEAD","/firmware.bin?client=192.168.10.2",200,"fixture"),
+                       ("HEAD","/firmware.bin?client=192.168.23.27",403,"ESP32-http-Update"),
+                       ("GET","/firmware/target.sgkenc?token=NEVER_LOG",200,"ESP32HTTPClient"),
+                       ("GET","/mobile/app.apk?token=NEVER_LOG",200,"fixture")]
+                for method,uri,expected,agent in cases:
+                    client=UnixHTTP("fixture",timeout=3)
+                    client.request(method,uri,headers={"User-Agent":agent,"X-Forwarded-For":"192.168.23.27"})
                     response=client.getresponse();response.read();client.close()
                     self.assertEqual(expected,response.status)
                 until=time.monotonic()+3
-                while (not log.exists() or len(log.read_text().splitlines())<3) and time.monotonic()<until:
+                while (not log.exists() or len(log.read_text().splitlines())<self_head_count+6) and time.monotonic()<until:
                     time.sleep(0.05)
                 rows=trace.read_records(log)
-                self.assertEqual(3,len(rows))
+                self.assertEqual(self_head_count+6,len(rows))
+                self.assertEqual(self_head_count+3,sum(row["method"]=="HEAD" for row in rows))
                 self.assertNotIn("NEVER_LOG",log.read_text())
                 self.assertEqual("192.168.23.0/24",trace.repair_candidate(
                     rows,["192.168.10.0/24","192.168.23.0/24"],["192.168.10.0/24"]))
