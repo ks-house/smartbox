@@ -177,7 +177,8 @@ The six fixed SSH broker commands are unchanged; this tool needs a one-time
 operator-authenticated invocation and does not grant ongoing nginx privileges.
 
 Home Assistant was independently found stopped, and starting its existing
-container restored direct/external HTTP and authenticated WebSocket entry.
+container restored direct/external HTTP and TLS-verified WebSocket auth_required entry.
 The owner confirmed phone access. Automatic restart is still disabled; exact
-stop cause and recurrence prevention remain open. HA is now an active anonymous
-MQTT client and must be prepared before broker authentication cutover.
+stop cause and recurrence prevention remain open. HA is running again with previously captured anonymous MQTT configuration;
+verify its actual current MQTT connection and adopt its named account before
+broker authentication cutover.

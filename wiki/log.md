@@ -101,3 +101,5 @@ source_of_truth: true
 - Initial new isolated trace fixture failed on container temp-directory permissions; moved its five cache paths into the test-owned temp directory. Final real-nginx/Python19 PASS before the final report/candidate guard adjustment; rerun plus required native/target builds follow. No trace installed, additional device request, broker cutover or physical acceptance claimed.
 
 - Final local Python19 including five actual-nginx regressions PASS, native13 PASS and ESP32-C6 build PASS (RAM62172B/flash1343626B). Generated version header restored. Captured immutable operator launcher observe-ota-origin.sh prepared privately and syntax/AST checked; no NAS trace activation or additional device command performed.
+
+- Evidence clarification: HA container/HTTP/WebSocket restoration is verified; its prior anonymous MQTT configuration is captured, but a fresh HA-specific MQTT connection is not independently proven. auth_required proves the TLS WebSocket authentication entry, not a completed HA API login. Both remain separate from broker cutover readiness.
