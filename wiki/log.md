@@ -122,3 +122,9 @@ source_of_truth: true
 - Python22 PASS before final failure-summary/scope adjustment. Initial test expectations incorrectly assumed no admission retry and immutable fixture query variables; fixed the fixture to use an immutable peer map and count real probe attempts. Final Python/native/target and links/whitespace gates follow. Installed SmartBox failure and broker cutover remain open.
 
 - Final Python22 with real nginx HEAD/error-redirect/admission cases, native13 and ESP32-C6 build PASS (RAM62172B/flash1343626B). Generated version header restored. Actual observer01 cleanup receipt retained; zero device OTA requests. New captured operator session02 is prepared only after source validation; source publication and NAS execution remain separate.
+
+## [2026-10-16] compile | Merge observed-capture gate and prepare session02
+
+- PR11 exact-head35f40e0 hosted38850280716 SUCCESS including native/origin/C6; merged5549f53 under unchanged administrator update-lock policy. Both repositories openPR0. Main publication38850708755 is live; no new artifact/install claim.
+- Session01 actual cleanup/one late agent GET retained privately; zero device OTA requests, no LAN repair or broker/credential change. Updated immutable source/plan session02 uses a fresh report key and capture_ready gate; operator authentication requested once because nginx is outside fixed broker authority.
+- Local22/13/C6 and links/whitespace PASS; primary wiki/hardware evidence append-only updated. HA HTTP200/Backend ready12 postcheck PASS; HA automatic restart/named-account/fresh MQTT acceptance and328 cutover remain pending.
