@@ -248,3 +248,8 @@ route avoids that exception. No public exception, NAS auth policy or credential
 cutover has been applied by this candidate work. Actual install/reboot/fresh
 health, authenticated remote check, external refusal and HA/client readiness
 remain required before broker activation.
+
+
+### Authenticated OTA installer compatibility (2026-10-16)
+
+The measured NAS candidate failed before policy activation when the volatile bootstrap directory was absent. The single-public-peer gate now uses an exact-address nginx map, whose optional include tolerates absent runtime files. The closed fixture must exercise that initial state. The approved single-host, maximum300s bootstrap scope is unchanged; source validation does not prove NAS application or device installation.
