@@ -7,6 +7,14 @@
 #include <HTTPUpdate.h>
 #include "secrets.h"
 
+// Older local headers retain private-network OTA; production CI requires these.
+#ifndef SECRET_OTA_USER
+#define SECRET_OTA_USER ""
+#endif
+#ifndef SECRET_OTA_PASS
+#define SECRET_OTA_PASS ""
+#endif
+
 #ifndef NATIVE_BUILD
 #include <esp_task_wdt.h>
 #endif
@@ -39,6 +47,7 @@ AutoOtaManager::OtaDiagnostics AutoOtaManager::getDiagnostics() {
 
 void AutoOtaManager::init(SmartBoxController& controller) {
     controllerPtr = &controller;
+    Serial.println("[OTA] HTTPS authentication client schema=1");
     lastScheduleCheck = 0;
     lastOtaRunTime = 0;
     otaForceRequested = false;
@@ -151,6 +160,10 @@ void AutoOtaManager::runOtaProcess(bool force) {
     
     HTTPClient http;
     http.begin(client, VERSION_URL);
+    http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+    if (SECRET_OTA_USER[0] && SECRET_OTA_PASS[0]) {
+        http.setAuthorization(SECRET_OTA_USER, SECRET_OTA_PASS);
+    }
     int httpCode = http.GET();
     otaManifestHttpCode = httpCode;
     
@@ -214,6 +227,8 @@ void AutoOtaManager::runOtaProcess(bool force) {
         client2.setCACert(SECRET_ROOT_CA_CERT); // TLS Root CA verification
         
         otaPhase = OTA_PHASE_FIRMWARE;
+        httpUpdate.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+        httpUpdate.setAuthorization(SECRET_OTA_USER, SECRET_OTA_PASS);
         t_httpUpdate_return ret = httpUpdate.update(client2, FIRMWARE_URL);
         
         if (ret == HTTP_UPDATE_FAILED) {

@@ -122,3 +122,24 @@ source_of_truth: true
 - Python22 PASS before final failure-summary/scope adjustment. Initial test expectations incorrectly assumed no admission retry and immutable fixture query variables; fixed the fixture to use an immutable peer map and count real probe attempts. Final Python/native/target and links/whitespace gates follow. Installed SmartBox failure and broker cutover remain open.
 
 - Final Python22 with real nginx HEAD/error-redirect/admission cases, native13 and ESP32-C6 build PASS (RAM62172B/flash1343626B). Generated version header restored. Actual observer01 cleanup receipt retained; zero device OTA requests. New captured operator session02 is prepared only after source validation; source publication and NAS execution remain separate.
+
+## [2026-10-16] compile | Merge observed-capture gate and prepare session02
+
+- PR11 exact-head35f40e0 hosted38850280716 SUCCESS including native/origin/C6; merged5549f53 under unchanged administrator update-lock policy. Both repositories openPR0. Main publication38850708755 is live; no new artifact/install claim.
+- Session01 actual cleanup/one late agent GET retained privately; zero device OTA requests, no LAN repair or broker/credential change. Updated immutable source/plan session02 uses a fresh report key and capture_ready gate; operator authentication requested once because nginx is outside fixed broker authority.
+- Local22/13/C6 and links/whitespace PASS; primary wiki/hardware evidence append-only updated. HA HTTP200/Backend ready12 postcheck PASS; HA automatic restart/named-account/fresh MQTT acceptance and328 cutover remain pending.
+
+
+- Main capture-gate publication38850708755 SUCCESS at5549f53. Strict-TLS Tailscale readback0.1.0-g5549f53 matches staged MQTT provisioning and diagnostic fields;1397376B/SHA256c7a97148c122b293ef2a1e04273732f0b6db925e181f21d6138553ad624ca4e2 preserved privately. Previous7612 publication metadata retained before updating expected version.
+- Post-publication outside probe38851138739 SUCCESS with build/deploy skipped. Broker key-only readback remains dedbac762b24a73c91af719eb0a6611f41e177d75b63b20e6949cafe5e216df0 and both anonymous directivestrue. No device OTA or operating credential cutover this turn.
+- Current ordinary operator master is absent; updated session02 execution/readback is not confirmed. One fresh authenticated invocation is requested; do not assume execution from elapsed time, bypass sudo/key limits or claim installed-device acceptance. Both repositories openPR0; SmartBox issue7 checkpoint updated in place.
+
+## [2026-10-16] fix | Prepare authenticated WAN OTA after measured external403
+
+- Observer02 actual capture_ready verifies both successful loopback HEAD paths. Exactly one OTA request yields device version200/firmware403 from PUBLIC, followed by fresh IDLE and no installed version. Normal trace cleanup succeeds; no guessed public/private CIDR change or repeated OTA.
+- Owner confirms same Gatekeeper router and asks MQTT capability. Command reception is proved by the correlated device download attempt; fresh read-only TLS MQTT confirms632f004/IDLE. No physical lid movement tested. NAS DDNS/egress match each other but differ from the established field peer.
+- Add dedicated HTTPS credentials/redirect refusal to existing client, protected production provisioning and a main-only external auth probe. Prepare pinned NAS auth policy/private hashed identity, original proxy preservation/header stripping, real auth fixtures and rollback. Optional legacy public/32 bootstrap is explicit/default-off, artifact/credential bound and server-clock-limited300s, with early closure and later authenticated-check evidence.
+- Python38 PASS including actual nginx auth/expiry, query/header privacy, credential-file ownership/symlink checks and activation rollback. Candidate proxy extraction accepts captured NAS source. Original global config has no direct user directive, so verify actual host nginx worker UID/GID instead of assuming a generated include layout.
+- No NAS auth install, public exception, broker cutover or extra device command; operator consent/authentication remains required after reviewable source/artifact preparation. Native/C6 final gates follow; relay/FSM/partition/scheduling contracts unchanged.
+
+- Final Python38 PASS includes296 real authenticated-policy HTTP cases across normal/open/expired fixtures, GET/HEAD-only role checks, rollback and input ownership/privacy. Native13 and C6 build PASS (RAM62172B/flash1343884B). Generated version header restored. Fresh distinct256-bit OTA identity stored only in private files and GitHub repository secrets via stdin after auth presence/status checks; no values printed. NAS settings/bootstrap remain unmodified pending approval/authentication.
