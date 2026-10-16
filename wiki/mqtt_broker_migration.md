@@ -205,3 +205,46 @@ URI/query string is never serialized. The real-nginx regression includes HEAD,
 GET,403 internal redirects, spoofed forwarded headers and query-token omission.
 Reports now distinguish LOOPBACK/TAILNET from public peers. No routing, credential,
 TLS, relay or persistent SSH permission contract is changed.
+
+## Measured remote-site failure and authenticated HTTPS candidate
+
+Observer02 established both real loopback HEAD records before active. One
+device OTA request produced an ESP32 version GET200 and firmware GET403 from
+outside the allowed private ranges. Fresh post-attempt IDLE continued; no new
+version/reboot was observed. The trace finished and cleaned normally. NAS DDNS
+and egress agree, while the one global MQTT field peer differs from both.
+The owner confirms SmartBox shares Gatekeeper's router. This is a download
+origin-policy failure, not evidence of MQTT command-delivery failure or a sensor
+problem. Read-only MQTT recheck confirms old632f004, connected/fresh IDLE.
+
+The prepared client adds a distinct HTTPS download identity to both existing
+TLS requests and disables redirects. Credentials remain in the private build
+header and HTTP Authorization, never URLs. Production publishing requires
+non-placeholder256-bit credentials and same-origin fixed HTTPS paths. The
+main-only authenticated external probe verifies anonymous/wrong credentials
+denied, valid credentials accepted, TLS chain/hostname and optional image hash.
+
+The candidate NAS policy protects exactly /version.json and /firmware.bin,
+preserves the original proxy body and private/tailnet routes, and strips OTA
+Authorization before the upstream. Only a salted password hash is group-readable
+by the verified nginx worker; private input is owner0600 data pinned by digest,
+not executed code. Full original-prefix config validation, real nginx auth
+fixtures, two-file/gateway binding and exact rollback precede live acceptance.
+Unconfirmed rollback preserves the hash file for recovery.
+
+A legacy device has no download credentials. The prepared optional bootstrap
+requires explicit approval, one exact observed global IPv4 /32 refusal bound to
+the reviewed field connection, and a still-connected MQTT peer. It is disabled
+by default. The root worker opens it only after the protected image version/hash,
+new credential bytes and client schema match. A server-clock map rejects new
+unauthenticated requests after at most300s even if controller cleanup fails.
+First complete ESP32 firmware transfer closes the peer exception early.
+Only a subsequent authenticated version check with the required realm counts
+as remote authentication acceptance; download itself is not installation.
+
+All devices sharing that source public IP could download the credential-bearing
+image during an authorized bootstrap window. A private onsite/Tailscale delivery
+route avoids that exception. No public exception, NAS auth policy or credential
+cutover has been applied by this candidate work. Actual install/reboot/fresh
+health, authenticated remote check, external refusal and HA/client readiness
+remain required before broker activation.

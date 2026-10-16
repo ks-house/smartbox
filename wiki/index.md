@@ -55,4 +55,4 @@ source_of_truth: true
 
 ## Broker migration follow-up
 
-- [mqtt_broker_migration.md](mqtt_broker_migration.md): combined named-principal migration, private OTA origin guard, publication refusal gate and remaining device acceptance.
+- [mqtt_broker_migration.md](mqtt_broker_migration.md): combined named-principal migration, private/authenticated OTA protection, bounded legacy bootstrap and remaining device acceptance.

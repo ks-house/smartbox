@@ -319,3 +319,18 @@ for both OTA paths. Do not trigger the device during waiting_for_agent or
 verifying_capture. A ready session reports capture_ready=true and verified paths.
 Error-page redirects retain only a fixed original OTA path label in the log;
 raw request queries remain excluded.
+
+### Authenticated WAN OTA and legacy transition
+
+[The migration runbook](../wiki/mqtt_broker_migration.md) distinguishes MQTT
+command delivery from HTTPS artifact access. New production builds require
+SECRET_OTA_USER/PASS separately from MQTT and keep both OTA URLs on one verified
+HTTPS origin. Redirects are disabled; never embed credentials in URLs.
+
+[The authenticated installer](../ops/install_authenticated_ota.py) defaults to
+validation and uses pinned private data, real auth fixtures, exact rollback and
+the existing proxy routes. [The bounded bootstrap](../ops/bootstrap_authenticated_ota.py)
+requires a separate explicit public-source decision; it sends no device command.
+Same-public-IP users can download during an authorized window, so use a private
+onsite route when that source cannot be trusted. Firmware download, install,
+reboot, fresh idle and an authenticated remote check are distinct acceptance.
