@@ -85,3 +85,10 @@ source_of_truth: true
 - Current verified Backend Target health remains525/boot911/IDLE/OFF with advisory VALID, pending0/gapfalse. The ordinary operator master is absent, so nginx application is not confirmed. No second device OTA, broker cutover, arbitrary shell or new administrator prompt.
 
 - Current diagnostic main publisher38828134589 confirmed live againstb41387e; native/origin steps observed separately from firmware publication/installation. No source-only or CI success is treated as an emitted installed-device diagnostic.
+
+
+## [2026-10-16] test | Verify diagnostic publication and preserve installed-device boundary
+
+- Main diagnostic publisher38828134589 SUCCESS atb41387e. Strict-TLS private NAS readback0.1.0-gb41387e has matching staged MQTT provisioning and compiled diagnostic fields; SHA256412d0d6d2186f636c14ce99bba37c4d2d1bd34fcf78decfbcc566b2d26e3b9d9. Independent post-publication external HEAD/GET probe38828916009 PASS; its publication job is skipped.
+- Fresh subscribe-only observation receives retained advertised0.1.0-g632f004 and nonretained IDLE telemetry without ota fields. New device install/emission remains unproved, and the ordinary operator master is absent. No second OTA, physical command or operating broker change was sent.
+- One-time nginx LAN update result is still required before guarded device installation and version-bound broker restaging/cutover. This is an outstanding external dependency, not objective completion; no repeated administrator question or goal pause/completion request.
