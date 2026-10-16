@@ -103,3 +103,9 @@ source_of_truth: true
 - Final local Python19 including five actual-nginx regressions PASS, native13 PASS and ESP32-C6 build PASS (RAM62172B/flash1343626B). Generated version header restored. Captured immutable operator launcher observe-ota-origin.sh prepared privately and syntax/AST checked; no NAS trace activation or additional device command performed.
 
 - Evidence clarification: HA container/HTTP/WebSocket restoration is verified; its prior anonymous MQTT configuration is captured, but a fresh HA-specific MQTT connection is not independently proven. auth_required proves the TLS WebSocket authentication entry, not a completed HA API login. Both remain separate from broker cutover readiness.
+
+## [2026-10-16] compile | Merge bounded origin observer after exact-head validation
+
+- PR10 exact-head7137bf2 hosted38844587014 SUCCESS including native/origin/target; merged7612cd40 with existing administrator merge permission under unchanged update-lock policy. Both repositories openPR0. Local final native13/C6 builds PASS; generated version header restored and changed-document links/whitespace PASS.
+- Main publication38844978553 is live; independent outside refusal job passes. Actual new artifact readback is pending. Fresh read-only MQTT still advertises632f004 and sends nonretained telemetry without ota fields. No further OTA or broker cutover.
+- Immutable source/plan operator launcher prepared and requested once because six-command broker key intentionally lacks nginx authority. Before any device request, require active trace and actual local200 records for both OTA paths, terminal publication/readback and fresh safe state. Bounded observer is not yet installed; HA remains restored with restart-policy/MQTT-readiness follow-up441.
