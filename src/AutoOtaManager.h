@@ -15,7 +15,22 @@ public:
         OTA_STATE_SUCCESS
     };
 
+    struct OtaDiagnostics {
+        uint32_t attempts;
+        const char* phase;
+        int manifestHttpCode;
+        int updaterError;
+        bool requestPending;
+    };
+    static OtaDiagnostics getDiagnostics();
+
 private:
+    enum OtaPhase { OTA_PHASE_IDLE, OTA_PHASE_VERSION, OTA_PHASE_FIRMWARE,
+                    OTA_PHASE_REBOOT_PENDING };
+    static volatile OtaPhase otaPhase;
+    static volatile uint32_t otaAttempts;
+    static volatile int otaManifestHttpCode;
+    static volatile int otaUpdaterError;
     static SmartBoxController* controllerPtr;
     static unsigned long lastScheduleCheck;
     static unsigned long lastOtaRunTime;  // millis() of last OTA run (0 = never)

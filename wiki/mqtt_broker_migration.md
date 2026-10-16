@@ -111,3 +111,29 @@ remain pending. The six fixed broker maintenance commands intentionally do not
 grant nginx configuration authority. This one-time operator-authenticated range
 correction does not broaden SSH/sudo privileges. Broker cutover stays blocked
 until this device is prepared. Track the operating gap in GitHub issue7.
+
+
+## Remote OTA diagnostics (source preparation)
+
+smartbox/telemetry now adds a bounded ota object; existing fields remain intact.
+
+| Field | Meaning |
+|---|---|
+| state | Existing OTA state such as CHECKING, UP_TO_DATE, FAILED or SUCCESS |
+| phase | Last started attempt phase: IDLE, VERSION, FIRMWARE or REBOOT_PENDING |
+| attempts | Attempts started since this boot; reset by init/reboot |
+| manifest_http_code | Version-manifest HTTPClient result, including negative transport codes |
+| updater_error | HTTPUpdate raw error for a failed binary update; not an HTTP status |
+| request_pending | A subsequent forced check is queued; last-attempt codes remain separate |
+
+Each started attempt clears the prior HTTP/updater codes before recording new
+results. Failed phase/results remain available after the FSM returns to IDLE.
+No URL, raw error text, firmware contents or credentials are sent in these fields.
+OTA scheduling, TLS verification, version comparison, relay isolation, watchdog
+ordering and partitions are preserved.
+
+The NetworkTask publishes telemetry after synchronous OTA processing returns.
+This is last-attempt advisory state, not continuous download progress or
+persistent crash/power-loss history. A reboot resets it; installation still
+requires new-version reconnect and fresh idle evidence. Installed-device error
+and recovery verification remains open under issue7.

@@ -19,6 +19,23 @@ volatile bool AutoOtaManager::otaInProgress = false;
 
 volatile AutoOtaManager::OtaState AutoOtaManager::otaState = AutoOtaManager::OTA_STATE_IDLE;
 char AutoOtaManager::otaErrorMessage[128] = "";
+volatile AutoOtaManager::OtaPhase AutoOtaManager::otaPhase = AutoOtaManager::OTA_PHASE_IDLE;
+volatile uint32_t AutoOtaManager::otaAttempts = 0;
+volatile int AutoOtaManager::otaManifestHttpCode = 0;
+volatile int AutoOtaManager::otaUpdaterError = 0;
+
+AutoOtaManager::OtaDiagnostics AutoOtaManager::getDiagnostics() {
+    const char* phase = "IDLE";
+    switch (otaPhase) {
+        case OTA_PHASE_VERSION: phase = "VERSION"; break;
+        case OTA_PHASE_FIRMWARE: phase = "FIRMWARE"; break;
+        case OTA_PHASE_REBOOT_PENDING: phase = "REBOOT_PENDING"; break;
+        default: break;
+    }
+    // These codes describe the last started attempt. A queued request is separate.
+    return {otaAttempts, phase, otaManifestHttpCode, otaUpdaterError, otaForceRequested};
+}
+
 
 void AutoOtaManager::init(SmartBoxController& controller) {
     controllerPtr = &controller;
@@ -27,6 +44,10 @@ void AutoOtaManager::init(SmartBoxController& controller) {
     otaForceRequested = false;
     otaInProgress = false;
     otaState = OTA_STATE_IDLE;
+    otaPhase = OTA_PHASE_IDLE;
+    otaAttempts = 0;
+    otaManifestHttpCode = 0;
+    otaUpdaterError = 0;
     memset(otaErrorMessage, 0, sizeof(otaErrorMessage));
 }
 
@@ -113,6 +134,10 @@ bool AutoOtaManager::startOtaUpdate(bool force) {
 }
 
 void AutoOtaManager::runOtaProcess(bool force) {
+    otaAttempts = otaAttempts + 1;
+    otaPhase = OTA_PHASE_VERSION;
+    otaManifestHttpCode = 0;
+    otaUpdaterError = 0;
     Serial.printf("[OTA] Background update process started (force=%s).\n", force ? "true" : "false");
     otaInProgress = true;
     otaState = OTA_STATE_CHECKING;
@@ -127,6 +152,7 @@ void AutoOtaManager::runOtaProcess(bool force) {
     HTTPClient http;
     http.begin(client, VERSION_URL);
     int httpCode = http.GET();
+    otaManifestHttpCode = httpCode;
     
     if (httpCode == HTTP_CODE_OK) {
         String payload = http.getString();
@@ -187,9 +213,11 @@ void AutoOtaManager::runOtaProcess(bool force) {
         WiFiClientSecure client2;
         client2.setCACert(SECRET_ROOT_CA_CERT); // TLS Root CA verification
         
+        otaPhase = OTA_PHASE_FIRMWARE;
         t_httpUpdate_return ret = httpUpdate.update(client2, FIRMWARE_URL);
         
         if (ret == HTTP_UPDATE_FAILED) {
+            otaUpdaterError = httpUpdate.getLastError();
             Serial.printf("[OTA] HTTPS update FAILED! Error (%d): %s\n", 
                           httpUpdate.getLastError(), 
                           httpUpdate.getLastErrorString().c_str());
@@ -219,6 +247,7 @@ void AutoOtaManager::runOtaProcess(bool force) {
         } else if (ret == HTTP_UPDATE_OK) {
             Serial.println("[OTA] HTTPS update SUCCESS! Rebooting device in 1.5 seconds...");
             otaState = OTA_STATE_SUCCESS;
+            otaPhase = OTA_PHASE_REBOOT_PENDING;
             delay(1500);
             ESP.restart();
         }
