@@ -180,3 +180,13 @@ source_of_truth: true
 ## [2026-10-17] test | Validate final shared broker documentation
 
 - Native13 and ESP32-C6 dummy-only build PASS. Temporary secrets header removed and generated version bytes restored. No artifact publication or physical actuation.
+
+## [2026-10-17] code | Prepare installed OTA diagnostic failure and recovery acceptance
+
+- Owner requests remaining7 gate. Add blocking-only manifest rule scoped to one exact original peer/account and at most120s server time. Rewrite to a verified missing upstream path keeps normal Basic auth/access/proxy phases; firmware, Target/APK routes, TLS and anonymous refusal stay intact.
+- Four contract tests PASS/one explicit Docker fixture opt-in. Actual NAS native isolated job8c9c0588 proves52 auth/path/expiry/method/header-stripping cases. Initial fixture regex quoting/module-shadow failures were corrected before live changes; no production policy or device command.
+- Acceptance refuses stale/reboot/queued/firmware-phase/extra diagnostic fields and requires exactly one FAILED404 and one no-update200 attempt. Native/C6 dummy checks follow. Actual source/artifact admission, live observations, watchdog and exact cleanup are still pending.
+
+## [2026-10-17] test | Validate OTA diagnostic helper software gates
+
+- Native13 and ESP32-C6 dummy-only build PASS for the diagnostic helper branch. Temporary secrets header removed and generated version bytes restored. No artifact publication, live policy or physical actuation.
