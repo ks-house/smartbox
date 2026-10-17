@@ -118,3 +118,8 @@ original stop-cause/alarms and447 event JSON remain follow-ups.
 
 [Cross-project accepted evidence](https://github.com/ks-house/smart-gatekeeper/blob/main/wiki/broker_cutover_2026_10_17.md).
 This acceptance supersedes earlier pending preparation checkpoints below.
+
+
+## SmartBox7 remaining diagnostic gate
+
+A manifest-only, peer/account/time-bound failure helper and real-nginx52-case fixture are prepared. No new firmware publication is required; actual FAILED404 then UP_TO_DATE200 device telemetry and cleanup remain pending. See [acceptance](ota_diagnostic_acceptance.md).
