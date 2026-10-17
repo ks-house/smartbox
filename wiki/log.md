@@ -190,3 +190,13 @@ source_of_truth: true
 ## [2026-10-17] test | Validate OTA diagnostic helper software gates
 
 - Native13 and ESP32-C6 dummy-only build PASS for the diagnostic helper branch. Temporary secrets header removed and generated version bytes restored. No artifact publication, live policy or physical actuation.
+
+## [2026-10-17] test | Accept actual installed diagnostic failure and recovery
+
+- Admissionea897694 verifies exacte0323a0/artifact333e23df and fresh no-update state, measures original HTTP peer and cleans private trace. Broker-visible private address is not an OTA-origin authority. Isolated preflight fixes precede all device requests.
+- Actual357864821 accepts exactly two test checks: attempts2→3→4, HTTP200→404→200, VERSION/IDLE, increasing millis and zero updater error/queued request. Includes removed, stable auth guard hashes/API readiness preserved;120s server-clock cap and independent watchdog. No actuator or new firmware install.
+- PR15 exact9e46d4e/hosted39010352192 passes/merged2c148e19; redundant main39011920146 cancelled. No helper firmware publication. Current wiki replaces prior pending acceptance with measured result while retaining historical log.
+
+## [2026-10-17] test | Validate accepted OTA diagnostic documentation
+
+- Native13 and ESP32-C6 dummy-only build PASS for the diagnostic helper branch. Temporary secrets header removed and generated version bytes restored. No artifact publication, live policy or physical actuation.
