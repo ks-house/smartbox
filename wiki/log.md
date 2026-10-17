@@ -157,3 +157,26 @@ source_of_truth: true
 - Actual NAS full candidate validation failed before activate: the geo-block include attempted to open the absent peer wildcard as a literal file. No policy-installed receipt or bootstrap session was created; live broker readback retains both anonymous directives and original configuration hash. Root-only guard file readback is unavailable through the ordinary account.
 - Replace the exact public-peer geo with a map and exact address entry. Core wildcard include handling permits absent volatile runtime; private CIDRs, original peer trust, server-clock expiry, authentication, header stripping and rollback stay enforced.
 - Closed real-nginx fixture now starts with no runtime directory. Python38 including296 HTTP cases PASS, native13 PASS and ESP32-C6 build PASS (RAM62172B/flash1343884B). Source publication and NAS application remain separate; no additional device OTA or physical operation.
+
+
+## [2026-10-17] compile | Revalidate SmartBox WSL source for combined broker transition
+
+- User provides the SmartBox WSL path and requests coherent system configuration. Read AGENTS, index and recent log; git fetch/fast-forward reports already currente0323a0 with no pre-existing local changes.
+- Combined broker remains anonymous pending HA notice verification; existing key roles are valid. Gatekeeper source prepares an explicitly privileged signed maintenance path for diagnostics/operator updates, preserving both existing role keys. No SmartBox credential/firmware/relay/partition/FSM or OTA change.
+- Document shared-role coordination and evidence boundaries. Native/C6 documentation gates follow with dummy provisioning only; no real secrets or device artifact publication.
+
+
+## [2026-10-17] test | Complete WSL documentation gates with dummy provisioning
+
+- Native13 PASS and ESP32-C6 build PASS using the committed example dummy header, never operational credentials. RAM62172B/flash1343884B; private build transcripts retained outside Git.
+- Temporary dummy header removed and generated git-version header restored. Firmware is not published, sent or installed. Relay/FSM/16MB OTA contracts and physical acceptance remain unchanged.
+
+## [2026-10-17] test | Accept named SmartBox broker and persisted telemetry
+
+- Jointc1c77a8f at02:56UTC confirms0.1.0-ge0323a0 fresh telemetry, anonymous=false2, named device/collector, collector RestartCount0 and eight services. Wrong-principal canary uses no actual control topics.
+- Exact Grafana datasource DNS and Influx4086 health recovered with image/data preserved. Read-only query200/latest02:53:58UTC confirms storage. Old broker/collector remain stopped/no-autostart for rollback.
+- Current wiki distinguishes accepted migration from earlier preparation. No firmware/pin/FSM/16MB OTA change, extra device OTA/reboot or physical lid claim. Native/C6 docs gates use dummy provisioning only.
+
+## [2026-10-17] test | Validate final shared broker documentation
+
+- Native13 and ESP32-C6 dummy-only build PASS. Temporary secrets header removed and generated version bytes restored. No artifact publication or physical actuation.

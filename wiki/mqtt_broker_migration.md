@@ -253,3 +253,25 @@ remain required before broker activation.
 ### Authenticated OTA installer compatibility (2026-10-16)
 
 The measured NAS candidate failed before policy activation when the volatile bootstrap directory was absent. The single-public-peer gate now uses an exact-address nginx map, whose optional include tolerates absent runtime files. The closed fixture must exercise that initial state. The approved single-host, maximum300s bootstrap scope is unchanged; source validation does not prove NAS application or device installation.
+
+
+## 2026-10-17 accepted authenticated shared broker
+
+Final joint acceptancec1c77a8f at02:56UTC confirms installed SmartBox0.1.0-ge0323a0
+fresh telemetry after actual broker replacement, both anonymous=false listeners,
+separate named device/collector and collector RestartCount0. HA retains its scoped
+SmartBox control authority; Target namespaces remain isolated. Eight services run;
+original broker/collector are stopped/no-autostart and preserved for rollback.
+
+Read-only Influx query200/latest02:53:58UTC confirms stored data after same-image/
+persistent-data-preserving DNS recovery. Grafana's exact smartbox_influxdb name
+resolves and actual Influx mapped4086/health passes. Authenticated HTTPS OTA and
+installed-version acceptance preceded cutover; no additional device OTA/reboot/
+actuator command or physical lid verification is performed here.
+
+Signed root/fixed-role maintenance now works without owner password handoffs.
+Additional NAS settings permission is only2026-10-17. Gatekeeper issues441
+original stop-cause/alarms and447 event JSON remain follow-ups.
+
+[Cross-project accepted evidence](https://github.com/ks-house/smart-gatekeeper/blob/main/wiki/broker_cutover_2026_10_17.md).
+This acceptance supersedes earlier pending preparation checkpoints below.
