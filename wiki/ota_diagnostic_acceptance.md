@@ -47,3 +47,24 @@ An actual NAS native nginx isolated52-case fixture passes using dummy credential
 and private Unix sockets. Operating fault/application, two actual device observations
 and exact cleanup remain pending. Native13/C6 checks are run with dummy provisioning;
 no firmware publication is needed for this operational helper.
+
+
+## 2026-10-17 installed diagnostic gate accepted
+
+Signed operating test357864821 succeeds on installed0.1.0-ge0323a0 and protected
+artifact333e23df00876b5464689a9a7dda93b0492989e4055c97c9814878a50d200fd3.
+Fresh nonretained telemetry proves attempts2→3→4 with UP_TO_DATE200→FAILED404→
+UP_TO_DATE200, all VERSION/IDLE, updater_error0/request_pendingfalse and increasing
+millis32421139→32451213→32511362. Actual HTTP peer is measured before admission;
+broker-visible private addresses are not substituted. One prior same-version
+admission check is separate from the two test attempts.
+
+Full nginx validates the narrow account/peer/version-path rule, server time caps
+it at120s and an independent watchdog is armed. Both runtime files are removed and
+the original guard hashes preserved; API64b5c2f readiness passes. No public download
+exception, credential change, actuator command or firmware phase/install.
+
+PR15/source9e46d4e passes39010352192 Python/native/C6 and merges2c148e19. The redundant
+main39011920146 is cancelled. No helper/documentation firmware publication is needed.
+[Joint operating evidence](https://github.com/ks-house/smart-gatekeeper/blob/main/wiki/followup_acceptance_2026_10_17.md).
+Physical lid/electrical/rollback qualification remains distinct.
