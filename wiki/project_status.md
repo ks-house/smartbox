@@ -89,3 +89,32 @@ IDLE
 - Candidate adds a private OTA origin guard and external anonymous HEAD/GET refusal gate before credential-bearing publication. An initial NAS pre-validation failed before activation; absence of both guard files verified. Relative-config-prefix regression is reproduced/fixed; native NAS retry remains pending.
 - Floating platform HEAD failed with Core6.1.19; pin to last-successful operating platform dd01e49 restores target build. Native13, placeholder C6 build and six origin tests with actual nginx pass.
 - No new operating credentials, firmware/actuator commands or broker activation. See [migration](mqtt_broker_migration.md).
+
+
+## 2026-10-17 shared NAS transition coordination
+
+WSL source main is verified ate0323a0. SmartBox shares Mosquitto with Smart Gatekeeper, HA and Telegraf; the operating broker still permits anonymous clients until the HA preparation/log acceptance gate passes. Existing private schema2 candidate preserves Backend credentials and provides distinct Target, SmartBox, HA, telemetry and diagnostic identities.
+
+The agent is preparing a separately signed root maintenance path to diagnose/update the operator without repeated administrator entry. Registration itself does not change a device account, broker policy, firmware, relay/FSM or OTA route. Source, staged candidate, actual device version, authenticated reconnect and physical lid movement must remain separate evidence. No actuator/OTA command is issued by this coordination checkpoint.
+
+
+## 2026-10-17 accepted authenticated shared broker
+
+Final joint acceptancec1c77a8f at02:56UTC confirms installed SmartBox0.1.0-ge0323a0
+fresh telemetry after actual broker replacement, both anonymous=false listeners,
+separate named device/collector and collector RestartCount0. HA retains its scoped
+SmartBox control authority; Target namespaces remain isolated. Eight services run;
+original broker/collector are stopped/no-autostart and preserved for rollback.
+
+Read-only Influx query200/latest02:53:58UTC confirms stored data after same-image/
+persistent-data-preserving DNS recovery. Grafana's exact smartbox_influxdb name
+resolves and actual Influx mapped4086/health passes. Authenticated HTTPS OTA and
+installed-version acceptance preceded cutover; no additional device OTA/reboot/
+actuator command or physical lid verification is performed here.
+
+Signed root/fixed-role maintenance now works without owner password handoffs.
+Additional NAS settings permission is only2026-10-17. Gatekeeper issues441
+original stop-cause/alarms and447 event JSON remain follow-ups.
+
+[Cross-project accepted evidence](https://github.com/ks-house/smart-gatekeeper/blob/main/wiki/broker_cutover_2026_10_17.md).
+This acceptance supersedes earlier pending preparation checkpoints below.

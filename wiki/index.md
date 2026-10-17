@@ -56,3 +56,5 @@ source_of_truth: true
 ## Broker migration follow-up
 
 - [mqtt_broker_migration.md](mqtt_broker_migration.md): combined named-principal migration, private/authenticated OTA protection, bounded legacy bootstrap and remaining device acceptance.
+
+- Shared authenticated broker accepted2026-10-17; see [migration](mqtt_broker_migration.md) and [current status](project_status.md). Earlier baseline is historical.
