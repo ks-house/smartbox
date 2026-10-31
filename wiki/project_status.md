@@ -170,3 +170,9 @@ Physical lid/electrical/rollback qualification remains distinct.
 - Exact installed0.2.0 accepts a separate MQTT reboot despite OTA lockout. Owner-authorized one-shot recovery reboot at01:09:04KST uses fresh protected sensor-fault admission, QoS0/non-retained and a durable no-resend intent. Fresh online + uptime12931ms confirms new boot; later retained status uptime300933ms and a fresh collector receipt still report sensor invalid/null voltage. This did not restore measurement or install0.2.1.
 - No registered dedicated HA power switch, field Tailnet route/jump host or installed Wi-Fi uploader was found. Scheduled reboot/config/protection release cannot supply the missing OTA admission. Matching installed Arduino3.3.11 SDK default confirms an image before sensor health and no app rollback command exists; actual OTA flash state remains unqueried.
 - Keep PR22 Draft/unmerged, version manifest held and power observer active. See [remote path evidence](ina219_regression.md#additional-remote-recovery-investigation-2026-11-01-kst). No further autonomous restart/OTA/motion trial is queued.
+
+### 2026-11-01 — field recovery preparation
+
+Owner requests an offline USB recovery kit; no new remote device action. Correction includes bounded version/typed INA219 Serial diagnostics and an explicit16MB image/bootloader header setting, previously inherited as8MB despite the16MB table. A native-USB field profile enables CDC with zero TX wait; normal UART profile is retained for ordinary builds. Actual hardware flash size, USB enumeration and commissioning remain pending.
+
+The private production bundle is built only on explicit exact-commit dispatch and uploaded only as AES256-GCM CMS ciphertext. The Windows tool defaults to offline verification, snapshots overwritten sectors/settings, writes app0+otadata only and keeps commissioning manual. [Equipment and field procedure](field_recovery.md). PR22 and release hold remain until real field acceptance.

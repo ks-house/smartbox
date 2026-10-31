@@ -64,3 +64,5 @@ source_of_truth: true
 - [battery_power_management.md](battery_power_management.md): automatic low-voltage recovery, measurement validity, bounded savings and NAS/HA monitoring with installed-evidence boundaries.
 
 - [ina219_regression.md](ina219_regression.md): field-before/after evidence, continuous-reader rollback candidate, numeric failure diagnostics and the confirmed0.2.0 recovery-OTA lockout.
+
+- [field_recovery.md](field_recovery.md): owner-private offline USB firmware kit, equipment, guarded app0/otadata recovery and physical acceptance procedure.
