@@ -40,5 +40,15 @@ class InstallTests(unittest.TestCase):
             self.assertEqual('preserved',collector.read_text())
             self.assertIn(('stop','smartbox-power-monitor.service'),calls)
             self.assertFalse(any('mosquitto' in str(call) or 'grafana' in str(call) for call in calls))
+    def test_bootstrap_accepts_healthy_source_legacy_or_offline_only_explicitly(self):
+        for sample,status in [(None,'OFFLINE'),({'schema':0},'LEGACY_FIRMWARE')]:
+            with self.assertRaises(ValueError):m.validate_observer_admission(sample,{'status':status},False)
+            m.validate_observer_admission(sample,{'status':status},True)
+        for status in ['NORMAL','LOW_BATTERY','ENERGY_SAVING','BATTERY_PROTECTED','RECOVERY_WAIT','POWER_SENSOR_FAULT','INITIALIZING']:
+            m.validate_observer_admission({'schema':1},{'status':status},False)
+    def test_bootstrap_never_bypasses_invalid_or_failed_source(self):
+        for status in ['SOURCE_INVALID','SOURCE_UNAVAILABLE','unrecognized']:
+            with self.assertRaises(ValueError):m.validate_observer_admission(None,{'status':status},True)
+        with self.assertRaises(ValueError):m.validate_observer_admission(None,{'status':'OFFLINE'},'yes')
 if __name__=='__main__':unittest.main()
 

@@ -246,3 +246,13 @@ source_of_truth: true
 - New bounded transport review finds discontinuous/offline boot acceptance and lost-ack/stale-attempt evidence defects. Fix latest fresh online status, consecutive same-boot uptime/receipt continuity≥30s, persisted requested-versus-confirmed uncertainty and unconditional current-attempt terminal report. Public acceptance tests reproduce RED→GREEN; exact private transport fixture passes lost-ack and broken-pipe cases. Retained legacy status is explicitly labelled last-boot evidence, not a newly queried version.
 
 - Final local93 Python total/84 executed PASS/9 explicit environment skips, native37 PASS, C6 dummy build PASS; exact private transport lost-ack/broken-pipe fixtures2 PASS. Generated version header restored. Keep new main publication and installed acceptance separate from this verified source checkpoint.
+
+
+## [2026-10-31] fix | Preserve unconfirmed OTA incident and bootstrap independent offline monitoring
+
+- PR18 exact-head41197174127 PASS/merged7a55dd8; real publication41197607762 and external exact-auth/refusal41197969972 PASS. Source tree matches reviewed code; clean primary SmartBox main fast-forwarded. Local dummy image never published.
+- One OTA write issued under durable intent fefcfda7; admission12.12004–12.12404V/continuous old protected uptime. No new-boot/schema acceptance within the observation window. Broker logs old-client timeout20:48:24KST; subsequent passive retained state offline. Actual installed version/download completion are unverified. No resend, reboot, actuator command or speculative rollback; owner cannot field-check now. Old artifact retained privately; backend readiness remains healthy.
+- Boundaries checked: old/new image headers, trust anchors and compiled MQTT/OTA identity presence match; NVS Wi-Fi load path unchanged. Existing field subnet route absent. Broker file logs used after Docker CLI/log-stream timeouts. Missing access logs do not prove a failed/no download.
+- Reproduce stale legacy receipts misclassified forever and installer blocked on schema1. Add explicit healthy-source-only --bootstrap and legacy90s offline threshold, preserving normal schema1 gate, source failure rejection, no voltage claim and notification dedup. Four regressions RED→GREEN; focused48 PASS. Fresh narrow review finds no Critical/Important issues. Final local/hosted/deployed observer checks follow; this does not fix or claim device recovery.
+
+- Final monitor follow-up local97 Python total/88 executed PASS/9 explicit skips, native37 PASS and C6 dummy build PASS. Added incident [#19](https://github.com/ks-house/smartbox/issues/19) with UTF-8 remote readback and explicit unverified installed version. No additional device command.

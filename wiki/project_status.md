@@ -3,7 +3,7 @@ title: SmartBox current project status
 type: reference
 project: smartbox
 status: active
-updated: 2026-08-12
+updated: 2026-10-31
 source_of_truth: true
 applies_to:
   - firmware
@@ -14,9 +14,16 @@ applies_to:
 
 # 현재 프로젝트 상태
 
-> Repository baseline: `9f2facbec58d47b0372677bcdf51cc853a00944d`
+> MCU publication baseline: `7a55dd8253fc50681897b0ebe67292499bb10657` (0.2.0-g7a55dd8; installed acceptance unconfirmed)
 >
 > 이 문서는 checkout에서 확인한 구현을 설명한다. 현장 설치 또는 실기기 합격을 자동으로 뜻하지 않는다.
+
+## 2026-10-31 운영 경계
+
+- 소스/CI/운영 파일 게시와 외부 인증·익명 차단 검사는 통과했다. OTA 명령 쓰기는1회이며 새 버전의 연속 부팅·유효 schema1 자료는 확인하지 못했다. 현재 실제 실행 버전은 미확인이고, 이후 MQTT 상태는 offline이다.
+- 마지막 관찰은20:46KST 전후12.12V의 구형 보호 정지다. 이후 값을 현재 전압으로 표시하지 않는다. 원인은 전원·다운로드·부팅·Wi-Fi 중 아직 확정하지 못했다. 현장 LED/AP/USB 로그가 필요하며 소유자는 지금 확인할 수 없다.
+- 브로커/API는 응답하고 구·신 이미지 헤더/인증서/접속 식별값 대조는 일치했다. 이전 이미지를 보존하며 추가 OTA/재부팅/구동/추측성 rollback을 하지 않는다.
+- 별도의 읽기 전용 NAS 감시는 구형/오프라인에서도 설치할 수 있게 보완 중이다. 설치·알림 수락은 운영 결과로 따로 기록한다.
 
 ## 한눈에 보기
 
@@ -26,9 +33,9 @@ applies_to:
 | Actuator | Active-Low relay, Main high-impedance cutoff, 100 ms 방향 전환 interlock, 3.8 s 기본 timeout | GPIO/접점/부하/과전류 실측 필요 |
 | Startup | NVS의 logical lid-open/protection이면 출력 격리 후 전압 회복을 확인하여 자동 재개 | NVS는 실제 위치 증거가 아니며 boot 자체로 구동하지 않음 |
 | Wi-Fi | 부팅 후 5분 AP+STA captive portal, 이후 STA, 15초 연결 재시도 | AP/OEM/router 현장 복구 증거 별도 |
-| MQTT | PsychicMqttClient, MQTTS URI, Root CA, command/config, LWT, HA discovery 20개 | broker 수락과 물리 동작 완료는 별개 |
-| Telemetry | 30초 live, motor 500 ms batch, 1분 heartbeat sample, 설정 주기 batch | timestamp는 `millis()`이며 wall-clock epoch가 아님 |
-| OTA | 부팅 1회 확인, `otaHour` 일 1회 확인, HTTPS Root CA, pre-OTA relay isolation | signature, rollback, post-reboot health confirmation은 확인되지 않음 |
+| MQTT | PsychicMqttClient, MQTTS URI, Root CA, command/config, LWT, HA discovery 26개 | broker 수락과 물리 동작 완료는 별개 |
+| Telemetry | 전원 schema1, 유효성·보호·복구 상태, MQTT 30/60/120/300초 적응 보고 | timestamp는 `millis()`이며 wall-clock epoch가 아님 |
+| OTA | 부팅/일정 HTTPS 확인, 전력 조건과 원자적 격리 예약, 실패 시 보호 유지 | signature, rollback, post-reboot health confirmation은 확인되지 않음 |
 | CI/CD | native test → target build → `firmware.bin`/`version.json` SFTP | main push가 배포를 발생시키므로 운영 승인 경계 필요 |
 
 ## 현재 FSM

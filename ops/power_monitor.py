@@ -33,7 +33,10 @@ def evaluate(sample,now,source_ok=True):
         at=float(sample['at']);age=float(now)-at
         if not math.isfinite(age) or age < -5:raise ValueError('receipt clock')
         value['sample_age_s']=max(0,round(age,1))
-        if sample.get('schema')!=1:value['status']='LEGACY_FIRMWARE';return value
+        if sample.get('schema')!=1:
+            # Captured legacy0.1 MQTT cadence is30s; old frames cannot stay fresh indefinitely.
+            value['status']='OFFLINE' if age>90 else 'LEGACY_FIRMWARE'
+            return value
         interval=sample['interval_s'];code=sample['state']
         if interval not in (30,60,120,300) or code not in STATES:raise ValueError('closed schema')
         value['report_interval_s']=interval

@@ -36,3 +36,8 @@ Interfaces: immutable BatterySnapshot with valid/state/remaining/report interval
 - [ ] Install scoped monitoring after isolated tests; verify actual status/dashboard without external test email.
 - [ ] If fresh device voltage and idle state permit, send one authorized OTA trigger; otherwise preserve published recovery route and explain actual blocker.
 - [ ] Verify actual installed version/new boot/schema/health and continuous auto-recovery observation separately from physical movement. Record outstanding energy/physical evidence.
+
+
+## Follow-up: independent read-only monitoring bootstrap
+
+The first operating OTA did not produce installed acceptance and the owner cannot inspect the field device now. Keep the no-resend intent and preserve both artifacts; device restoration needs new evidence. Independently reproduce stale-legacy misclassification and schema1-only installer blocking. Add explicit --bootstrap for healthy Influx with legacy/offline device while preserving default schema1 and source-error rejection. Validate dedup/no voltage claim, run relevant Python/native/C6 checks and a fresh narrow review, then deploy only the NAS observer from pinned source. A source-only merge must cancel its redundant main firmware publication before the build job starts; the published MCU artifact stays exactly7a55/12c42958. Verify active service, fresh source classification, local owner notification and unchanged collector/artifact/readiness. No device, account, ACL or TLS changes.
