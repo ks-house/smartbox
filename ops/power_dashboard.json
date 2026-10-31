@@ -342,7 +342,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"${smartbox_bucket}\") |> range(start: -2h) |> filter(fn: (r) => r.topic == \"smartbox/telemetry\" and r._field == \"battery_v\") |> last() |> map(fn: (r) => ({_time: now(), _value: (float(v: uint(v: now())) - float(v: uint(v: r._time))) / 1000000000.0, _field: \"receipt_age_s\"})) |> keep(columns: [\"_time\", \"_value\"]) |> group() |> sort(columns: [\"_time\"])"
+          "query": "from(bucket: \"${smartbox_bucket}\") |> range(start: -2h) |> filter(fn: (r) => r.topic == \"smartbox/telemetry\" and (r._field == \"battery_v\" or r._field == \"power_schema\")) |> group() |> sort(columns: [\"_time\"]) |> tail(n: 1) |> map(fn: (r) => ({_time: now(), _value: (float(v: uint(v: now())) - float(v: uint(v: r._time))) / 1000000000.0, _field: \"receipt_age_s\"})) |> keep(columns: [\"_time\", \"_value\"])"
         }
       ]
     }
