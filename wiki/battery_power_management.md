@@ -1,0 +1,68 @@
+# Battery recovery and power monitoring
+
+Status: source implementation and isolated validation; publication/installation are separate gates. Owner approved automatic resume and existing-hardware-first firmware update on2026-10-31.
+
+## Power policy
+
+The system retains its12V lead-acid profile and default11.3V/3s guard. Warning=cutoff+0.7V, saving=cutoff+0.4V. Noncritical changes qualify for15s and have0.1V exit hysteresis to avoid repeated radio publications near a threshold. Recovery requires max(12.4V,cutoff+0.8V) continuously for300s with fresh valid samples; a gap>2s, invalid sample or voltage dip restarts qualification. These are software policy defaults, not measured SOC or a battery-manufacturer acceptance claim.
+
+A confirmed critical episode preserves the existing single3800ms fail-open stroke and interlock. Invalid/missing INA219 instead isolates immediately, including failure during that stroke; it never returns synthetic12.2V/0mA. Recovery leaves outputs isolated, clears pending movement/median/debounce and enters idle with3s blind time. Fresh normal detection may then run the existing FSM. Recovery alone does not force a lid stroke or prove physical position.
+
+Protection is persisted. A boot whose NVS says protection or logical lid-open starts isolated recovery rather than a calibration stroke, avoiding repeated movement on power failure or OTA reboot. The explicit lab STARTUP_OPEN regression remains. Old NVS lid state is not actual position evidence.
+
+## Savings and update recovery
+
+Normal/warning/saving distance polls remain50/50/100ms. Voltage/current sample200ms normally or moving,1000ms while isolated. Main yields1ms normally/20ms while isolated; network processing yields100/1000ms. No scheduled night sleep is introduced. After the5min provisioning window, connected Wi-Fi modem sleep is enabled; this preserves the MQTT connection rather than entering deep sleep.
+
+Telemetry periods are30/60/120/300s for normal/warning/saving/protected-or-recovering. Qualified phase changes publish promptly. Authenticated transport, watchdogs, relay100ms+100ms interlock, motor timeout and16MB OTA partition remain.
+
+OTA starts only after30s fresh stable recovery-level voltage and no motor/protection. Admission is checked again before flash. The loop observes power during OTA without actuating; failed/no-update exit cannot clear protection. Existing TLS CA/authentication/redirect refusal and previous bootable-slot behavior are retained. No signature/health rollback feature is claimed beyond existing implementation.
+
+## Telemetry and alerts
+
+Existing smartbox/telemetry and retained smartbox/status carry power_schema1, power_sensor_valid, power_state_code, power_sample_age_ms, power_report_interval_s, power_recovery_remaining_s/count, minimum/recovery voltage and admission flags. Codes: NORMAL0, WARNING1, SAVING2, PROTECTED3, RECOVERING4, SENSOR_FAULT5, UNKNOWN6. No new MQTT principal, topic permission or credential is required. Invalid voltage is null; old raw voltage is not reused as current valid data.
+
+HA discovery adds five power sensors and one measurement-fault binary sensor (26 entities total). The existing voltage entity uses live telemetry and availability from both transport and measurement quality. Motor current remains MOTOR_BRANCH; no total battery Wh, charge current or percentage is inferred before wiring/whole-system measurement.
+
+The NAS observer queries only existing Influx telemetry with the existing collector identity, bounds input, rejects redirects and distinguishes source unavailability, stale telemetry, legacy firmware and power faults. Warning/saving alerts qualify60s; critical faults are prompt and deduplicated. Local owner DSM notifications have a persisted retry queue. OFFLINE means no fresh telemetry beyond2x the announced period+30s, not a confirmed battery/electrical diagnosis. No actuator/control publishing exists in the observer.
+
+[Operator installer](../ops/install_power_monitor.py) verifies the exact captured source, validates the existing query before writing, creates only its dedicated service/config/state and rolls back those new files on failure. It does not restart the broker/API/collector/HA. External test email and account/security changes are excluded. [Grafana dashboard export](../ops/power_dashboard.json) needs an existing authenticated import; a prepared file is not operating dashboard acceptance.
+
+## Validation and field boundaries
+
+Native production-component regressions include permanent shutdown recovery, dip/gap/clock wrap, sensor failure, rejected stale/under-threshold commands, independent timers, no recovery pulse, old relay/stall/OTA contracts and warning chatter. Python checks cover clock/source/quality/legacy-cohort rejection, stale-period handling, deduplication and actual installation rollback under isolated files/service fixtures. C6 compilation uses dummy local provisioning; that image must never be published.
+
+Before operating OTA, preserve the prior artifact/metadata, require reviewed CI publication and authenticated HTTPS content/version readback, observe fresh adequate voltage and send at most one owner-authorized trigger_ota. Installation/new boot/new schema and automatic recovery need actual observation. Physical lid movement and energy savings require separate field evidence; no unattended actuator test is permitted.
+
+
+## Review corrections before release
+
+Direction output modes are restored only on a subsequent legitimate movement: Main OFF,100ms release, neutral latch preload, OUTPUT restore/direction select,100ms settle, Main ON. Current stall uses magnitude. OTA reserves admission/isolation/state under one controller lock, rejects movement/maintenance while reserved and rechecks current power immediately before flashing. Every non-reboot updater exit retains protection. Missed night checks catch up once that calendar day after adequate power; routine reboot cannot interrupt even the manifest request.
+
+INA219 now uses an independently tested triggered register sampler: verify calibration4096 and the existing0.1-ohm/100uA LSB profile, new conversion-ready, overflow,320mV range, coherent current/shunt and repeated register state. Power-down is explicit between samples. The12V policy rejects readings above16V as unsupported, rather than enabling actuators. These profile assumptions still need physical shunt/load verification. See the [TI INA219 datasheet](https://www.ti.com/lit/ds/symlink/ina219.pdf).
+
+A successful HTTP stream with an Influx error table is a source failure, never device-offline evidence; malformed cohorts and nonfinite/negative sample ages are rejected. Dashboard reporting-period labels describe configuration, and last-receipt age is separate. Final local gates:37 native tests PASS,76 Python tests PASS with9 explicit environment skips, C6 dummy build PASS (RAM62220B/flash1347818B). Source/runtime/physical acceptance remain separate.
+
+
+## 2026-10-31 operating checkpoint
+
+PR #18 contains the implementation; publication and installed acceptance are still pending. A read-only MQTT observation at 10:10 UTC measured about 12.17 V with a live MCU and legacy BATTERY_LOW_SHUTDOWN. The owner cannot connect an external supply now and will wait for solar charging. Do not weaken recovery/admission thresholds or publish a candidate that the legacy scheduled updater could install before a fresh energy check. No actuator or OTA command was sent.
+
+The existing custom WebStation OTA guard retained a stale Docker bridge address after container restart, causing manifest HTTP 502. The narrow operator in ops/repair_ota_static_origin.py replaces only the two exact OTA content handlers with direct reads of the same static mount, preserves authentication/access/method policy, and removes the Docker-address dependency. It validates the full nginx tree and the existing http worker's metadata/HEAD/range reads in a private Unix-socket fixture. Both prior manifest bytes and image digest are bound to the private rollback artifact; activation rechecks the pair, verifies actual TLS bytes, preserves the existing integrity binding, and restores configuration on failure.
+
+Applied at 10:57 UTC after isolated validation; no new listener, credentials, ACL or container restart. Hosted read-only verification [41194901015](https://github.com/ks-house/smartbox/actions/runs/41194901015) passed authenticated exact prior-image download and anonymous/wrong-credential refusal. Its publication job was skipped. This repairs the server path, not device installation or physical lid operation.
+
+A new Grafana dashboard uses the existing datasource; the old dashboard is preserved. Legacy voltage/current can be graphed, while unreported measurement quality and new policy states must remain unknown. NAS observer installation requires fresh schema 1 and remains pending with firmware installation. General backup issue #461 remains deferred; only the previous OTA artifact pair and changed guard are preserved for this update.
+
+
+## Explicit initial legacy transition (2026-10-31)
+
+The owner renewed the firmware installation request after the charging hold. Two-minute passive evidence at20:12–20:14 KST measured12.140–12.144V, motor-branch0.4–0.6mA, a continuously increasing uptime and persistent legacy BATTERY_LOW_SHUTDOWN. The initial blanket installation hold is superseded only by this bounded legacy transition; no deployed firmware threshold changes.
+
+The operator [first_battery_transition.py](../ops/first_battery_transition.py) accepts only the captured0.1.0-ge0323a0 legacy, four consecutive live protected observations spanning85–110s, final receipt≤3s, unloaded voltage12.0–16V with≤0.05V spread/no>0.02V fall, motor-branch magnitude≤2mA, continuous uptime, no pending OTA and no new-schema/fabricated fallback frame. The12.0V floor is an operator margin for this first isolated transition, not measured MCU rail health/SOC or a general automatic OTA bypass. Existing e0323a0 saves logical lid-open for protection; reviewed new boot converts it to isolated protection without calibration. Future OTA admission remains fresh stable recovery-level voltage for30s and idle; automatic motor recovery remains12.4V/300s.
+
+The hardware guide routes battery→LM2596→5V MCU separately from motor switching. [TI](https://www.ti.com/product/LM2596) supports regulator input headroom but does not prove installed rail stability or battery capacity. The existing16MB inactive OTA slot and old bootable image remain; [Espressif](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c6/api-reference/system/ota.html) documents inactive-slot OTA and redundant otadata. Installed rollback/health evidence is still not claimed.
+
+Before the one deliberate nonretained QoS0 trigger, the caller must verify exact reviewed main CI publication and authenticated HTTPS manifest/image identity using existing credentials. A root-private O_EXCL reservation, file fsync and parent-directory fsync precede publishing; any uncertain outcome retains it and forbids automatic resend. The tool can publish only trigger_ota, never an actuator command. New version/new uptime/fresh valid schema1/protected boot must be observed before acceptance. Preparation, publication and installed acceptance remain separate.
+
+Installed acceptance additionally requires a consecutive post-send valid-schema pair spanning at least30s with increasing uptime consistent with receipt time, and the latest fresh nonretained expected-version online status. Offline, reboot or bad measurement resets acceptance. Lost handoff/acknowledgement is recorded as requested-but-uncertain, and each attempt replaces stale terminal evidence without removing the no-resend reservation. Final local validation:93 Python total/84 executed PASS/9 explicit environment skips, native37 PASS, C6 dummy build PASS, and two exact private-transport failure fixtures PASS.

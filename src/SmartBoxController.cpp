@@ -1,15 +1,5 @@
 #include "SmartBoxController.h"
 
-// AutoOtaManager uses Arduino 'String' type which is unavailable in native/test builds.
-// In native builds, OTA is never active, so isOtaInProgress() is stubbed to false.
-#ifndef NATIVE_BUILD
-#include "AutoOtaManager.h"
-#else
-struct AutoOtaManager {
-    static bool isOtaInProgress() { return false; }
-};
-#endif
-
 // Fixed pin assignments as per AGENTS.md
 static const int RELAY_MAIN_PIN = 6;
 static const int RELAY_DIR_A_PIN = 7;
@@ -64,6 +54,11 @@ void SmartBoxController::init() {
     lastDirClose = false;
     isCalibrationPhase = false;
     
+    lastPowerReading=hw.getMillis();
+    lowBatteryOpening=false;
+    if(initialState==STATE_BATTERY_LOW_SHUTDOWN) batteryPolicy.restoreProtection();
+    readSensors();
+
     // Fill median filter buffer
     for (int i = 0; i < 5; i++) {
         distanceHistory[i] = 999.0f;
@@ -74,51 +69,15 @@ void SmartBoxController::init() {
 void SmartBoxController::update() {
     std::lock_guard<std::recursive_mutex> lock(dataMutex);
 
-    // OTA 업데이트 중 — 모든 센서/액추에이터 루프 완전 정지
-    if (currentState == STATE_OTA_UPDATING) {
-        return;
+    if(servicePower()) return;
+    if(currentState==STATE_OTA_UPDATING) return;
+    const auto power=powerSnapshot();
+    const unsigned long distancePeriod=power.state==BatteryState::SAVING ? 100 : 50;
+    if(hw.getMillis()-sensorTimer>=distancePeriod) {
+        sensorTimer=hw.getMillis(); updateDistanceBuffer();
+        currentDistance=getFilteredDistance();
     }
 
-    // Adaptive sensor polling: fixed 50ms interval
-    if (currentState != STATE_OTA_UPDATING) {
-        if (hw.getMillis() - sensorTimer >= 50) {
-            sensorTimer = hw.getMillis();
-            updateDistanceBuffer();
-            float filtered = getFilteredDistance();
-            currentDistance = filtered;
-        }
-    }
-    
-    // Read INA219 battery/motor stats every 200ms
-    static unsigned long lastReading = 0;
-    if (hw.getMillis() - lastReading >= 200) {
-        lastReading = hw.getMillis();
-        readSensors();
-    }
-    
-    // Battery low voltage 3-second guard filter
-    // OTA BYPASS: TLS 핸드셰이크 중 순간 전압 강하를 배터리 방전으로 오인하지 않도록,
-    // OTA 진행 중에는 저전압 감지 루틴 전체를 건너뜁니다.
-    static unsigned long lowVoltGuardStart = 0;
-    if (AutoOtaManager::isOtaInProgress()) {
-        // OTA 통신 구간: 타이머를 리셋하여 OTA 종료 후 즉시 셧다운이 트리거되지 않도록 방어
-        lowVoltGuardStart = 0;
-        Serial.println("[BATTERY] Low-voltage guard bypassed: OTA in progress (transient voltage drop expected).");
-    } else if (batteryVoltage < config.voltageShutdownLimit && currentState != STATE_BATTERY_LOW_SHUTDOWN) {
-        if (lowVoltGuardStart == 0) {
-            lowVoltGuardStart = hw.getMillis();
-        } else if (hw.getMillis() - lowVoltGuardStart >= 3000) {
-            Serial.printf("[BATTERY] CRITICAL LOW VOLTAGE DETECTED! Voltage: %.2f V (Limit: %.2f V) for 3+ seconds.\n", batteryVoltage, config.voltageShutdownLimit);
-            Serial.printf("[DIAGNOSTIC] Initializing emergency lid opening. State: %d, Curr: %.1f mA, Dist: %.1f cm\n",
-                          currentState, motorCurrent, currentDistance);
-            transitionTo(STATE_BATTERY_LOW_SHUTDOWN);
-            // Immediately start opening the lid using the remaining power
-            setRelayStates(true, true, false);
-        }
-    } else {
-        lowVoltGuardStart = 0;
-    }
-    
     // Cooldown management
 
     if (isCooldown && (hw.getMillis() - cooldownTimer >= config.cooldownTime)) {
@@ -206,7 +165,7 @@ void SmartBoxController::update() {
             // 여기서는 스톨 감지 및 actuatorTime 타임아웃만 처리
             // Bypass motor inrush current for the first 500ms (dual actuator startup)
             if (hw.getMillis() - stateTimer > 500) {
-                if (motorCurrent > config.currentStallLimit) {
+                if (std::fabs(motorCurrent) > config.currentStallLimit) {
                     openStallCount++;
                     Serial.printf("[WARN] Stall candidate OPEN (%d/3): %.1f mA (Limit: %.1f mA)\n",
                                   openStallCount, motorCurrent, config.currentStallLimit);
@@ -269,7 +228,7 @@ void SmartBoxController::update() {
         case STATE_CLOSING: {
             // Bypass motor inrush current for the first 500ms (dual actuator startup)
             if (hw.getMillis() - stateTimer > 500) {
-                if (motorCurrent > config.currentStallLimit) {
+                if (std::fabs(motorCurrent) > config.currentStallLimit) {
                     closeStallCount++;
                     Serial.printf("[WARN] Stall candidate CLOSE (%d/3): %.1f mA (Limit: %.1f mA)\n",
                                   closeStallCount, motorCurrent, config.currentStallLimit);
@@ -355,7 +314,8 @@ void SmartBoxController::update() {
 
 void SmartBoxController::forceOpen() {
     std::lock_guard<std::recursive_mutex> lock(dataMutex);
-    if (currentState != STATE_BATTERY_LOW_SHUTDOWN && currentState != STATE_EMERGENCY_STOP) {
+    if (powerSnapshot().actuationAllowed && currentState != STATE_OTA_UPDATING &&
+        currentState != STATE_BATTERY_LOW_SHUTDOWN && currentState != STATE_EMERGENCY_STOP) {
         sensorDeadlockFlag = false;
         isCooldown = false;
         deadlockClearStartTime = 0;
@@ -365,7 +325,8 @@ void SmartBoxController::forceOpen() {
 
 void SmartBoxController::forceClose() {
     std::lock_guard<std::recursive_mutex> lock(dataMutex);
-    if (currentState != STATE_BATTERY_LOW_SHUTDOWN && currentState != STATE_EMERGENCY_STOP) {
+    if (powerSnapshot().actuationAllowed && currentState != STATE_OTA_UPDATING &&
+        currentState != STATE_BATTERY_LOW_SHUTDOWN && currentState != STATE_EMERGENCY_STOP) {
         if (currentState != STATE_IDLE && currentState != STATE_CLOSING && currentState != STATE_CLOSE_START) {
             maintenanceRequested = false;
             sensorDeadlockFlag = false;
@@ -378,7 +339,7 @@ void SmartBoxController::forceClose() {
 
 void SmartBoxController::resetEmergency() {
     std::lock_guard<std::recursive_mutex> lock(dataMutex);
-    if (currentState == STATE_EMERGENCY_STOP) {
+    if (powerSnapshot().actuationAllowed && currentState == STATE_EMERGENCY_STOP) {
         currentState = STATE_IDLE;
         isCooldown = true;
         cooldownTimer = hw.getMillis();
@@ -441,11 +402,70 @@ float SmartBoxController::getFilteredDistance() {
 }
 
 void SmartBoxController::readSensors() {
-    float v = hw.getBatteryVoltage();
-    float c = hw.getMotorCurrent();
+    const auto reading=hw.readPower();
+    batteryVoltage=reading.voltage; motorCurrent=reading.currentMa;
+    batteryPolicy.sample(static_cast<uint32_t>(hw.getMillis()),reading.voltage,
+                         reading.valid && std::isfinite(reading.currentMa),config.voltageShutdownLimit);
+}
+bool SmartBoxController::servicePower() {
+    const auto before=powerSnapshot();
+    const bool moving=isMotorRunning();
+    const unsigned long period=before.protectedMode && !moving ? 1000 : 200;
+    if(hw.getMillis()-lastPowerReading>=period) {
+        lastPowerReading=hw.getMillis(); readSensors();
+    }
+    const auto after=powerSnapshot();
+    if(after.protectedMode) {
+        if(currentState==STATE_OTA_UPDATING) {forceAllRelaysOff(); return true;}
+        if(currentState!=STATE_BATTERY_LOW_SHUTDOWN) {
+            const bool critical=after.valid && after.state==BatteryState::PROTECTED;
+            lowBatteryOpening=critical;
+            transitionTo(STATE_BATTERY_LOW_SHUTDOWN);
+            if(critical) setRelayStates(true,true,false); // Existing one bounded fail-open stroke.
+            else forceAllRelaysOff();
+        }
+        if(!after.valid) lowBatteryOpening=false;
+        if(!lowBatteryOpening || hw.getMillis()-stateTimer>=config.actuatorTime) {
+            lowBatteryOpening=false; forceAllRelaysOff();
+        }
+        return true;
+    }
+    if(currentState==STATE_BATTERY_LOW_SHUTDOWN) {
+        forceAllRelaysOff(); lowBatteryOpening=false;
+        maintenanceRequested=false; isCalibrationPhase=false; sensorDeadlockFlag=false;
+        isCooldown=false; lastDetectStartTime=0; distanceHistoryIdx=0;
+        currentDistance=999.0f;
+        for(float &distance:distanceHistory) distance=999.0f;
+        postCloseBlindStartTime=hw.getMillis();
+        transitionTo(STATE_IDLE);
+        return true; // Never run an actuator on the recovery tick.
+    }
+    if(!after.actuationAllowed && !moving) return true;
+    return false;
+}
+bool SmartBoxController::tryBeginOta() {
     std::lock_guard<std::recursive_mutex> lock(dataMutex);
-    batteryVoltage = v;
-    motorCurrent = c;
+    if(!canStartOta()) return false;
+    forceAllRelaysOff();
+    transitionTo(STATE_OTA_UPDATING);
+    return true;
+}
+bool SmartBoxController::canContinueOta() const {
+    std::lock_guard<std::recursive_mutex> lock(dataMutex);
+    return currentState==STATE_OTA_UPDATING && relaysIsolated &&
+        batteryPolicy.snapshot(static_cast<uint32_t>(hw.getMillis())).otaReady;
+}
+void SmartBoxController::servicePowerDuringOta() {
+    std::lock_guard<std::recursive_mutex> lock(dataMutex);
+    servicePower();
+}
+void SmartBoxController::finishOtaWithoutReboot() {
+    std::lock_guard<std::recursive_mutex> lock(dataMutex);
+    forceAllRelaysOff(); lowBatteryOpening=false;
+    const bool held=powerSnapshot().protectedMode;
+    if(held) batteryPolicy.restoreProtection();
+    transitionTo(held ? STATE_BATTERY_LOW_SHUTDOWN : STATE_IDLE);
+    postCloseBlindStartTime=hw.getMillis();
 }
 
 void SmartBoxController::setRelayStates(bool mainOn, bool dirOpen, bool dirClose) {
@@ -460,13 +480,21 @@ void SmartBoxController::setRelayStates(bool mainOn, bool dirOpen, bool dirClose
     }
 
     // 멤버 변수로 관리 (static local 제거: 테스트 간 오염 방지)
-    bool dirChanged = (dirOpen != lastDirOpen) || (dirClose != lastDirClose);
+    bool dirChanged = (dirOpen != lastDirOpen) || (dirClose != lastDirClose) ||
+                      (mainOn && relaysIsolated);
     
     if (dirChanged) {
         // Interlock Guard 2: Turn off main relay and wait for contact release (100ms)
         hw.setPinMode(RELAY_MAIN_PIN, INPUT);
         hw.delayMs(100);
         
+        // Preload neutral before restoring drive after high-impedance isolation.
+        hw.writePin(RELAY_DIR_A_PIN, HIGH);
+        hw.writePin(RELAY_DIR_B_PIN, HIGH);
+        if (mainOn) {
+            hw.setPinMode(RELAY_DIR_A_PIN, OUTPUT);
+            hw.setPinMode(RELAY_DIR_B_PIN, OUTPUT);
+        }
         // Write directions (Active-Low)
         if (dirOpen) {
             hw.writePin(RELAY_DIR_A_PIN, LOW);
@@ -497,12 +525,13 @@ void SmartBoxController::setRelayStates(bool mainOn, bool dirOpen, bool dirClose
 }
 
 void SmartBoxController::forceAllRelaysOff() {
+    std::lock_guard<std::recursive_mutex> lock(dataMutex);
     hw.setPinMode(RELAY_MAIN_PIN, INPUT);
     hw.setPinMode(RELAY_DIR_A_PIN, INPUT);
     hw.setPinMode(RELAY_DIR_B_PIN, INPUT);
     if (!relaysIsolated) {
         relaysIsolated = true;
-        Serial.println("[SAFETY] All relays forced OFF and isolated (0mA standby).");
+        Serial.println("[SAFETY] Relay outputs isolated; total standby draw is not measured.");
     }
 }
 
@@ -513,7 +542,7 @@ bool SmartBoxController::isMotorRunning() const {
         return true;
     }
     if (currentState == STATE_BATTERY_LOW_SHUTDOWN) {
-        return (hw.getMillis() - stateTimer < config.actuatorTime);
+        return lowBatteryOpening && (hw.getMillis() - stateTimer < config.actuatorTime);
     }
     return false;
 }
@@ -536,7 +565,7 @@ bool SmartBoxController::canSendTelemetry() const {
 
 void SmartBoxController::startMaintenanceMode() {
     std::lock_guard<std::recursive_mutex> lock(dataMutex);
-    if (currentState == STATE_BATTERY_LOW_SHUTDOWN || currentState == STATE_EMERGENCY_STOP || currentState == STATE_OTA_UPDATING) {
+    if (!powerSnapshot().actuationAllowed || currentState == STATE_BATTERY_LOW_SHUTDOWN || currentState == STATE_EMERGENCY_STOP || currentState == STATE_OTA_UPDATING) {
         return;
     }
     maintenanceRequested = true;
@@ -549,6 +578,7 @@ void SmartBoxController::startMaintenanceMode() {
 
 void SmartBoxController::stopMaintenanceMode() {
     std::lock_guard<std::recursive_mutex> lock(dataMutex);
+    if(currentState==STATE_OTA_UPDATING) return;
     maintenanceRequested = false;
     if (currentState == STATE_MAINTENANCE) {
         transitionTo(STATE_CLOSE_START);

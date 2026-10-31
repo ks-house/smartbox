@@ -1,0 +1,350 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_INFLUXDB",
+      "label": "Existing SmartBox InfluxDB",
+      "type": "datasource",
+      "pluginId": "influxdb",
+      "pluginName": "InfluxDB"
+    }
+  ],
+  "uid": "smartbox-power",
+  "title": "SmartBox 배터리·전원 감시",
+  "description": "전압·보호·측정 유효성·수신 간격. 전류는 모터 분기이며 SOC/전체 소비량을 뜻하지 않습니다.",
+  "tags": [
+    "smartbox",
+    "power"
+  ],
+  "timezone": "Asia/Seoul",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-48h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "smartbox_bucket",
+        "type": "constant",
+        "label": "SmartBox bucket",
+        "query": "smartbox",
+        "current": {
+          "text": "smartbox",
+          "value": "smartbox"
+        },
+        "hide": 0
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "배터리 전압 — 측정 지점 기준",
+      "type": "timeseries",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "volt"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"${smartbox_bucket}\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r.topic == \"smartbox/telemetry\" and r._field == \"battery_v\") |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "전원 보호 상태",
+      "type": "state-timeline",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "정상",
+                  "color": "green"
+                },
+                "1": {
+                  "text": "주의",
+                  "color": "yellow"
+                },
+                "2": {
+                  "text": "절전",
+                  "color": "orange"
+                },
+                "3": {
+                  "text": "보호 정지",
+                  "color": "red"
+                },
+                "4": {
+                  "text": "회복 대기",
+                  "color": "blue"
+                },
+                "5": {
+                  "text": "측정 오류",
+                  "color": "red"
+                },
+                "6": {
+                  "text": "미확인·구형 펌웨어",
+                  "color": "gray"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"${smartbox_bucket}\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r.topic == \"smartbox/telemetry\" and (r._field == \"power_state_code\" or r._field == \"fsm_state\" or r._field == \"battery_v\")) |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\") |> map(fn: (r) => ({_time: r._time, _start: r._start, _stop: r._stop, _field: \"power_state\", _value: if exists r.power_state_code then int(v: r.power_state_code) else if exists r.fsm_state and r.fsm_state == \"BATTERY_LOW_SHUTDOWN\" then 3 else 6})) |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false) |> keep(columns: [\"_time\", \"_value\"]) |> group() |> sort(columns: [\"_time\"])"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "전압 측정 상태",
+      "type": "state-timeline",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "측정 불가",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "측정 정상",
+                  "color": "green"
+                },
+                "2": {
+                  "text": "미확인·구형 펌웨어",
+                  "color": "gray"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"${smartbox_bucket}\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r.topic == \"smartbox/telemetry\" and (r._field == \"power_sensor_valid\" or r._field == \"battery_v\")) |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\") |> map(fn: (r) => ({_time: r._time, _start: r._start, _stop: r._stop, _field: \"measurement_valid\", _value: if exists r.power_sensor_valid then int(v: r.power_sensor_valid) else 2})) |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false) |> keep(columns: [\"_time\", \"_value\"]) |> group() |> sort(columns: [\"_time\"])"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "회복까지 남은 시간",
+      "type": "timeseries",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "새 펌웨어 적용 대기"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"${smartbox_bucket}\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r.topic == \"smartbox/telemetry\" and r._field == \"power_recovery_remaining_s\") |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "예정 보고 주기",
+      "type": "timeseries",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "새 펌웨어 적용 대기"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"${smartbox_bucket}\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r.topic == \"smartbox/telemetry\" and r._field == \"power_report_interval_s\") |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "모터 분기 전류",
+      "type": "timeseries",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "mamp"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"${smartbox_bucket}\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r.topic == \"smartbox/telemetry\" and r._field == \"motor_current_ma\") |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "마지막 자료 수신 경과",
+      "type": "stat",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "h": 5,
+        "w": 12
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"${smartbox_bucket}\") |> range(start: -2h) |> filter(fn: (r) => r.topic == \"smartbox/telemetry\" and r._field == \"battery_v\") |> last() |> map(fn: (r) => ({_time: now(), _value: (float(v: uint(v: now())) - float(v: uint(v: r._time))) / 1000000000.0, _field: \"receipt_age_s\"})) |> keep(columns: [\"_time\", \"_value\"]) |> group() |> sort(columns: [\"_time\"])"
+        }
+      ]
+    }
+  ]
+}

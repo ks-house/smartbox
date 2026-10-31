@@ -46,13 +46,13 @@ static void NetworkTask(void* pvParameters) {
         mqttManager.update();
 
         // Periodic MQTT Telemetry (every 30 seconds)
-        if (millis() - lastMqttTelemetry >= 30000) {
+        if (millis() - lastMqttTelemetry >= controller.powerSnapshot().telemetryIntervalMs) {
             lastMqttTelemetry = millis();
             mqttManager.publishTelemetry();
         }
         
         // Yield CPU
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(pdMS_TO_TICKS(controller.powerSnapshot().protectedMode ? 1000 : 100));
     }
 }
 #endif
@@ -72,8 +72,9 @@ void setup() {
 
     // Load initial lid state and set FSM start state
     bool lidWasOpen = ConfigManager::loadLidState();
-    if (lidWasOpen) {
-        controller.setInitialState(STATE_STARTUP_OPEN);
+    if (lidWasOpen || ConfigManager::loadPowerHold()) {
+        // Logical NVS state does not prove physical position. No automatic boot stroke.
+        controller.setInitialState(STATE_BATTERY_LOW_SHUTDOWN);
     }
 
     // 3. Register unified state change callback (BUG-F fix: single lambda merges NVS + MQTT callbacks)
@@ -89,6 +90,7 @@ void setup() {
         if (next == STATE_OTA_UPDATING) {
             Serial.println("[SYSTEM] OTA mode entered. All background routines suspended.");
         } else {
+            ConfigManager::savePowerHold(next == STATE_BATTERY_LOW_SHUTDOWN);
             // 논리적 뚜껑 상태를 Preferences에 저장
             if (next == STATE_HOLD || next == STATE_OPENING ||
                 next == STATE_BATTERY_LOW_SHUTDOWN || next == STATE_STARTUP_OPEN) {
@@ -104,7 +106,7 @@ void setup() {
             mqtt->publishEventState((int)prev, (int)next);
 
             // 개폐 사이클 시작: IDLE → non-IDLE 전환
-            if (prev == STATE_IDLE && next != STATE_IDLE) {
+            if (prev == STATE_IDLE && next != STATE_IDLE && next != STATE_BATTERY_LOW_SHUTDOWN) {
                 cycleStartTime = millis();
                 cyclePeakCurrent = 0.0f;
                 cycleStartBatt = controller.getBatteryVoltage();
@@ -125,7 +127,9 @@ void setup() {
             if (next == STATE_EMERGENCY_STOP) {
                 mqtt->publishEventAlarm("STALL_OVERCURRENT", controller.getMotorCurrent(), "Motor stall / emergency stop triggered");
             } else if (next == STATE_BATTERY_LOW_SHUTDOWN) {
-                mqtt->publishEventAlarm("LOW_BATTERY", controller.getBatteryVoltage(), "Critical low battery voltage detected");
+                const auto power=controller.powerSnapshot();
+                mqtt->publishEventAlarm(power.valid ? "LOW_BATTERY" : "POWER_SENSOR_FAULT",
+                    power.voltage,power.valid ? "Low-voltage protection" : "Power measurement unavailable");
             }
         }
     });
@@ -188,6 +192,7 @@ void loop() {
 #ifndef NATIVE_BUILD
     static bool loopTaskSubscribed = true;
     if (controller.isOtaMode()) {
+        controller.servicePowerDuringOta();
         if (loopTaskSubscribed) {
             esp_task_wdt_delete(NULL);
             loopTaskSubscribed = false;
@@ -247,4 +252,6 @@ void loop() {
                       controller.getMotorCurrent(),
                       (int)controller.getCurrentState());
     }
+    // Yield without delaying the actuator timer or the24/7 sensing contract.
+    delay(controller.powerSnapshot().protectedMode && !controller.isMotorRunning() ? 20 : 1);
 }

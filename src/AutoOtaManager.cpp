@@ -21,6 +21,7 @@
 
 SmartBoxController* AutoOtaManager::controllerPtr = nullptr;
 unsigned long AutoOtaManager::lastScheduleCheck = 0;
+int AutoOtaManager::lastOtaRunDay = -1;
 unsigned long AutoOtaManager::lastOtaRunTime = 0; // 0 = never run
 volatile bool AutoOtaManager::otaForceRequested = false;
 volatile bool AutoOtaManager::otaInProgress = false;
@@ -50,6 +51,7 @@ void AutoOtaManager::init(SmartBoxController& controller) {
     Serial.println("[OTA] HTTPS authentication client schema=1");
     lastScheduleCheck = 0;
     lastOtaRunTime = 0;
+    lastOtaRunDay = -1;
     otaForceRequested = false;
     otaInProgress = false;
     otaState = OTA_STATE_IDLE;
@@ -80,6 +82,8 @@ void AutoOtaManager::update() {
         return;
     }
     
+    if (!controllerPtr->canStartOta()) return;
+
     // Check if dynamic force update requested
     if (otaForceRequested) {
         otaForceRequested = false;
@@ -97,6 +101,8 @@ void AutoOtaManager::update() {
     // --- First-boot check: always run OTA version check once after bootup ---
     if (lastOtaRunTime == 0) {
         lastOtaRunTime = now;
+        struct tm bootTimeInfo;
+        if (getLocalTime(&bootTimeInfo, 0)) lastOtaRunDay = bootTimeInfo.tm_year * 400 + bootTimeInfo.tm_yday;
         Serial.println("[AUTO-OTA] First boot: running initial OTA version check...");
         runOtaProcess(false);
         return;
@@ -113,11 +119,11 @@ void AutoOtaManager::update() {
     }
 
     int configuredOtaHour = controllerPtr->getConfig().otaHour;
-    if (timeinfo.tm_hour == configuredOtaHour) {
+    if (timeinfo.tm_hour >= configuredOtaHour) {
         // Use day-of-year as guard to run only once per calendar day
-        static int lastOtaRunDay = -1;
-        if (lastOtaRunDay != timeinfo.tm_yday) {
-            lastOtaRunDay = timeinfo.tm_yday;
+        const int calendarDay = timeinfo.tm_year * 400 + timeinfo.tm_yday;
+        if (lastOtaRunDay != calendarDay) {
+            lastOtaRunDay = calendarDay;
             lastOtaRunTime = now;
             Serial.printf("[AUTO-OTA] Scheduled daily OTA check at %02d:00 (config.otaHour=%d, day=%d).\n",
                           configuredOtaHour, configuredOtaHour, timeinfo.tm_yday);
@@ -132,7 +138,7 @@ bool AutoOtaManager::startOtaUpdate(bool force) {
         return false;
     }
     
-    if (force) {
+    if (force && controllerPtr->canStartOta()) {
         otaForceRequested = true;
         otaState = OTA_STATE_CHECKING;
         memset(otaErrorMessage, 0, sizeof(otaErrorMessage));
@@ -143,6 +149,7 @@ bool AutoOtaManager::startOtaUpdate(bool force) {
 }
 
 void AutoOtaManager::runOtaProcess(bool force) {
+    if (!controllerPtr->canStartOta()) return;
     otaAttempts = otaAttempts + 1;
     otaPhase = OTA_PHASE_VERSION;
     otaManifestHttpCode = 0;
@@ -198,14 +205,21 @@ void AutoOtaManager::runOtaProcess(bool force) {
     }
     http.end();
     
+    if (needsUpdate && !controllerPtr->canStartOta()) {
+        otaState = OTA_STATE_FAILED; otaInProgress = false;
+        strncpy(otaErrorMessage, "POWER_NOT_READY", sizeof(otaErrorMessage)-1);
+        return;
+    }
     if (needsUpdate) {
         Serial.println("[OTA] Step 2: Preparing hardware for flashing...");
         
         // Critical Safety Interlock
-        controllerPtr->forceAllRelaysOff();
+        if (!controllerPtr->tryBeginOta()) {
+            otaState = OTA_STATE_FAILED; otaInProgress = false;
+            strncpy(otaErrorMessage, "POWER_OR_BUSY", sizeof(otaErrorMessage)-1);
+            return;
+        }
         Serial.println("[OTA] Pre-OTA Safety Interlock: All relays isolated.");
-        
-        controllerPtr->transitionTo(STATE_OTA_UPDATING);
         Serial.println("[OTA] FSM transitioned to STATE_OTA_UPDATING.");
         
         // Wait until motor is fully stopped and contacts separated
@@ -214,6 +228,13 @@ void AutoOtaManager::runOtaProcess(bool force) {
             delay(50);
         }
         delay(500); // Allow physical contacts to fully separate
+        if (!controllerPtr->canContinueOta()) {
+            otaState = OTA_STATE_FAILED;
+            strncpy(otaErrorMessage, "POWER_NOT_READY", sizeof(otaErrorMessage)-1);
+            controllerPtr->finishOtaWithoutReboot();
+            otaInProgress = false;
+            return;
+        }
         
 #ifndef NATIVE_BUILD
         // Unsubscribe current task (NetworkTask) from WDT during flashing
@@ -226,9 +247,19 @@ void AutoOtaManager::runOtaProcess(bool force) {
         WiFiClientSecure client2;
         client2.setCACert(SECRET_ROOT_CA_CERT); // TLS Root CA verification
         
-        otaPhase = OTA_PHASE_FIRMWARE;
         httpUpdate.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
         httpUpdate.setAuthorization(SECRET_OTA_USER, SECRET_OTA_PASS);
+        if (!controllerPtr->canContinueOta()) {
+#ifndef NATIVE_BUILD
+            esp_task_wdt_add(NULL);
+#endif
+            otaState = OTA_STATE_FAILED;
+            strncpy(otaErrorMessage, "POWER_NOT_READY", sizeof(otaErrorMessage)-1);
+            controllerPtr->finishOtaWithoutReboot();
+            otaInProgress = false;
+            return;
+        }
+        otaPhase = OTA_PHASE_FIRMWARE;
         t_httpUpdate_return ret = httpUpdate.update(client2, FIRMWARE_URL);
         
         if (ret == HTTP_UPDATE_FAILED) {
@@ -247,7 +278,7 @@ void AutoOtaManager::runOtaProcess(bool force) {
             Serial.println("[OTA] NetworkTask re-subscribed to WDT before state recovery.");
 #endif
             // Failure recovery: restore FSM to STATE_IDLE
-            controllerPtr->transitionTo(STATE_IDLE);
+            controllerPtr->finishOtaWithoutReboot();
             Serial.println("[OTA] Recovered state to STATE_IDLE after update failure.");
             
         } else if (ret == HTTP_UPDATE_NO_UPDATES) {
@@ -258,7 +289,7 @@ void AutoOtaManager::runOtaProcess(bool force) {
             esp_task_wdt_add(NULL);
             Serial.println("[OTA] NetworkTask re-subscribed to WDT before no-update recovery.");
 #endif
-            controllerPtr->transitionTo(STATE_IDLE);
+            controllerPtr->finishOtaWithoutReboot();
         } else if (ret == HTTP_UPDATE_OK) {
             Serial.println("[OTA] HTTPS update SUCCESS! Rebooting device in 1.5 seconds...");
             otaState = OTA_STATE_SUCCESS;

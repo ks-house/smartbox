@@ -267,6 +267,7 @@ void WifiManager::update() {
         }
         webServer.stop();
         WiFi.mode(WIFI_STA);
+        WiFi.setSleep(true); // Connected modem sleep; preserve24/7 MQTT and sensing.
         Serial.println("[WIFI] 5-minute boot provisioning window expired. SoftAP disabled for power saving.");
     }
 

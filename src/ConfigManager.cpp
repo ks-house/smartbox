@@ -132,3 +132,16 @@ void ConfigManager::loadWifiCredentials(String& ssid, String& password) {
         Serial.println("[CONFIG] Failed to open Preferences to load WiFi credentials.");
     }
 }
+
+bool ConfigManager::loadPowerHold() {
+    Preferences prefs;
+    if(!prefs.begin("smartbox",true)) return true;
+    const bool held=prefs.getBool("power_hold",false);prefs.end();return held;
+}
+void ConfigManager::savePowerHold(bool held) {
+    Preferences prefs;
+    if(prefs.begin("smartbox",false)) {
+        if(prefs.getBool("power_hold",false)!=held) prefs.putBool("power_hold",held);
+        prefs.end();
+    } else Serial.println("[POWER] Persistent protection marker unavailable; outputs remain guarded.");
+}

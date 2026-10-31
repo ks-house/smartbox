@@ -33,6 +33,7 @@ private:
     static volatile int otaUpdaterError;
     static SmartBoxController* controllerPtr;
     static unsigned long lastScheduleCheck;
+    static int lastOtaRunDay;
     static unsigned long lastOtaRunTime;  // millis() of last OTA run (0 = never)
     static volatile bool otaForceRequested;
     static volatile bool otaInProgress;

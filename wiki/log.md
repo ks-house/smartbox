@@ -200,3 +200,49 @@ source_of_truth: true
 ## [2026-10-17] test | Validate accepted OTA diagnostic documentation
 
 - Native13 and ESP32-C6 dummy-only build PASS for the diagnostic helper branch. Temporary secrets header removed and generated version bytes restored. No artifact publication, live policy or physical actuation.
+
+
+## [2026-10-31] code | Implement owner-approved automatic battery recovery and monitoring
+
+- Add per-instance fresh/valid power policy, continuous300s recovery at max12.4V/cutoff+0.8,15s noncritical qualification/0.1V exit hysteresis and stale/clock-wrap guards. Preserve bounded critical fail-open/interlock; invalid sensor immediately isolates without synthetic voltage.
+- Persist protection, migrate uncertain boot-open state to isolated recovery, clear stale movement on resume and retain24h sensing. Add adaptive30/60/120/300s reporting, idle yields, connected Wi-Fi savings, power-conditioned OTA admission/failure cleanup and no low-power scheduled reboot.
+- Extend existing telemetry/status namespaces and HA discovery to26 entities without broker/account changes. Add bounded read-only NAS monitoring with existing identity, deduplicated owner-local notifications, private installation rollback and Grafana export. Runtime install/firmware acceptance remain pending.
+- Existing13 native tests PASS; automatic-recovery/NaN defects, sensor-midstroke, low-voltage entry/reset, warning chatter and legacy mixed-frame defects reproduced RED then fixed. Latest native26 PASS; Python63 tests PASS with9 explicit environment skips; C6 dummy build passes. Final fresh review and hosted gates follow. No dummy image publication or device/control action.
+
+
+## [2026-10-31] fix | Close independent battery release review findings
+
+- Independent reviewer found5 Important/2 Minor issues; reproduce and fix direction-mode restoration, actual OTA no-update cleanup, atomic reservation/all movement rejection/immediate energy gate, actual INA219 profile/status freshness, HTTP200 error-stream classification and malformed age/display semantics.
+- Extend actual production AutoOtaManager/PowerManager host fixtures, pthread interlock test and register-level conversion failures/range/cohort/wrap tests. Preserve legacy bounded fail-open but reject out-of-profile12V readings above16V, apply stall magnitude, and let missed low-energy night checks catch up once when charged. No calibration or re-review bypass.
+- Final local37 native PASS,76 Python PASS/9 explicit environment skips and C6 dummy build PASS (RAM62220B/flash1347818B). The credential-free local binary remains unpublished; final main CI/artifact/installed/runtime acceptance pending.
+
+
+## [2026-10-31] fix | Repair stale OTA content origin and retain charged-install gate
+
+- Existing SmartBox manifest502 traced to custom guard172.17.0.2 while current Docker static service used0.3. New narrow handler repair retains the same content mount/auth/access/method policy and removes bridge-IP dependence; full nginx candidate and three real http-worker Unix-socket content checks PASS.
+- Fresh narrow review found missing runtime acceptance and manifest binding. Reproduce RED then fix with exact prior manifest/image capture, immediate pre-apply pair check, actual TLS content confirmation, integrity-binding preservation and exact rollback. Six focused tests PASS. Applied root receipt e316f95f; previous artifacts/guard retained privately. No new credentials/listener or unrelated service restart.
+- Hosted41194901015 PASS for authenticated exact prior0.1.0-ge0323a0/SHA333e23df download and anonymous/wrong-credential refusal; build/publication skipped. Grafana new dashboard retains old dashboard and distinguishes legacy unknown fields. New firmware publication/install and schema1 observer remain pending.
+- Fresh earlier live telemetry12.17V/legacyBATTERY_LOW_SHUTDOWN; owner explicitly waits for solar charging because external power is unavailable. Keep12.4V recovery/admission thresholds; do not lower them to force installation. Zero actuator/OTA commands. Final local/hosted gates follow this checkpoint.
+
+- Final expanded Python suite:82 total,73 executed PASS and9 explicit environment skips; native37 PASS; C6 dummy-only build PASS RAM62220B/flash1347818B. Generated version header restored. NAS observer preflight reuses existing Influx identity and correctly returns LEGACY_FIRMWARE with fresh source32.9s; no service installed or fake valid voltage.
+
+
+## [2026-10-31] compile | Record Grafana login confirmation without changing deployment admission
+
+- Owner reports Grafana login complete. Browser inventory still contains the previously verified smartbox-power dashboard. This turn cannot re-read the UI because the browser control reports user binding unavailable; do not turn login confirmation into a fresh dashboard/runtime verification claim.
+- Existing dashboard remains applied from the prior measured acceptance; firmware publication/install and NAS observer remain pending solar charging. No source/configuration, credential or device command change. This is an operational log entry only.
+
+- Operational-log-only validation: native37 PASS and ESP32-C6 dummy build PASS. Generated version header restored; no image publication or device request.
+
+
+## [2026-10-31] code | Bound the explicitly requested initial legacy firmware transition
+
+- Owner renews firmware installation. Fresh passive125s evidence at20:12–20:14KST is12.140–12.144V/0.4–0.6mA motor branch, monotonic uptime and old BATTERY_LOW_SHUTDOWN. Existing old NVS callback preserves logical lid-open; reviewed new boot restores isolated protection. No actuator command or protection-threshold change.
+- Add operator-only exact-legacy first transition with four continuous near-current unloaded observations, fixed OTA payload/QoS0/nonretained and crash-durable O_EXCL no-resend intent. The explicit12.0V bootstrap floor is not an MCU rail/SOC guarantee and does not weaken new firmware's12.4V automatic OTA/motor policy.
+- Fresh narrow review finds mixed fabricated sensor rows and unsynced parent directory. Reproduce RED and fix; nine admission/delivery-uncertainty regressions PASS. Exact new schema is rejected in this legacy operator. Final suite/build/hosted checks and publication/install evidence follow; none sent yet.
+
+- Final pre-publication local checks:91 Python total/82 executed PASS/9 explicit environment skips, native37 PASS and C6 dummy build PASS. Existing HA principal passively confirms retained online0.1.0-ge0323a0 and five fresh stable protected frames; no publish. Generated version header restored; new artifact/install still pending.
+
+- New bounded transport review finds discontinuous/offline boot acceptance and lost-ack/stale-attempt evidence defects. Fix latest fresh online status, consecutive same-boot uptime/receipt continuity≥30s, persisted requested-versus-confirmed uncertainty and unconditional current-attempt terminal report. Public acceptance tests reproduce RED→GREEN; exact private transport fixture passes lost-ack and broken-pipe cases. Retained legacy status is explicitly labelled last-boot evidence, not a newly queried version.
+
+- Final local93 Python total/84 executed PASS/9 explicit environment skips, native37 PASS, C6 dummy build PASS; exact private transport lost-ack/broken-pipe fixtures2 PASS. Generated version header restored. Keep new main publication and installed acceptance separate from this verified source checkpoint.
