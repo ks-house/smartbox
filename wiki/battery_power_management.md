@@ -33,3 +33,12 @@ The NAS observer queries only existing Influx telemetry with the existing collec
 Native production-component regressions include permanent shutdown recovery, dip/gap/clock wrap, sensor failure, rejected stale/under-threshold commands, independent timers, no recovery pulse, old relay/stall/OTA contracts and warning chatter. Python checks cover clock/source/quality/legacy-cohort rejection, stale-period handling, deduplication and actual installation rollback under isolated files/service fixtures. C6 compilation uses dummy local provisioning; that image must never be published.
 
 Before operating OTA, preserve the prior artifact/metadata, require reviewed CI publication and authenticated HTTPS content/version readback, observe fresh adequate voltage and send at most one owner-authorized trigger_ota. Installation/new boot/new schema and automatic recovery need actual observation. Physical lid movement and energy savings require separate field evidence; no unattended actuator test is permitted.
+
+
+## Review corrections before release
+
+Direction output modes are restored only on a subsequent legitimate movement: Main OFF,100ms release, neutral latch preload, OUTPUT restore/direction select,100ms settle, Main ON. Current stall uses magnitude. OTA reserves admission/isolation/state under one controller lock, rejects movement/maintenance while reserved and rechecks current power immediately before flashing. Every non-reboot updater exit retains protection. Missed night checks catch up once that calendar day after adequate power; routine reboot cannot interrupt even the manifest request.
+
+INA219 now uses an independently tested triggered register sampler: verify calibration4096 and the existing0.1-ohm/100uA LSB profile, new conversion-ready, overflow,320mV range, coherent current/shunt and repeated register state. Power-down is explicit between samples. The12V policy rejects readings above16V as unsupported, rather than enabling actuators. These profile assumptions still need physical shunt/load verification. See the [TI INA219 datasheet](https://www.ti.com/lit/ds/symlink/ina219.pdf).
+
+A successful HTTP stream with an Influx error table is a source failure, never device-offline evidence; malformed cohorts and nonfinite/negative sample ages are rejected. Dashboard reporting-period labels describe configuration, and last-receipt age is separate. Final local gates:37 native tests PASS,76 Python tests PASS with9 explicit environment skips, C6 dummy build PASS (RAM62220B/flash1347818B). Source/runtime/physical acceptance remain separate.

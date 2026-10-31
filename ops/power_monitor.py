@@ -22,6 +22,9 @@ STATES={0:'NORMAL',1:'LOW_BATTERY',2:'ENERGY_SAVING',3:'BATTERY_PROTECTED',4:'RE
 FIELDS={'power_schema':'schema','power_sensor_valid':'valid','power_state_code':'state',
  'power_report_interval_s':'interval_s','power_sample_age_ms':'sample_age_ms','battery_v':'voltage'}
 
+class SourceResponseError(RuntimeError):pass
+class SourceFormatError(ValueError):pass
+
 def evaluate(sample,now,source_ok=True):
     value={'status':'SOURCE_UNAVAILABLE','severity':'warning','voltage_v':None}
     if not source_ok:return value
@@ -36,7 +39,8 @@ def evaluate(sample,now,source_ok=True):
         value['report_interval_s']=interval
         if age>2*interval+30:value['status']='OFFLINE';return value
         voltage=sample.get('voltage')
-        if sample.get('valid')!=1 or sample.get('sample_age_ms',999999)>2000 or not isinstance(voltage,(int,float)) or not math.isfinite(voltage) or not 0<voltage<=26:
+        age_ms=float(sample.get('sample_age_ms',999999))
+        if sample.get('valid')!=1 or not math.isfinite(age_ms) or not 0<=age_ms<=2000 or not isinstance(voltage,(int,float)) or not math.isfinite(voltage) or not 0<voltage<=16:
             value['status']='POWER_SENSOR_FAULT';return value
         value['voltage_v']=round(voltage,3);value['status']=STATES[code]
         value['severity']='info' if code in (0,4,6) else 'warning'
@@ -64,22 +68,27 @@ def epoch(value):
     return parsed.timestamp()
 
 def parse_flux(text):
-    rows=[line for line in text.splitlines() if line and not line.startswith('#')]
-    values={}
-    for row in csv.DictReader(io.StringIO('\n'.join(rows))):
-        field=row.get('_field')
-        if field not in FIELDS or row.get('_time')=='_time':continue
+    values={};header=None
+    for cells in csv.reader(io.StringIO(text)):
+        if not cells or not any(cells) or cells[0].startswith('#'):continue
+        if 'error' in cells and 'reference' in cells:
+            raise SourceResponseError('query error record')
+        if all(k in cells for k in ('_time','_field','_value')):
+            header=cells;continue
+        if header is None or len(cells)!=len(header):raise SourceFormatError('invalid query record')
+        row=dict(zip(header,cells));field=row.get('_field')
+        if field not in FIELDS:continue
         try:values[FIELDS[field]]=(epoch(row['_time']),float(row['_value']))
-        except (ValueError,KeyError,TypeError):continue
+        except (ValueError,KeyError,TypeError,OverflowError):raise SourceFormatError('invalid sample record')
     if not values:return None
-    # Schema is mandatory for a new frame; legacy samples cannot supply it.
     if 'schema' not in values:
-        at=max(t for t,v in values.values());return {'schema':0,'at':at}
+        return {'schema':0,'at':max(t for t,v in values.values())}
     at=values['schema'][0]
     if 'voltage' in values and values['voltage'][0]>at+0.001:
         return {'schema':0,'at':values['voltage'][0]}
     required=('schema','state','valid','interval_s','sample_age_ms')
-    if any(k not in values or abs(values[k][0]-at)>0.001 for k in required):return None
+    if any(k not in values or abs(values[k][0]-at)>0.001 for k in required):
+        raise SourceFormatError('incomplete or mixed telemetry cohort')
     sample={k:v for k,(t,v) in values.items() if abs(t-at)<=0.001};sample['at']=at
     return sample
 
@@ -138,6 +147,7 @@ def cycle(config,directory,now=None,fetch=fetch_sample,notifier=notify_owner):
     now=time.time() if now is None else now
     previous=json.loads(regular(directory/'state.json')) if (directory/'state.json').exists() else {}
     try:sample=fetch(config);current=evaluate(sample,now)
+    except SourceFormatError:current={'status':'SOURCE_INVALID','severity':'warning','voltage_v':None}
     except Exception:current=evaluate(None,now,source_ok=False)
     state,event=advance(previous,current,now)
     pending=state.get('pending',[])

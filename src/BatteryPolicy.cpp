@@ -12,7 +12,7 @@ void BatteryPolicy::sample(uint32_t now,float voltage,bool valid,float cutoff) {
   sampled_=true; sampleAt_=now;
   cutoff_=std::isfinite(cutoff) && cutoff>0 && cutoff<25 ? cutoff : 11.3f;
   recovery_=std::max(12.4f,cutoff_+0.8f);
-  valid_=valid && std::isfinite(voltage) && voltage>0 && voltage<=26.0f;
+  valid_=valid && std::isfinite(voltage) && voltage>0 && voltage<=16.0f;
   voltage_=voltage;
   if(!valid_) {
     latched_=true; state_=BatteryState::SENSOR_FAULT;

@@ -208,3 +208,10 @@ source_of_truth: true
 - Persist protection, migrate uncertain boot-open state to isolated recovery, clear stale movement on resume and retain24h sensing. Add adaptive30/60/120/300s reporting, idle yields, connected Wi-Fi savings, power-conditioned OTA admission/failure cleanup and no low-power scheduled reboot.
 - Extend existing telemetry/status namespaces and HA discovery to26 entities without broker/account changes. Add bounded read-only NAS monitoring with existing identity, deduplicated owner-local notifications, private installation rollback and Grafana export. Runtime install/firmware acceptance remain pending.
 - Existing13 native tests PASS; automatic-recovery/NaN defects, sensor-midstroke, low-voltage entry/reset, warning chatter and legacy mixed-frame defects reproduced RED then fixed. Latest native26 PASS; Python63 tests PASS with9 explicit environment skips; C6 dummy build passes. Final fresh review and hosted gates follow. No dummy image publication or device/control action.
+
+
+## [2026-10-31] fix | Close independent battery release review findings
+
+- Independent reviewer found5 Important/2 Minor issues; reproduce and fix direction-mode restoration, actual OTA no-update cleanup, atomic reservation/all movement rejection/immediate energy gate, actual INA219 profile/status freshness, HTTP200 error-stream classification and malformed age/display semantics.
+- Extend actual production AutoOtaManager/PowerManager host fixtures, pthread interlock test and register-level conversion failures/range/cohort/wrap tests. Preserve legacy bounded fail-open but reject out-of-profile12V readings above16V, apply stall magnitude, and let missed low-energy night checks catch up once when charged. No calibration or re-review bypass.
+- Final local37 native PASS,76 Python PASS/9 explicit environment skips and C6 dummy build PASS (RAM62220B/flash1347818B). The credential-free local binary remains unpublished; final main CI/artifact/installed/runtime acceptance pending.

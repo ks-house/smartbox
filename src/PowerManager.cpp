@@ -1,4 +1,5 @@
 #include "PowerManager.h"
+#include "AutoOtaManager.h"
 #include <Arduino.h>
 #include <time.h>
 #ifndef NATIVE_BUILD
@@ -19,7 +20,7 @@ void PowerManager::update() {
     }
 
     // Suspend power management transitions during active OTA
-    if (controllerPtr->isOtaMode()) {
+    if (controllerPtr->isOtaMode() || AutoOtaManager::isOtaInProgress()) {
         return;
     }
 

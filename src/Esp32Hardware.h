@@ -2,13 +2,10 @@
 #define ESP32_HARDWARE_H
 
 #include "HardwareInterface.h"
-#include <Adafruit_INA219.h>
+#include "Ina219Sampler.h"
 
 class Esp32Hardware : public HardwareInterface {
 private:
-    Adafruit_INA219 ina219;
-    bool hasINA219 = false;
-    unsigned long lastPowerProbe = 0;
     uint8_t trigPin;
     uint8_t echoPin;
 

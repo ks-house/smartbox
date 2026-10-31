@@ -77,8 +77,8 @@
     },
     {
       "id": 2,
-      "title": "전원 보호 단계 0정상·1경고·2절전·3보호·4회복·5측정오류",
-      "type": "timeseries",
+      "title": "전원 보호 상태",
+      "type": "state-timeline",
       "datasource": {
         "type": "influxdb",
         "uid": "${DS_INFLUXDB}"
@@ -91,7 +91,42 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "none"
+          "unit": "none",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "정상",
+                  "color": "green"
+                },
+                "1": {
+                  "text": "주의",
+                  "color": "yellow"
+                },
+                "2": {
+                  "text": "절전",
+                  "color": "orange"
+                },
+                "3": {
+                  "text": "보호 정지",
+                  "color": "red"
+                },
+                "4": {
+                  "text": "회복 대기",
+                  "color": "blue"
+                },
+                "5": {
+                  "text": "측정 오류",
+                  "color": "red"
+                },
+                "6": {
+                  "text": "초기 확인",
+                  "color": "gray"
+                }
+              }
+            }
+          ]
         },
         "overrides": []
       },
@@ -113,8 +148,8 @@
     },
     {
       "id": 3,
-      "title": "전압 측정 유효성 1유효·0불명",
-      "type": "timeseries",
+      "title": "전압 측정 상태",
+      "type": "state-timeline",
       "datasource": {
         "type": "influxdb",
         "uid": "${DS_INFLUXDB}"
@@ -127,7 +162,22 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "none"
+          "unit": "none",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "측정 불가",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "측정 정상",
+                  "color": "green"
+                }
+              }
+            }
+          ]
         },
         "overrides": []
       },
@@ -185,7 +235,7 @@
     },
     {
       "id": 5,
-      "title": "자료 수신 간격 — 마지막 수신은 현재 전압이 아님",
+      "title": "예정 보고 주기",
       "type": "timeseries",
       "datasource": {
         "type": "influxdb",
@@ -221,7 +271,7 @@
     },
     {
       "id": 6,
-      "title": "모터 분기 전류 — 전체 배터리 소비량 아님",
+      "title": "모터 분기 전류",
       "type": "timeseries",
       "datasource": {
         "type": "influxdb",
@@ -254,6 +304,41 @@
           "mode": "single"
         }
       }
+    },
+    {
+      "id": 7,
+      "title": "마지막 자료 수신 경과",
+      "type": "stat",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "h": 5,
+        "w": 12
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"${smartbox_bucket}\") |> range(start: -2h) |> filter(fn: (r) => r.topic == \"smartbox/telemetry\" and r._field == \"power_schema\") |> last() |> map(fn: (r) => ({_time: now(), _value: (float(v: uint(v: now())) - float(v: uint(v: r._time))) / 1000000000.0, _field: \"receipt_age_s\"}))"
+        }
+      ]
     }
   ]
 }

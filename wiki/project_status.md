@@ -24,7 +24,7 @@ applies_to:
 |---|---|---|
 | Controller | 11-state FSM, 5-sample median, debounce, post-close blind time, deadlock self-healing | native test 대상이나 실제 센서·기구 반복 시험은 별도 |
 | Actuator | Active-Low relay, Main high-impedance cutoff, 100 ms 방향 전환 interlock, 3.8 s 기본 timeout | GPIO/접점/부하/과전류 실측 필요 |
-| Startup | NVS가 lid-open을 기록한 경우 `STARTUP_OPEN → OPEN_START → OPENING → HOLD → CLOSE_START → CLOSING → IDLE` 보정 | 모든 부팅에서 보정하는 구현은 아님 |
+| Startup | NVS의 logical lid-open/protection이면 출력 격리 후 전압 회복을 확인하여 자동 재개 | NVS는 실제 위치 증거가 아니며 boot 자체로 구동하지 않음 |
 | Wi-Fi | 부팅 후 5분 AP+STA captive portal, 이후 STA, 15초 연결 재시도 | AP/OEM/router 현장 복구 증거 별도 |
 | MQTT | PsychicMqttClient, MQTTS URI, Root CA, command/config, LWT, HA discovery 20개 | broker 수락과 물리 동작 완료는 별개 |
 | Telemetry | 30초 live, motor 500 ms batch, 1분 heartbeat sample, 설정 주기 batch | timestamp는 `millis()`이며 wall-clock epoch가 아님 |
@@ -144,3 +144,8 @@ PR15/source9e46d4e passes39010352192 Python/native/C6 and merges2c148e19. The re
 main39011920146 is cancelled. No helper/documentation firmware publication is needed.
 [Joint operating evidence](https://github.com/ks-house/smart-gatekeeper/blob/main/wiki/followup_acceptance_2026_10_17.md).
 Physical lid/electrical/rollback qualification remains distinct.
+
+
+## 2026-10-31 automatic battery recovery candidate
+
+[Battery power management](battery_power_management.md) describes the owner-approved automatic recovery, profile validity, savings, OTA reservation and monitoring. Source verification passes37 native/76 Python (9 environment skips)/C6 dummy compilation. Reviewed production publication, installed recovery and monitoring acceptance remain separate; no local dummy image is eligible for deployment.

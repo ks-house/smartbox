@@ -3,9 +3,15 @@
 #endif
 #include <unity.h>
 #include <cmath>
+#ifdef NATIVE_BUILD
+#include <future>
+#include <condition_variable>
+#include <thread>
+#endif
 #include "MockHardware.h"
 
 #include "SmartBoxController.h"
+#include "Ina219Sampler.h"
 
 #ifdef NATIVE_BUILD
 MockSerial Serial;
@@ -795,6 +801,130 @@ void test_warning_dwell_and_hysteresis_prevent_report_chatter(void) {
     TEST_ASSERT_EQUAL(static_cast<int>(BatteryState::NORMAL),static_cast<int>(p.snapshot(now).state));
 }
 
+
+void test_recovered_relay_direction_modes_and_next_close(void) {
+    MockHardware hw;hw.setBatteryVoltage(12.6f);SmartBoxController box(hw);
+    box.setInitialState(STATE_BATTERY_LOW_SHUTDOWN);box.init();
+    for(int i=0;i<301;i++){hw.advanceMillis(1000);box.update();}
+    hw.clearEventHistory();box.forceOpen();box.update();
+    TEST_ASSERT_EQUAL(OUTPUT,hw.getPinMode(RELAY_DIR_A_PIN));
+    TEST_ASSERT_EQUAL(OUTPUT,hw.getPinMode(RELAY_DIR_B_PIN));
+    TEST_ASSERT_EQUAL(LOW,hw.getPinValue(RELAY_DIR_A_PIN));
+    hw.advanceMillis(4000);box.update();box.forceClose();box.update();
+    TEST_ASSERT_EQUAL(OUTPUT,hw.getPinMode(RELAY_DIR_A_PIN));
+    TEST_ASSERT_EQUAL(OUTPUT,hw.getPinMode(RELAY_DIR_B_PIN));
+    TEST_ASSERT_EQUAL(HIGH,hw.getPinValue(RELAY_DIR_A_PIN));
+    TEST_ASSERT_EQUAL(LOW,hw.getPinValue(RELAY_DIR_B_PIN));
+}
+void test_close_command_cannot_leave_ota(void) {
+    MockHardware hw;hw.setBatteryVoltage(12.6f);SmartBoxController box(hw);box.init();
+    box.transitionTo(STATE_HOLD);box.transitionTo(STATE_OTA_UPDATING);
+    box.forceClose();box.update();
+    TEST_ASSERT_EQUAL(STATE_OTA_UPDATING,box.getCurrentState());
+    TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(RELAY_MAIN_PIN));
+}
+void test_reverse_current_stall_uses_magnitude(void) {
+    MockHardware hw;SmartBoxController box(hw);box.init();box.forceOpen();box.update();
+    hw.setMotorCurrent(-4000);hw.advanceMillis(600);
+    box.update();box.update();box.update();
+    TEST_ASSERT_EQUAL(STATE_HOLD,box.getCurrentState());
+    TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(RELAY_MAIN_PIN));
+}
+
+
+#ifdef NATIVE_BUILD
+static void chargeForOta(MockHardware& hw,SmartBoxController& box) {
+    hw.setBatteryVoltage(12.6f);
+    for(int i=0;i<35;i++){hw.advanceMillis(1000);box.update();}
+}
+void test_atomic_ota_reservation_blocks_all_motion_commands(void) {
+    MockHardware hw;hw.setBatteryVoltage(12.6f);SmartBoxController box(hw);box.init();chargeForOta(hw,box);
+    TEST_ASSERT_TRUE(box.tryBeginOta());
+    box.forceOpen();box.forceClose();box.startMaintenanceMode();box.stopMaintenanceMode();box.resetEmergency();box.update();
+    TEST_ASSERT_EQUAL(STATE_OTA_UPDATING,box.getCurrentState());
+    TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(RELAY_MAIN_PIN));TEST_ASSERT_TRUE(box.canContinueOta());
+    hw.setBatteryVoltage(11);for(int i=0;i<17;i++){hw.advanceMillis(200);box.servicePowerDuringOta();}
+    TEST_ASSERT_FALSE(box.canContinueOta());box.finishOtaWithoutReboot();
+    TEST_ASSERT_EQUAL(STATE_BATTERY_LOW_SHUTDOWN,box.getCurrentState());
+}
+class PausedContactHardware:public MockHardware {
+ public:
+    std::mutex gate;std::condition_variable cv;bool pause=false,entered=false,released=false;
+    void delayMs(unsigned long ms) override {
+        if(pause && ms==100){std::unique_lock<std::mutex> l(gate);entered=true;cv.notify_all();cv.wait(l,[this]{return released;});pause=false;}
+        MockHardware::delayMs(ms);
+    }
+};
+void test_ota_cannot_suspend_an_opening_interlock(void) {
+    PausedContactHardware hw;hw.setBatteryVoltage(12.6f);SmartBoxController box(hw);box.init();chargeForOta(hw,box);box.forceOpen();hw.pause=true;
+    std::thread loop([&]{box.update();});
+    {std::unique_lock<std::mutex> l(hw.gate);hw.cv.wait(l,[&]{return hw.entered;});}
+    auto reserve=std::async(std::launch::async,[&]{return box.tryBeginOta();});
+    const bool blocked=reserve.wait_for(std::chrono::milliseconds(10))==std::future_status::timeout;
+    {std::lock_guard<std::mutex> l(hw.gate);hw.released=true;hw.cv.notify_all();}
+    loop.join();const bool accepted=reserve.get();
+    TEST_ASSERT_TRUE(blocked);TEST_ASSERT_FALSE(accepted);
+    TEST_ASSERT_EQUAL(STATE_OPENING,box.getCurrentState());
+    hw.advanceMillis(4000);box.update();TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(RELAY_MAIN_PIN));
+}
+#endif
+
+
+class RegisterInaBus:public Ina219Bus {
+ public:
+    uint32_t clock=0,trigger=0;uint16_t config=0,calibration=0;
+    int16_t shunt=6,current=6;
+    bool badCalWrite=false,badConfigWrite=false,badCal=false,badConfig=false,readFail=false,neverReady=false,overflow=false,oldOverflow=false;
+    bool writeRegister(uint8_t reg,uint16_t v)override{
+        if(reg==5){if(badCalWrite)return false;calibration=v;}
+        if(reg==0){if(badConfigWrite)return false;config=v;if((v&7)==3)trigger=clock;}
+        return true;
+    }
+    bool readRegister(uint8_t reg,uint16_t &v)override{
+        if(readFail)return false;
+        if(reg==0)v=badConfig?0:config;
+        else if(reg==5)v=badCal?0:calibration;
+        else if(reg==1)v=static_cast<uint16_t>(shunt);
+        else if(reg==4)v=static_cast<uint16_t>(current);
+        else if(reg==2){bool ready=!neverReady && uint32_t(clock-trigger)>=2;v=uint16_t((3158u<<3)|(ready?2:0)|((ready?overflow:oldOverflow)?1:0));}
+        else return false;
+        return true;
+    }
+    uint32_t nowMs()override{return clock;}
+    void waitMs(uint32_t n)override{clock+=n;}
+};
+void test_ina_triggered_fresh_profile_and_units(void){
+    RegisterInaBus bus;auto sample=sampleIna219(bus);
+    TEST_ASSERT_TRUE(sample.valid);TEST_ASSERT_FLOAT_WITHIN(0.00002f,12.63206f,sample.voltage);
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f,0.6f,sample.currentMa);
+    TEST_ASSERT_EQUAL_UINT16(0x3998,bus.config);TEST_ASSERT_EQUAL_UINT16(4096,bus.calibration);
+}
+void test_ina_bad_transfer_or_profile_is_not_valid(void){
+    for(int i=0;i<5;i++){
+        RegisterInaBus b;if(i==0)b.badCalWrite=true;if(i==1)b.badConfigWrite=true;if(i==2)b.badCal=true;if(i==3)b.badConfig=true;if(i==4)b.readFail=true;
+        TEST_ASSERT_FALSE(sampleIna219(b).valid);
+    }
+}
+void test_ina_stale_conversion_and_overflow_are_not_valid(void){
+    RegisterInaBus stale;stale.neverReady=true;TEST_ASSERT_FALSE(sampleIna219(stale).valid);TEST_ASSERT_LESS_OR_EQUAL_UINT32(20,stale.clock);
+    RegisterInaBus overflow;overflow.overflow=true;TEST_ASSERT_FALSE(sampleIna219(overflow).valid);
+    RegisterInaBus old;old.oldOverflow=true;TEST_ASSERT_TRUE(sampleIna219(old).valid);
+}
+void test_ina_saturation_and_incoherent_current_are_not_valid(void){
+    for(int n:{32000,-32000,32767,-32768}){RegisterInaBus b;b.shunt=n;b.current=n;TEST_ASSERT_FALSE(sampleIna219(b).valid);}
+    RegisterInaBus wrong;wrong.shunt=100;wrong.current=-100;TEST_ASSERT_FALSE(sampleIna219(wrong).valid);
+    RegisterInaBus reverse;reverse.shunt=-6;reverse.current=-6;auto value=sampleIna219(reverse);TEST_ASSERT_TRUE(value.valid);TEST_ASSERT_FLOAT_WITHIN(0.0001f,-0.6f,value.currentMa);
+}
+void test_ina_conversion_timeout_clock_wrap(void){
+    RegisterInaBus b;b.clock=UINT32_MAX-1;TEST_ASSERT_TRUE(sampleIna219(b).valid);
+}
+
+
+void test_12v_profile_overvoltage_cannot_enable_motor(void){
+    MockHardware hw;hw.setBatteryVoltage(18.0f);SmartBoxController box(hw);box.init();box.forceOpen();box.update();
+    TEST_ASSERT_FALSE(box.powerSnapshot().valid);TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(RELAY_MAIN_PIN));
+}
+
 #ifdef NATIVE_BUILD
 int main(int argc, char **argv) {
     UNITY_BEGIN();
@@ -824,6 +954,17 @@ int main(int argc, char **argv) {
     RUN_TEST(test_subthreshold_grace_does_not_start_normal_motor);
     RUN_TEST(test_power_fault_cannot_be_cleared_by_emergency_reset);
     RUN_TEST(test_warning_dwell_and_hysteresis_prevent_report_chatter);
+    RUN_TEST(test_recovered_relay_direction_modes_and_next_close);
+    RUN_TEST(test_close_command_cannot_leave_ota);
+    RUN_TEST(test_reverse_current_stall_uses_magnitude);
+    RUN_TEST(test_12v_profile_overvoltage_cannot_enable_motor);
+    RUN_TEST(test_ina_triggered_fresh_profile_and_units);
+    RUN_TEST(test_ina_bad_transfer_or_profile_is_not_valid);
+    RUN_TEST(test_ina_stale_conversion_and_overflow_are_not_valid);
+    RUN_TEST(test_ina_saturation_and_incoherent_current_are_not_valid);
+    RUN_TEST(test_ina_conversion_timeout_clock_wrap);
+    RUN_TEST(test_atomic_ota_reservation_blocks_all_motion_commands);
+    RUN_TEST(test_ota_cannot_suspend_an_opening_interlock);
     return UNITY_END();
 }
 #else
@@ -858,6 +999,10 @@ void setup() {
     RUN_TEST(test_subthreshold_grace_does_not_start_normal_motor);
     RUN_TEST(test_power_fault_cannot_be_cleared_by_emergency_reset);
     RUN_TEST(test_warning_dwell_and_hysteresis_prevent_report_chatter);
+    RUN_TEST(test_recovered_relay_direction_modes_and_next_close);
+    RUN_TEST(test_close_command_cannot_leave_ota);
+    RUN_TEST(test_reverse_current_stall_uses_magnitude);
+    RUN_TEST(test_12v_profile_overvoltage_cannot_enable_motor);
     UNITY_END();
 }
 

@@ -144,9 +144,11 @@ public:
       return batteryPolicy.snapshot(static_cast<uint32_t>(hw.getMillis()));
   }
   bool canStartOta() const {
-      const auto p=powerSnapshot();
-      return p.otaReady && !isMotorRunning() && !isOtaMode();
+      std::lock_guard<std::recursive_mutex> lock(dataMutex);
+      return currentState == STATE_IDLE && batteryPolicy.snapshot(static_cast<uint32_t>(hw.getMillis())).otaReady;
   }
+  bool tryBeginOta();
+  bool canContinueOta() const;
   void servicePowerDuringOta();
   void finishOtaWithoutReboot();
   void forceOpen();
