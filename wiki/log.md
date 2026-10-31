@@ -256,3 +256,13 @@ source_of_truth: true
 - Reproduce stale legacy receipts misclassified forever and installer blocked on schema1. Add explicit healthy-source-only --bootstrap and legacy90s offline threshold, preserving normal schema1 gate, source failure rejection, no voltage claim and notification dedup. Four regressions RED→GREEN; focused48 PASS. Fresh narrow review finds no Critical/Important issues. Final local/hosted/deployed observer checks follow; this does not fix or claim device recovery.
 
 - Final monitor follow-up local97 Python total/88 executed PASS/9 explicit skips, native37 PASS and C6 dummy build PASS. Added incident [#19](https://github.com/ks-house/smartbox/issues/19) with UTF-8 remote readback and explicit unverified installed version. No additional device command.
+
+
+## [2026-10-31] fix | Confirm installed execution and support actual NAS systemd219
+
+- Later retained status/HA discovery explicitly confirms0.2.0-g7a55dd8; schema1 persists with sensor_valid0/state5. Ten-minute same-boot uptime progression confirmed. This supersedes earlier absence-based offline/unknown-install interpretation; measurement/motor recovery remain unaccepted. No additional device commands.
+- Independent NAS observer PR20 exactc264/CI41201978386 PASS merged9929aadd; redundant main41202901825 cancelled before firmware build. Manifest-only hold c25ef434 verified404 for version and200 for authenticated-route binary, API readiness retained; candidate bytes preserved privately unchanged.
+- Actual first observer install rolls back at unsupported systemd219 --now. Read-only flag probe returns unrecognized option; isolated installer reproduces RED. Separate enable/start fixes it GREEN, preserving existing rollback. Exact failed-state retry cleanup is reviewed with no Critical/Important findings. Final checks and actual retry follow.
+
+- Runtime retry33367ae2 succeeds under systemd219: observer active, existing identity reused, POWER_SENSOR_FAULT and pending0.22:13 final589aaefe verifies repeated observations, exactly one notification accepted22:08:16KST, collector/candidate/manifest-hold/API preserved. No device command.98 Python total/89 PASS/9 explicit skips, native37/C6 PASS; narrow static review has no Critical/Important findings.
+- Separate new dashboard-only receipt-age query uses latest battery_v OR power_schema. This fixes stale-age display when the valid new protocol deliberately omits voltage. Narrow review passes; actual Influx queryea506a57 returns133.7s. UI import and hosted exact-head check follow.

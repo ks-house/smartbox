@@ -114,7 +114,7 @@ def apply_candidate(raw,config,monitor,collector,collector_sha,expected):
             with os.fdopen(fd,'wb') as f:f.write(data);f.flush();os.fsync(f.fileno())
             created.append(path)
         monitor.atomic(STATE/'installation.json',{'source_sha256':expected,'collector_source_sha256':collector_sha,'prior_service':'absent','at':int(time.time())})
-        command('daemon-reload');command('enable','--now',SERVICE)
+        command('daemon-reload');command('enable',SERVICE);command('start',SERVICE)
         until=time.monotonic()+20
         while not (STATE/'state.json').is_file() and time.monotonic()<until:time.sleep(1)
         if command('is-active',SERVICE,check=False)!=0 or not (STATE/'state.json').is_file():raise RuntimeError('observer did not become active')

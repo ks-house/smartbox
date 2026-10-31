@@ -50,5 +50,21 @@ class InstallTests(unittest.TestCase):
         for status in ['SOURCE_INVALID','SOURCE_UNAVAILABLE','unrecognized']:
             with self.assertRaises(ValueError):m.validate_observer_admission(None,{'status':status},True)
         with self.assertRaises(ValueError):m.validate_observer_admission(None,{'status':'OFFLINE'},'yes')
+    def test_enable_then_start_supports_systemd219_without_now_option(self):
+        from unittest.mock import patch
+        import types,hashlib,json
+        with tempfile.TemporaryDirectory() as tmp:
+            base=pathlib.Path(tmp);root=base/'program';state=base/'private'/'state';unit=base/'observer.service'
+            collector=base/'collector';collector.write_text('preserved');sha=hashlib.sha256(collector.read_bytes()).hexdigest();calls=[]
+            def command(*args,check=True):
+                calls.append(args)
+                if '--now' in args:raise RuntimeError('systemd219 unrecognized option --now')
+                if args[0]=='start':(state/'state.json').write_text(json.dumps({'current':{'status':'OFFLINE'},'pending':[]}))
+                return 0
+            monitor=types.SimpleNamespace(atomic=lambda p,v:p.write_text(json.dumps(v)),regular=lambda p:p.read_text())
+            with patch.multiple(m,ROOT=root,STATE=state,UNIT=unit),patch.object(m,'command',command),patch.object(m.Path,'is_file',autospec=True,side_effect=lambda p:True if str(p)=='/usr/syno/bin/synodsmnotify' else p.exists() and not p.is_dir()):
+                result=m.apply_candidate(b'# harmless',{'token':'fake'},monitor,collector,sha,'a'*64)
+            self.assertTrue(result['installed']);self.assertLess(calls.index(('enable',m.SERVICE)),calls.index(('start',m.SERVICE)))
+            self.assertEqual('preserved',collector.read_text())
 if __name__=='__main__':unittest.main()
 
