@@ -91,6 +91,7 @@ void MqttManager::onMqttConnect(bool sessionPresent) {
     m_reconnectTimer.detach();
     m_wasConnected = true;
     m_isConnecting = false;
+    m_lastPowerState = -1;
 
     // Subscribe to command topic
     m_mqttClient.subscribe("smartbox/command", 1);
@@ -114,6 +115,7 @@ void MqttManager::onMqttConnect(bool sessionPresent) {
     // Force publish current state so Home Assistant syncs immediately after reconnect or reboot
     int currentFsmState = static_cast<int>(m_controller.getCurrentState());
     publishEventState(currentFsmState, currentFsmState);
+    // NetworkTask publishes the fresh power frame after callback return.
 }
 
 void MqttManager::onMqttDisconnect() {
@@ -293,6 +295,13 @@ void MqttManager::update() {
         }
     }
 
+    const auto power = m_controller.powerSnapshot();
+    if (m_mqttClient.connected() && static_cast<int>(power.state) != m_lastPowerState &&
+        millis() - m_lastPowerAttempt >= 1000) {
+        m_lastPowerAttempt = millis();
+        publishTelemetry();
+    }
+
     // Dynamic logging timer check (5 minutes duration)
     if (m_debugLoggingActive) {
         if (millis() - m_debugStartTime >= DEBUG_MODE_DURATION_MS) {
@@ -366,7 +375,24 @@ void MqttManager::publishTelemetry() {
     JsonDocument doc;
     doc["timestamp"] = millis();
     doc["fsm_state"] = stateToString(static_cast<int>(m_controller.getCurrentState()));
-    doc["battery_v"] = m_controller.getBatteryVoltage();       // FEAT-2: 배터리 전압 추가
+    const auto power = m_controller.powerSnapshot();
+    if (power.valid) doc["battery_v"] = power.voltage;
+    else doc["battery_v"] = nullptr;
+    doc["firmware"] = m_controller.getFirmwareVersion();
+    doc["power_schema"] = 1;
+    doc["power_sensor_valid"] = power.valid ? 1 : 0;
+    doc["power_state_code"] = static_cast<unsigned>(power.state);
+    doc["power_state"] = BatteryPolicy::name(power.state);
+    doc["power_sample_age_ms"] = power.sampleAgeMs;
+    doc["power_report_interval_s"] = power.telemetryIntervalMs / 1000;
+    doc["power_recovery_remaining_s"] = (power.recoveryRemainingMs + 999) / 1000;
+    doc["power_recovery_count"] = power.recoveryCount;
+    if (power.minimumVoltage > 0) doc["power_min_voltage_v"] = power.minimumVoltage;
+    else doc["power_min_voltage_v"] = nullptr;
+    doc["power_recovery_voltage_v"] = power.recoveryVoltage;
+    doc["power_actuation_allowed"] = power.actuationAllowed ? 1 : 0;
+    doc["power_ota_ready"] = power.otaReady ? 1 : 0;
+    doc["current_scope"] = "MOTOR_BRANCH";
     doc["motor_current_ma"] = m_controller.getMotorCurrent(); // FEAT-2: 모터 전류 추가
     doc["distance_cm"] = m_controller.getDistance();
     doc["wifi_rssi"] = WiFi.RSSI();
@@ -385,6 +411,14 @@ void MqttManager::publishTelemetry() {
     String output;
     serializeJson(doc, output);
     m_mqttClient.publish("smartbox/telemetry", 0, false, output.c_str());
+    // Extend the existing retained status namespace; no new broker ACL is needed.
+    doc["status"] = "online";
+    doc["device_id"] = "ESP32C6_SMARTBOX_01";
+    doc["firmware_version"] = m_controller.getFirmwareVersion();
+    doc["ip"] = WiFi.localIP().toString();
+    output = ""; serializeJson(doc, output);
+    const int sent = m_mqttClient.publish("smartbox/status", 1, true, output.c_str());
+    if (sent > 0) m_lastPowerState = static_cast<int>(power.state);
 }
 
 void MqttManager::publishBatchTelemetry(const TelemetryData* data, int count, const char* batchType) {
@@ -532,13 +566,49 @@ void MqttManager::publishAutoDiscovery() {
     // Battery
     {
         JsonDocument doc = createDiscoveryDoc("[SmartBox] 배터리 전압", "battery_v", "sensor");
-        doc["state_topic"] = "smartbox/event/state";
+        doc["state_topic"] = "smartbox/telemetry";
         doc["value_template"] = "{{ value_json.battery_v | round(2) }}";
+        JsonArray availability = doc["availability"].to<JsonArray>();
+        JsonObject transport = availability.add<JsonObject>();
+        transport["topic"] = "smartbox/status";
+        transport["value_template"] = "{{ value_json.status }}";
+        JsonObject quality = availability.add<JsonObject>();
+        quality["topic"] = "smartbox/telemetry";
+        quality["value_template"] = "{{ 'online' if value_json.power_sensor_valid | default(0) == 1 else 'offline' }}";
+        doc["availability_mode"] = "all";
+        doc["expire_after"] = 660;
         doc["unit_of_meas"] = "V";
         doc["device_class"] = "voltage";
         doc["state_class"] = "measurement";
         doc["icon"] = "mdi:battery-charging";
         pubConfig("sensor", "battery_v", doc);
+    }
+    struct PowerSensor { const char* id; const char* name; const char* field; const char* unit; };
+    const PowerSensor powerSensors[] = {
+      {"power_state","[SmartBox] 전원 보호 단계","power_state",nullptr},
+      {"power_recovery_wait","[SmartBox] 자동 재개 대기","power_recovery_remaining_s","s"},
+      {"power_recovery_count","[SmartBox] 자동 재개 횟수","power_recovery_count",nullptr},
+      {"power_report_interval","[SmartBox] 예정 보고 주기","power_report_interval_s","s"},
+      {"power_min_voltage","[SmartBox] 부팅 후 최저 전압","power_min_voltage_v","V"}
+    };
+    for (const auto& item : powerSensors) {
+      JsonDocument doc=createDiscoveryDoc(item.name,item.id,"sensor");
+      doc["state_topic"]="smartbox/status";
+      doc["value_template"]=String("{{ value_json.")+item.field+" | default('unknown') }}";
+      doc["availability_topic"]="smartbox/status";
+      doc["availability_template"]="{{ value_json.status }}";
+      doc["expire_after"]=660;
+      if(item.unit) doc["unit_of_meas"]=item.unit;
+      pubConfig("sensor",item.id,doc);
+    }
+    {
+      JsonDocument doc=createDiscoveryDoc("[SmartBox] 전원 측정 오류","power_sensor_fault","binary_sensor");
+      doc["state_topic"]="smartbox/status";
+      doc["value_template"]="{{ 'ON' if value_json.power_sensor_valid == 0 else 'OFF' }}";
+      doc["device_class"]="problem"; doc["expire_after"]=660;
+      doc["availability_topic"]="smartbox/status";
+      doc["availability_template"]="{{ value_json.status }}";
+      pubConfig("binary_sensor","power_sensor_fault",doc);
     }
     // Cycle duration
     {

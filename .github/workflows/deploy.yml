@@ -52,6 +52,9 @@ jobs:
       - name: Verify OTA origin gate behavior
         run: RUN_NGINX_ORIGIN_INTEGRATION=1 python -m unittest discover -s test -p 'test_ota*.py' -v
 
+      - name: Validate power monitoring regressions
+        run: python -m unittest discover -s test -p 'test_power*.py' -v
+
       - name: Validate target build without production secrets
         if: github.event_name == 'pull_request'
         run: pio run -e esp32-c6-devkitc-1 -j 4
@@ -170,10 +173,7 @@ jobs:
           PLATFORMIO_BUILD_FLAGS="-DFIRMWARE_VERSION_OVERRIDE=\"\\\"${FULL_VERSION}\\\"\"" pio run -e esp32-c6-devkitc-1
 
       - name: Generate version.json metadata
-        run: |
-          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          echo "{\"version\": \"${{ env.FULL_VERSION }}\", \"build_number\": \"${{ github.run_id }}\", \"commit\": \"${{ github.sha }}\", \"date\": \"$BUILD_DATE\"}" > .pio/build/esp32-c6-devkitc-1/version.json
-          cat .pio/build/esp32-c6-devkitc-1/version.json
+        run: python3 scripts/write_release_metadata.py
 
       - name: Prepare deployment directory
         run: |

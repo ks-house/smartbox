@@ -46,7 +46,7 @@ void PowerManager::update() {
     // the device before AutoOtaManager has a chance to start the OTA process.
     // The +1 offset also guarantees OTA has finished (typical OTA < 5 minutes).
     int rebootHour = (controllerPtr->getConfig().otaHour + 1) % 24;
-    if (currentHour == rebootHour && controllerPtr->getCurrentState() == STATE_IDLE && !controllerPtr->isMotorRunning()) {
+    if (currentHour == rebootHour && controllerPtr->getCurrentState() == STATE_IDLE && controllerPtr->canStartOta()) {
 #ifndef NATIVE_BUILD
         Preferences prefs;
         if (prefs.begin("smartbox", false)) {

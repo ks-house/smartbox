@@ -53,6 +53,8 @@ private:
     Ticker m_reconnectTimer;
     Ticker m_rebootTimer;
 
+    int m_lastPowerState = -1;
+    unsigned long m_lastPowerAttempt = 0;
     bool m_debugLoggingActive;
     unsigned long m_debugStartTime;
     bool m_wasConnected;

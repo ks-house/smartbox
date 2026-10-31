@@ -10,10 +10,10 @@ ESP32-C6, AJ-SR04T, INA219, Active-Low relay와 12 V linear actuator 두 개를 
 
 - 11-state non-blocking FSM과 Active-Low relay interlock.
 - 거리 5-sample median, debounce, 3초 post-close blind time, 최대 HOLD와 sensor deadlock self-healing.
-- INA219 전압/전류 감시, open/close stall 처리, 11.3 V 기본 저전압 보호.
+- INA219 전압/전류 감시, open/close stall 처리, 11.3 V 기본 저전압 보호와 유효 전압 안정 확인 후 자동 재개.
 - 부팅 5분 captive portal과 저장된 STA 자동 재연결.
-- PsychicMqttClient 기반 MQTTS, Root CA, LWT, 원격 command/config, Home Assistant discovery 20개.
-- 30초 live telemetry, motor-event batch, 1분 heartbeat sample과 설정 주기 batch.
+- PsychicMqttClient 기반 MQTTS, Root CA, LWT, 원격 command/config, Home Assistant discovery 26개.
+- 전원 단계별 30/60/120/300초 live telemetry, motor-event batch, 1분 heartbeat sample과 설정 주기 batch.
 - 부팅 1회 + 설정한 `otaHour` 일 1회 HTTPS OTA 확인, pre-OTA relay isolation.
 - `(otaHour + 1) % 24` 시각의 일 1회 proactive reboot.
 - native FSM tests와 main push target build/SFTP deployment workflow.
@@ -30,6 +30,8 @@ ESP32-C6, AJ-SR04T, INA219, Active-Low relay와 12 V linear actuator 두 개를 
 | full isolation | INPUT | INPUT | INPUT |
 
 방향을 바꿀 때는 `Main OFF/INPUT → 100 ms → 방향 변경 → 100 ms → Main ON/LOW` 순서를 보존한다. 상세 계약은 [AGENTS.md](AGENTS.md)와 [개발 매뉴얼](docs/DEVELOPMENT_MANUAL.md)을 따른다.
+
+배터리 보호·복귀·감시 계약은 [wiki/battery_power_management.md](wiki/battery_power_management.md)를 따른다. 측정 실패를 정상 전압으로 표시하지 않으며, 모터 분기 전류로 전체 배터리 소비량을 추정하지 않는다.
 
 ## Hardware
 

@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #endif
 #include <unity.h>
+#include <cmath>
 #include "MockHardware.h"
 
 #include "SmartBoxController.h"
@@ -679,6 +680,121 @@ void test_post_close_blind_time(void) {
 }
 
 
+
+void test_battery_recovers_only_after_continuous_safe_voltage(void) {
+    MockHardware hw;
+    SmartBoxController box(hw);
+    box.init();
+    hw.setBatteryVoltage(11.0f);
+    for (int i=0;i<40;i++) { hw.advanceMillis(200); box.update(); }
+    TEST_ASSERT_EQUAL(STATE_BATTERY_LOW_SHUTDOWN,box.getCurrentState());
+    hw.setBatteryVoltage(12.6f);
+    for (int i=0;i<299;i++) { hw.advanceMillis(1000); box.update(); }
+    TEST_ASSERT_EQUAL(STATE_BATTERY_LOW_SHUTDOWN,box.getCurrentState());
+    for (int i=0;i<3;i++) { hw.advanceMillis(1000); box.update(); }
+    TEST_ASSERT_EQUAL(STATE_IDLE,box.getCurrentState());
+    TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(RELAY_MAIN_PIN));
+}
+void test_battery_recovery_dip_restarts_stable_window(void) {
+    MockHardware hw; SmartBoxController box(hw); box.init();
+    hw.setBatteryVoltage(11.0f);
+    for(int i=0;i<40;i++){hw.advanceMillis(200);box.update();}
+    hw.setBatteryVoltage(12.6f);
+    for(int i=0;i<200;i++){hw.advanceMillis(1000);box.update();}
+    hw.setBatteryVoltage(12.3f); hw.advanceMillis(1000); box.update();
+    hw.setBatteryVoltage(12.6f);
+    for(int i=0;i<150;i++){hw.advanceMillis(1000);box.update();}
+    TEST_ASSERT_EQUAL(STATE_BATTERY_LOW_SHUTDOWN,box.getCurrentState());
+    for(int i=0;i<152;i++){hw.advanceMillis(1000);box.update();}
+    TEST_ASSERT_EQUAL(STATE_IDLE,box.getCurrentState());
+}
+void test_bad_voltage_never_operates_motor(void) {
+    MockHardware hw; hw.setBatteryVoltage(NAN);
+    SmartBoxController box(hw);box.init();
+    hw.advanceMillis(200);box.update();box.forceOpen();box.update();
+    TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(RELAY_MAIN_PIN));
+    TEST_ASSERT_EQUAL(STATE_BATTERY_LOW_SHUTDOWN,box.getCurrentState());
+}
+
+
+void test_sensor_failure_during_protective_stroke_stops_now(void) {
+    MockHardware hw; SmartBoxController box(hw);box.init();
+    hw.setBatteryVoltage(11.0f);
+    for(int i=0;i<17;i++){hw.advanceMillis(200);box.update();}
+    TEST_ASSERT_EQUAL(OUTPUT,hw.getPinMode(RELAY_MAIN_PIN));
+    hw.setBatteryVoltage(NAN);hw.advanceMillis(200);box.update();
+    TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(RELAY_MAIN_PIN));
+}
+void test_restored_protection_cannot_repeat_emergency_stroke(void) {
+    MockHardware hw;hw.setBatteryVoltage(11.0f);SmartBoxController box(hw);
+    box.setInitialState(STATE_BATTERY_LOW_SHUTDOWN);box.init();hw.clearEventHistory();
+    for(int i=0;i<40;i++){hw.advanceMillis(200);box.update();}
+    for(const auto &event:hw.getEventHistory())
+        TEST_ASSERT_FALSE(event.type==EVENT_MODE && event.pin==RELAY_MAIN_PIN && event.value==OUTPUT);
+    TEST_ASSERT_EQUAL(STATE_BATTERY_LOW_SHUTDOWN,box.getCurrentState());
+}
+void test_recovery_gap_cannot_count_as_continuous_charge(void) {
+    BatteryPolicy policy;policy.restoreProtection();policy.sample(100,12.6f,true,11.3f);
+    policy.sample(300101,12.6f,true,11.3f);
+    TEST_ASSERT_TRUE(policy.snapshot(300101).protectedMode);
+    TEST_ASSERT_EQUAL_UINT32(BatteryPolicy::kRecoveryMs,policy.snapshot(300101).recoveryRemainingMs);
+}
+void test_policy_recovers_across_u32_wrap(void) {
+    BatteryPolicy policy;policy.restoreProtection();uint32_t now=UINT32_MAX-10000;
+    for(int i=0;i<=300;i++){policy.sample(now,12.6f,true,11.3f);now+=1000;}
+    TEST_ASSERT_FALSE(policy.snapshot(now-1000).protectedMode);
+    TEST_ASSERT_EQUAL_UINT32(1,policy.snapshot(now-1000).recoveryCount);
+}
+void test_expired_measurement_denies_commands_and_ota(void) {
+    MockHardware hw;hw.setBatteryVoltage(12.6f);SmartBoxController box(hw);box.init();
+    hw.advanceMillis(2500);box.forceOpen();
+    TEST_ASSERT_EQUAL(STATE_IDLE,box.getCurrentState());TEST_ASSERT_FALSE(box.canStartOta());
+    TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(RELAY_MAIN_PIN));
+}
+void test_low_timers_do_not_cross_controller_instances(void) {
+    MockHardware a,b;SmartBoxController first(a),second(b);first.init();second.init();
+    a.setBatteryVoltage(11.0f);
+    for(int i=0;i<15;i++){a.advanceMillis(200);first.update();}
+    b.setBatteryVoltage(11.0f);b.advanceMillis(200);second.update();
+    TEST_ASSERT_EQUAL(STATE_IDLE,second.getCurrentState());
+}
+void test_ota_failed_recovery_cannot_clear_low_power_latch(void) {
+    MockHardware hw;hw.setBatteryVoltage(12.6f);SmartBoxController box(hw);box.init();
+    box.transitionTo(STATE_OTA_UPDATING);hw.setBatteryVoltage(NAN);
+    hw.advanceMillis(200);box.servicePowerDuringOta();box.forceOpen();
+    TEST_ASSERT_EQUAL(STATE_OTA_UPDATING,box.getCurrentState());
+    box.finishOtaWithoutReboot();
+    TEST_ASSERT_EQUAL(STATE_BATTERY_LOW_SHUTDOWN,box.getCurrentState());
+    TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(RELAY_MAIN_PIN));
+}
+
+
+void test_subthreshold_grace_does_not_start_normal_motor(void) {
+    MockHardware hw;hw.setBatteryVoltage(11.0f);hw.setDistanceCm(30);
+    SmartBoxController box(hw);box.init();
+    for(int i=0;i<20;i++){hw.advanceMillis(50);box.update();}
+    TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(RELAY_MAIN_PIN));
+    TEST_ASSERT_EQUAL(STATE_IDLE,box.getCurrentState());
+}
+void test_power_fault_cannot_be_cleared_by_emergency_reset(void) {
+    MockHardware hw;SmartBoxController box(hw);box.init();
+    box.transitionTo(STATE_EMERGENCY_STOP);hw.advanceMillis(3000);box.resetEmergency();
+    TEST_ASSERT_EQUAL(STATE_EMERGENCY_STOP,box.getCurrentState());
+}
+
+
+void test_warning_dwell_and_hysteresis_prevent_report_chatter(void) {
+    BatteryPolicy p;uint32_t now=0;p.sample(now,12.2f,true,11.3f);
+    now+=1000;p.sample(now,11.9f,true,11.3f);
+    TEST_ASSERT_EQUAL(static_cast<int>(BatteryState::NORMAL),static_cast<int>(p.snapshot(now).state));
+    for(int i=0;i<16;i++){now+=1000;p.sample(now,11.9f,true,11.3f);}
+    TEST_ASSERT_EQUAL(static_cast<int>(BatteryState::WARNING),static_cast<int>(p.snapshot(now).state));
+    for(int i=0;i<20;i++){now+=1000;p.sample(now,12.04f,true,11.3f);}
+    TEST_ASSERT_EQUAL(static_cast<int>(BatteryState::WARNING),static_cast<int>(p.snapshot(now).state));
+    for(int i=0;i<16;i++){now+=1000;p.sample(now,12.2f,true,11.3f);}
+    TEST_ASSERT_EQUAL(static_cast<int>(BatteryState::NORMAL),static_cast<int>(p.snapshot(now).state));
+}
+
 #ifdef NATIVE_BUILD
 int main(int argc, char **argv) {
     UNITY_BEGIN();
@@ -695,6 +811,19 @@ int main(int argc, char **argv) {
     RUN_TEST(test_post_close_blind_time);
     RUN_TEST(test_telemetry_interval_config);
     RUN_TEST(test_sensor_deadlock_prevention);
+    RUN_TEST(test_battery_recovers_only_after_continuous_safe_voltage);
+    RUN_TEST(test_battery_recovery_dip_restarts_stable_window);
+    RUN_TEST(test_bad_voltage_never_operates_motor);
+    RUN_TEST(test_sensor_failure_during_protective_stroke_stops_now);
+    RUN_TEST(test_restored_protection_cannot_repeat_emergency_stroke);
+    RUN_TEST(test_recovery_gap_cannot_count_as_continuous_charge);
+    RUN_TEST(test_policy_recovers_across_u32_wrap);
+    RUN_TEST(test_expired_measurement_denies_commands_and_ota);
+    RUN_TEST(test_low_timers_do_not_cross_controller_instances);
+    RUN_TEST(test_ota_failed_recovery_cannot_clear_low_power_latch);
+    RUN_TEST(test_subthreshold_grace_does_not_start_normal_motor);
+    RUN_TEST(test_power_fault_cannot_be_cleared_by_emergency_reset);
+    RUN_TEST(test_warning_dwell_and_hysteresis_prevent_report_chatter);
     return UNITY_END();
 }
 #else
@@ -716,6 +845,19 @@ void setup() {
     RUN_TEST(test_post_close_blind_time);
     RUN_TEST(test_telemetry_interval_config);
     RUN_TEST(test_sensor_deadlock_prevention);
+    RUN_TEST(test_battery_recovers_only_after_continuous_safe_voltage);
+    RUN_TEST(test_battery_recovery_dip_restarts_stable_window);
+    RUN_TEST(test_bad_voltage_never_operates_motor);
+    RUN_TEST(test_sensor_failure_during_protective_stroke_stops_now);
+    RUN_TEST(test_restored_protection_cannot_repeat_emergency_stroke);
+    RUN_TEST(test_recovery_gap_cannot_count_as_continuous_charge);
+    RUN_TEST(test_policy_recovers_across_u32_wrap);
+    RUN_TEST(test_expired_measurement_denies_commands_and_ota);
+    RUN_TEST(test_low_timers_do_not_cross_controller_instances);
+    RUN_TEST(test_ota_failed_recovery_cannot_clear_low_power_latch);
+    RUN_TEST(test_subthreshold_grace_does_not_start_normal_motor);
+    RUN_TEST(test_power_fault_cannot_be_cleared_by_emergency_reset);
+    RUN_TEST(test_warning_dwell_and_hysteresis_prevent_report_chatter);
     UNITY_END();
 }
 

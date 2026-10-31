@@ -2,6 +2,7 @@
 #define SMART_BOX_CONTROLLER_H
 
 #include "HardwareInterface.h"
+#include "BatteryPolicy.h"
 #include <mutex>
 
 #ifndef NATIVE_BUILD
@@ -76,6 +77,10 @@ private:
   StateChangeCallback stateCallback;
   State initialState;
 
+  BatteryPolicy batteryPolicy;
+  unsigned long lastPowerReading = 0;
+  bool lowBatteryOpening = false;
+  bool servicePower();
   float batteryVoltage;
   float motorCurrent;
   float currentDistance;
@@ -134,6 +139,16 @@ public:
   void registerStateCallback(StateChangeCallback cb) { stateCallback = cb; }
   void setInitialState(State state) { initialState = state; }
 
+  BatterySnapshot powerSnapshot() const {
+      std::lock_guard<std::recursive_mutex> lock(dataMutex);
+      return batteryPolicy.snapshot(static_cast<uint32_t>(hw.getMillis()));
+  }
+  bool canStartOta() const {
+      const auto p=powerSnapshot();
+      return p.otaReady && !isMotorRunning() && !isOtaMode();
+  }
+  void servicePowerDuringOta();
+  void finishOtaWithoutReboot();
   void forceOpen();
   void forceClose();
   void resetEmergency();
@@ -148,7 +163,7 @@ public:
 #ifdef FIRMWARE_VERSION_OVERRIDE
   static constexpr const char *FIRMWARE_VERSION = FIRMWARE_VERSION_OVERRIDE;
 #else
-  static constexpr const char *FIRMWARE_VERSION = "0.1.0";
+  static constexpr const char *FIRMWARE_VERSION = "0.2.0";
 #endif
   const char *getFirmwareVersion() const { return FIRMWARE_VERSION; }
 

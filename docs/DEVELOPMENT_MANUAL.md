@@ -147,7 +147,7 @@ ESP32-C6 보드와 각 모듈은 아래의 확정된 GPIO 번호에 정밀하게
 
 추가 상태:
 * **EMERGENCY_STOP:** 과전류 3회 연속 -> 5초 자동 복구 또는 reset_emergency 명령
-* **BATTERY_LOW_SHUTDOWN:** 11.3V 이하 3초 -> 강제 개방 -> 릴레이 영구 격리
+* **BATTERY_LOW_SHUTDOWN:** 11.3V 이하 3초 -> 강제 개방 -> 릴레이 격리 후 안정 전압 5분 확인 시 자동 재개
 * **OTA_UPDATING:** 펌웨어 업데이트 중 -> 전 릴레이 차단, FSM 동결
 * **MAINTENANCE:** 5분 정비 모드 -> 자동 닫힘
 * **STARTUP_OPEN:** NVS가 이전 상태를 open으로 기록한 부팅에서 500ms 안정화 후 OPEN_START로 진입하여 open/hold/close 보정 사이클 수행
@@ -186,7 +186,7 @@ SmartBoxController는 std::recursive_mutex dataMutex로 배터리 전압, 모터
 > ESP32의 3.3V Logic Level과 5V Active-Low 릴레이 간 전압 차이로, GPIO를 HIGH로만 출력하면 포토커플러 내부 LED가 완전히 꺼지지 않습니다. 릴레이 차단 시 반드시 pinMode(PIN, INPUT) 고임피던스 모드를 사용하여 대기 전력을 0mA로 리셋하십시오.
 
 > **[규칙 4] OTA 중 저전압 가드 우회**
-> TLS 핸드셰이크 중 순간 전압 강하가 발생하면 배터리 방전으로 오인하여 BATTERY_LOW_SHUTDOWN이 트리거될 수 있습니다. AutoOtaManager::isOtaInProgress() 플래그 확인을 통해 OTA 구간에서 저전압 감지 루틴을 우회합니다.
+> 현재 전원 정책은 OTA 전 유효한 안정 전압을 확인하고 flash 전 다시 검사합니다. OTA 중 릴레이 격리와 전원 관측을 유지하며 실패 후 보호 래치를 해제하지 않습니다.
 
 ---
 
@@ -339,3 +339,8 @@ reboot, fresh idle and an authenticated remote check are distinct acceptance.
 ### Authenticated OTA installer compatibility (2026-10-16)
 
 The measured NAS candidate failed before policy activation when the volatile bootstrap directory was absent. The single-public-peer gate now uses an exact-address nginx map, whose optional include tolerates absent runtime files. The closed fixture must exercise that initial state. The approved single-host, maximum300s bootstrap scope is unchanged; source validation does not prove NAS application or device installation.
+
+
+## 2026-10-31 배터리 자동 재개·감시
+
+[전원 정책과 검증 경계](../wiki/battery_power_management.md)를 따른다. 전압 센서 오류는 측정 불가로 표시하고, 회복 기준 전압이 연속5분 안정될 때 자동 재개한다. 재개 자체로 강제 개폐하지 않는다. HA는 전원 보호 단계·재개 대기·재개 횟수·예정 보고 주기·최저 전압·측정 오류를 표시한다. 전체 에너지 소비와 실제 뚜껑 위치는 별도 계측 대상이다.

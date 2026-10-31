@@ -8,11 +8,12 @@ Esp32Hardware::Esp32Hardware(uint8_t trig, uint8_t echo)
 void Esp32Hardware::init() {
     // Initialize I2C with SDA=GPIO22 and SCL=GPIO23 as specified in development manual
     Wire.begin(22, 23);
+    Wire.setTimeOut(20);
     if (ina219.begin()) {
         hasINA219 = true;
         Serial.println("[SENSOR] INA219 Current sensor found and initialized.");
     } else {
-        Serial.println("[WARNING] INA219 not found on I2C bus! Using dummy simulation values.");
+        Serial.println("[WARNING] INA219 not found on I2C bus! Power measurements unavailable; actuator safety remains inhibited.");
     }
 }
 
@@ -36,19 +37,24 @@ void Esp32Hardware::delayMs(unsigned long ms) {
     delay(ms);
 }
 
-float Esp32Hardware::getBatteryVoltage() {
-    if (hasINA219) {
-        return ina219.getBusVoltage_V() + (ina219.getShuntVoltage_mV() / 1000.0f);
+PowerReading Esp32Hardware::readPower() {
+    if(!hasINA219) {
+        if(millis()-lastPowerProbe<5000) return {NAN,NAN,false};
+        lastPowerProbe=millis();
+        hasINA219=ina219.begin();
+        if(!hasINA219) return {NAN,NAN,false};
     }
-    return 12.2f; // Safely return nominal battery voltage if hardware is missing
+    const float bus=ina219.getBusVoltage_V(); const bool busOk=ina219.success();
+    const float shunt=ina219.getShuntVoltage_mV(); const bool shuntOk=ina219.success();
+    const float current=ina219.getCurrent_mA(); const bool currentOk=ina219.success();
+    const float voltage=bus+shunt/1000.0f;
+    const bool ok=busOk && shuntOk && currentOk && std::isfinite(voltage) &&
+                  voltage>0 && voltage<=26 && std::isfinite(current);
+    if(!ok) {hasINA219=false; lastPowerProbe=millis(); return {NAN,NAN,false};}
+    return {voltage,current,true};
 }
-
-float Esp32Hardware::getMotorCurrent() {
-    if (hasINA219) {
-        return ina219.getCurrent_mA();
-    }
-    return 0.0f; // Return 0mA if hardware is missing
-}
+float Esp32Hardware::getBatteryVoltage() { return readPower().voltage; }
+float Esp32Hardware::getMotorCurrent() { return readPower().currentMa; }
 
 float Esp32Hardware::getDistanceCm() {
     digitalWrite(trigPin, LOW);

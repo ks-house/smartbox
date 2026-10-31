@@ -80,6 +80,8 @@ void AutoOtaManager::update() {
         return;
     }
     
+    if (!controllerPtr->canStartOta()) return;
+
     // Check if dynamic force update requested
     if (otaForceRequested) {
         otaForceRequested = false;
@@ -132,7 +134,7 @@ bool AutoOtaManager::startOtaUpdate(bool force) {
         return false;
     }
     
-    if (force) {
+    if (force && controllerPtr->canStartOta()) {
         otaForceRequested = true;
         otaState = OTA_STATE_CHECKING;
         memset(otaErrorMessage, 0, sizeof(otaErrorMessage));
@@ -143,6 +145,7 @@ bool AutoOtaManager::startOtaUpdate(bool force) {
 }
 
 void AutoOtaManager::runOtaProcess(bool force) {
+    if (!controllerPtr->canStartOta()) return;
     otaAttempts = otaAttempts + 1;
     otaPhase = OTA_PHASE_VERSION;
     otaManifestHttpCode = 0;
@@ -198,6 +201,11 @@ void AutoOtaManager::runOtaProcess(bool force) {
     }
     http.end();
     
+    if (needsUpdate && !controllerPtr->canStartOta()) {
+        otaState = OTA_STATE_FAILED; otaInProgress = false;
+        strncpy(otaErrorMessage, "POWER_NOT_READY", sizeof(otaErrorMessage)-1);
+        return;
+    }
     if (needsUpdate) {
         Serial.println("[OTA] Step 2: Preparing hardware for flashing...");
         
@@ -247,7 +255,7 @@ void AutoOtaManager::runOtaProcess(bool force) {
             Serial.println("[OTA] NetworkTask re-subscribed to WDT before state recovery.");
 #endif
             // Failure recovery: restore FSM to STATE_IDLE
-            controllerPtr->transitionTo(STATE_IDLE);
+            controllerPtr->finishOtaWithoutReboot();
             Serial.println("[OTA] Recovered state to STATE_IDLE after update failure.");
             
         } else if (ret == HTTP_UPDATE_NO_UPDATES) {

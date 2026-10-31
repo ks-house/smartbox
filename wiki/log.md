@@ -200,3 +200,11 @@ source_of_truth: true
 ## [2026-10-17] test | Validate accepted OTA diagnostic documentation
 
 - Native13 and ESP32-C6 dummy-only build PASS for the diagnostic helper branch. Temporary secrets header removed and generated version bytes restored. No artifact publication, live policy or physical actuation.
+
+
+## [2026-10-31] code | Implement owner-approved automatic battery recovery and monitoring
+
+- Add per-instance fresh/valid power policy, continuous300s recovery at max12.4V/cutoff+0.8,15s noncritical qualification/0.1V exit hysteresis and stale/clock-wrap guards. Preserve bounded critical fail-open/interlock; invalid sensor immediately isolates without synthetic voltage.
+- Persist protection, migrate uncertain boot-open state to isolated recovery, clear stale movement on resume and retain24h sensing. Add adaptive30/60/120/300s reporting, idle yields, connected Wi-Fi savings, power-conditioned OTA admission/failure cleanup and no low-power scheduled reboot.
+- Extend existing telemetry/status namespaces and HA discovery to26 entities without broker/account changes. Add bounded read-only NAS monitoring with existing identity, deduplicated owner-local notifications, private installation rollback and Grafana export. Runtime install/firmware acceptance remain pending.
+- Existing13 native tests PASS; automatic-recovery/NaN defects, sensor-midstroke, low-voltage entry/reset, warning chatter and legacy mixed-frame defects reproduced RED then fixed. Latest native26 PASS; Python63 tests PASS with9 explicit environment skips; C6 dummy build passes. Final fresh review and hosted gates follow. No dummy image publication or device/control action.

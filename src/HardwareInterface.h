@@ -2,6 +2,8 @@
 #define HARDWARE_INTERFACE_H
 
 #include <stdint.h>
+#include <cmath>
+struct PowerReading { float voltage; float currentMa; bool valid; };
 
 #ifdef NATIVE_BUILD
 #ifndef INPUT
@@ -39,6 +41,10 @@ public:
     virtual float getBatteryVoltage() = 0;
     virtual float getMotorCurrent() = 0;
     virtual float getDistanceCm() = 0;
+    virtual PowerReading readPower() {
+        const float v=getBatteryVoltage(), c=getMotorCurrent();
+        return {v,c,std::isfinite(v) && std::isfinite(c)};
+    }
 };
 
 #endif // HARDWARE_INTERFACE_H
