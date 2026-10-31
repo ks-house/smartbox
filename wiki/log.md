@@ -225,3 +225,20 @@ source_of_truth: true
 - Fresh earlier live telemetry12.17V/legacyBATTERY_LOW_SHUTDOWN; owner explicitly waits for solar charging because external power is unavailable. Keep12.4V recovery/admission thresholds; do not lower them to force installation. Zero actuator/OTA commands. Final local/hosted gates follow this checkpoint.
 
 - Final expanded Python suite:82 total,73 executed PASS and9 explicit environment skips; native37 PASS; C6 dummy-only build PASS RAM62220B/flash1347818B. Generated version header restored. NAS observer preflight reuses existing Influx identity and correctly returns LEGACY_FIRMWARE with fresh source32.9s; no service installed or fake valid voltage.
+
+
+## [2026-10-31] compile | Record Grafana login confirmation without changing deployment admission
+
+- Owner reports Grafana login complete. Browser inventory still contains the previously verified smartbox-power dashboard. This turn cannot re-read the UI because the browser control reports user binding unavailable; do not turn login confirmation into a fresh dashboard/runtime verification claim.
+- Existing dashboard remains applied from the prior measured acceptance; firmware publication/install and NAS observer remain pending solar charging. No source/configuration, credential or device command change. This is an operational log entry only.
+
+- Operational-log-only validation: native37 PASS and ESP32-C6 dummy build PASS. Generated version header restored; no image publication or device request.
+
+
+## [2026-10-31] code | Bound the explicitly requested initial legacy firmware transition
+
+- Owner renews firmware installation. Fresh passive125s evidence at20:12–20:14KST is12.140–12.144V/0.4–0.6mA motor branch, monotonic uptime and old BATTERY_LOW_SHUTDOWN. Existing old NVS callback preserves logical lid-open; reviewed new boot restores isolated protection. No actuator command or protection-threshold change.
+- Add operator-only exact-legacy first transition with four continuous near-current unloaded observations, fixed OTA payload/QoS0/nonretained and crash-durable O_EXCL no-resend intent. The explicit12.0V bootstrap floor is not an MCU rail/SOC guarantee and does not weaken new firmware's12.4V automatic OTA/motor policy.
+- Fresh narrow review finds mixed fabricated sensor rows and unsynced parent directory. Reproduce RED and fix; nine admission/delivery-uncertainty regressions PASS. Exact new schema is rejected in this legacy operator. Final suite/build/hosted checks and publication/install evidence follow; none sent yet.
+
+- Final pre-publication local checks:91 Python total/82 executed PASS/9 explicit environment skips, native37 PASS and C6 dummy build PASS. Existing HA principal passively confirms retained online0.1.0-ge0323a0 and five fresh stable protected frames; no publish. Generated version header restored; new artifact/install still pending.
