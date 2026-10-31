@@ -403,6 +403,8 @@ float SmartBoxController::getFilteredDistance() {
 
 void SmartBoxController::readSensors() {
     const auto reading=hw.readPower();
+    latestPowerRead=reading;
+    if(reading.valid && std::isfinite(reading.voltage) && std::isfinite(reading.currentMa))lastVerifiedVoltage=reading.voltage;
     batteryVoltage=reading.voltage; motorCurrent=reading.currentMa;
     batteryPolicy.sample(static_cast<uint32_t>(hw.getMillis()),reading.voltage,
                          reading.valid && std::isfinite(reading.currentMa),config.voltageShutdownLimit);
@@ -443,17 +445,31 @@ bool SmartBoxController::servicePower() {
     if(!after.actuationAllowed && !moving) return true;
     return false;
 }
-bool SmartBoxController::tryBeginOta() {
+bool SmartBoxController::canStartOta(bool sensorFaultRecovery) const {
     std::lock_guard<std::recursive_mutex> lock(dataMutex);
-    if(!canStartOta()) return false;
-    forceAllRelaysOff();
-    transitionTo(STATE_OTA_UPDATING);
-    return true;
+    const uint32_t now=static_cast<uint32_t>(hw.getMillis());const auto power=batteryPolicy.snapshot(now);
+    if(!sensorFaultRecovery)return currentState==STATE_IDLE && power.otaReady;
+    const float cutoff=std::isfinite(config.voltageShutdownLimit) && config.voltageShutdownLimit>0 && config.voltageShutdownLimit<25 ? config.voltageShutdownLimit : 11.3f;
+    // Explicit owner recovery only; unknown battery capacity is not a healthy-voltage claim.
+    return !otaRecoveryUsed && now>=120000 && currentState==STATE_BATTERY_LOW_SHUTDOWN &&
+        relaysIsolated && !isMotorRunning() && power.state==BatteryState::SENSOR_FAULT &&
+        power.sampleAgeMs<=2000 && (!std::isfinite(lastVerifiedVoltage) || (lastVerifiedVoltage>=cutoff && lastVerifiedVoltage<=16.0f));
+}
+bool SmartBoxController::tryBeginOta(bool sensorFaultRecovery) {
+    std::lock_guard<std::recursive_mutex> lock(dataMutex);
+    if(!canStartOta(sensorFaultRecovery))return false;
+    forceAllRelaysOff();otaRecoveryReserved=sensorFaultRecovery;
+    if(sensorFaultRecovery){otaRecoveryUsed=true;otaRecoveryAt=static_cast<uint32_t>(hw.getMillis());}
+    transitionTo(STATE_OTA_UPDATING);return true;
 }
 bool SmartBoxController::canContinueOta() const {
     std::lock_guard<std::recursive_mutex> lock(dataMutex);
-    return currentState==STATE_OTA_UPDATING && relaysIsolated &&
-        batteryPolicy.snapshot(static_cast<uint32_t>(hw.getMillis())).otaReady;
+    if(currentState!=STATE_OTA_UPDATING || !relaysIsolated || isMotorRunning())return false;
+    const uint32_t now=static_cast<uint32_t>(hw.getMillis());const auto power=batteryPolicy.snapshot(now);
+    if(!otaRecoveryReserved)return power.otaReady;
+    const float cutoff=std::isfinite(config.voltageShutdownLimit) && config.voltageShutdownLimit>0 && config.voltageShutdownLimit<25 ? config.voltageShutdownLimit : 11.3f;
+    return uint32_t(now-otaRecoveryAt)<=120000 && power.sampleAgeMs<=2000 &&
+        (!std::isfinite(lastVerifiedVoltage) || (lastVerifiedVoltage>=cutoff && lastVerifiedVoltage<=16.0f));
 }
 void SmartBoxController::servicePowerDuringOta() {
     std::lock_guard<std::recursive_mutex> lock(dataMutex);
@@ -461,6 +477,7 @@ void SmartBoxController::servicePowerDuringOta() {
 }
 void SmartBoxController::finishOtaWithoutReboot() {
     std::lock_guard<std::recursive_mutex> lock(dataMutex);
+    otaRecoveryReserved=false;
     forceAllRelaysOff(); lowBatteryOpening=false;
     const bool held=powerSnapshot().protectedMode;
     if(held) batteryPolicy.restoreProtection();

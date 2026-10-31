@@ -59,8 +59,13 @@ static void NetworkTask(void* pvParameters) {
 
 void setup() {
     Serial.begin(115200);
+#if ARDUINO_USB_CDC_ON_BOOT && ARDUINO_USB_MODE
+    // Field USB logs may be dropped; a missing/stalled host must not block control.
+    Serial.setTxTimeoutMs(0);
+#endif
     delay(500); // Small delay for serial stability
     Serial.println("[SYSTEM] Starting SmartBox Controller...");
+    Serial.printf("[SYSTEM] Firmware: %s\n", controller.getFirmwareVersion());
 
     // 1. Initialize hardware binding
     hardware.init();
@@ -251,6 +256,17 @@ void loop() {
                       controller.getBatteryVoltage(),
                       controller.getMotorCurrent(),
                       (int)controller.getCurrentState());
+    }
+    // Bounded offline field diagnostics; no register writes or control commands.
+    static unsigned long lastPowerDiagnostic = 0;
+    if (millis() - lastPowerDiagnostic >= 5000) {
+        lastPowerDiagnostic = millis();
+        const auto reading = controller.powerReadDiagnostics();
+        const auto power = controller.powerSnapshot();
+        Serial.printf("[POWER-DIAG] driver=%u fault=%u config=0x%04x calibration=%u valid=%u age_ms=%lu\n",
+                      unsigned(reading.driver), unsigned(reading.fault),
+                      unsigned(reading.configuration), unsigned(reading.calibration),
+                      unsigned(power.valid), static_cast<unsigned long>(power.sampleAgeMs));
     }
     // Yield without delaying the actuator timer or the24/7 sensing contract.
     delay(controller.powerSnapshot().protectedMode && !controller.isMotorRunning() ? 20 : 1);

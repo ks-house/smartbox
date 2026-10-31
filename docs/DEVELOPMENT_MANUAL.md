@@ -344,3 +344,14 @@ The measured NAS candidate failed before policy activation when the volatile boo
 ## 2026-10-31 배터리 자동 재개·감시
 
 [전원 정책과 검증 경계](../wiki/battery_power_management.md)를 따른다. 전압 센서 오류는 측정 불가로 표시하고, 회복 기준 전압이 연속5분 안정될 때 자동 재개한다. 재개 자체로 강제 개폐하지 않는다. HA는 전원 보호 단계·재개 대기·재개 횟수·예정 보고 주기·최저 전압·측정 오류를 표시한다. 전체 에너지 소비와 실제 뚜껑 위치는 별도 계측 대상이다.
+
+
+## INA219 회귀 수정과 원격 복구 경계
+
+0.2.1은 [회귀 수정 후보](../wiki/ina219_regression.md)이며 현재 설치판0.2.0과 구분한다. 생산 reader는 Adafruit 연속0x399F/4096으로 복귀하고 읽기마다 성공 여부를 확인한다. power_read_fault_code/config/calibration/driver와 get_power_diagnostics를 사용해 원격 실패 단계를 수집한다. dummy12.2V는 사용하지 않는다.
+
+추가된 명시적 maintenance recovery는 기존 broker control 권한에 한정되며 recovery=true/32hex request_id/120초 이내 expires_at이 필요하다. 기동2분·출력 격리·정지·최근 샘플 시도·검증된 위험 전압 이력 거절·부팅당1회·최종 TTL 확인을 적용한다. 모터 보호와 일반/자동 OTA 조건을 낮추지 않는다. 이 경로는 배터리 실측을 보증하지 않으며,0.2.0에는 없어 서버 설정이나 추가 인증으로 우회할 수 없다. 현재 장치에 지원되지 않는 명령을 보내거나 전압을 정상으로 위조하지 않는다.
+
+## Offline field recovery package
+
+[Field procedure](../wiki/field_recovery.md) defines a production-provisioned native-USB field image built only by exact-commit prepare-field-recovery dispatch. Only authenticated-encrypted CMS output is uploaded; the recipient private key stays local. Standard UART and field USB environments share16MB dual-slot layout/header. Default Windows script is offline-only; physical USB-only power and disconnected actuators precede any write. Back up changed sectors/settings, write app0/otadata only, verify unchanged NVS, and keep manual physical commissioning separate. Matching firmware bytes are not field health proof.
