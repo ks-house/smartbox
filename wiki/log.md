@@ -242,3 +242,7 @@ source_of_truth: true
 - Fresh narrow review finds mixed fabricated sensor rows and unsynced parent directory. Reproduce RED and fix; nine admission/delivery-uncertainty regressions PASS. Exact new schema is rejected in this legacy operator. Final suite/build/hosted checks and publication/install evidence follow; none sent yet.
 
 - Final pre-publication local checks:91 Python total/82 executed PASS/9 explicit environment skips, native37 PASS and C6 dummy build PASS. Existing HA principal passively confirms retained online0.1.0-ge0323a0 and five fresh stable protected frames; no publish. Generated version header restored; new artifact/install still pending.
+
+- New bounded transport review finds discontinuous/offline boot acceptance and lost-ack/stale-attempt evidence defects. Fix latest fresh online status, consecutive same-boot uptime/receipt continuity≥30s, persisted requested-versus-confirmed uncertainty and unconditional current-attempt terminal report. Public acceptance tests reproduce RED→GREEN; exact private transport fixture passes lost-ack and broken-pipe cases. Retained legacy status is explicitly labelled last-boot evidence, not a newly queried version.
+
+- Final local93 Python total/84 executed PASS/9 explicit environment skips, native37 PASS, C6 dummy build PASS; exact private transport lost-ack/broken-pipe fixtures2 PASS. Generated version header restored. Keep new main publication and installed acceptance separate from this verified source checkpoint.

@@ -62,3 +62,19 @@ def trigger_once(client,intent_path,rows,now,legacy_version,candidate):
     result=client.publish('smartbox/command','{"command":"trigger_ota"}',qos=0,retain=False)
     if result.rc!=0:raise RuntimeError('uncertain first transition; reservation retained and no resend permitted')
     return intent
+
+
+def accept_boot(rows,status,sent_at,old_uptime,version,now):
+    """Accept only a fresh consecutive pair from one expected new boot, never PUBACK."""
+    try:
+        if len(rows)<2 or status.get('status')!='online' or status.get('version')!=version or status.get('retained') is not False:
+            return False
+        left,right=rows[-2:];start=number(sent_at);now=number(now);old=number(old_uptime)
+        if not start<number(status['at'])<=number(left['at'])<number(right['at'])<=now or now-right['at']>10:
+            return False
+        for row in (left,right):
+            if row.get('firmware')!=version or row.get('power_schema')!=1 or row.get('power_sensor_valid')!=1:return False
+            if not 0<=number(row['uptime_ms'])<old:return False
+        elapsed=right['at']-left['at'];uptime=(right['uptime_ms']-left['uptime_ms'])/1000.0
+        return 30<=elapsed<=400 and uptime>0 and abs(elapsed-uptime)<=5
+    except (ValueError,KeyError,TypeError):return False

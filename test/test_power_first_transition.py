@@ -56,4 +56,18 @@ class FirstTransitionTests(unittest.TestCase):
    self.assertTrue(p.exists())
    with self.assertRaises(FileExistsError):m.trigger_once(c,p,self.rows(),1091,'0.1.0-ge0323a0',{'version':'0.2.0-g1234567','commit':'1234567'+'a'*33,'sha256':'b'*64,'size':1400000})
    self.assertEqual(c.publish.call_count,1)
+ def boot_rows(self):
+  return [dict(at=1100,power_schema=1,power_sensor_valid=1,firmware='0.2.0-g1234567',uptime_ms=1000),dict(at=1400,power_schema=1,power_sensor_valid=1,firmware='0.2.0-g1234567',uptime_ms=301000)]
+ def test_installed_acceptance_needs_continuous_new_online_boot(self):
+  status={'at':1099,'status':'online','version':'0.2.0-g1234567','retained':False}
+  self.assertTrue(m.accept_boot(self.boot_rows(),status,1092,123000000,'0.2.0-g1234567',1401))
+  for change in [dict(uptime_ms=500),dict(uptime_ms=float('nan')),dict(power_sensor_valid=0),dict(at=1407),dict(firmware='wrong')]:
+   rows=self.boot_rows();rows[-1].update(change)
+   self.assertFalse(m.accept_boot(rows,status,1092,123000000,'0.2.0-g1234567',1401))
+ def test_offline_retained_and_post_restart_rows_cannot_be_accepted(self):
+  base={'at':1099,'status':'online','version':'0.2.0-g1234567','retained':False}
+  for change in [dict(status='offline'),dict(retained=True),dict(at=1200),dict(at=1080)]:
+   status={**base,**change};self.assertFalse(m.accept_boot(self.boot_rows(),status,1092,123000000,'0.2.0-g1234567',1401))
+  rows=self.boot_rows();rows[-1]['at']=1101;rows[-1]['uptime_ms']=2000
+  self.assertFalse(m.accept_boot(rows,base,1092,123000000,'0.2.0-g1234567',1102))
 if __name__=='__main__':unittest.main()
