@@ -30,3 +30,23 @@ These fields/requests are N/N-1 additions. They cannot be retrofitted into the a
 ## Verification checkpoint
 
 Local final validation:107 Python tests total,98 executed PASS and9 explicit environment skips; this includes16 actual AutoOtaManager host scenarios. Native46 tests PASS. ESP32-C6 public-dummy build PASS (RAM62324B, flash1355650B). Independent focused reviews have no outstanding Critical/Important findings after reproduced failures were fixed. Hosted CI and actual installation are separate gates. Never publish the local dummy image.
+
+## Additional remote recovery investigation —2026-11-01 KST
+
+The owner explicitly authorizes further remote recovery without field access. A separate installed MQTT reboot command is present; it is independent of canStartOta. This is an I2C-controller reinitialization attempt, not a code installation or an INA219 power cycle. The firmware update lockout does not mean every remote maintenance action is absent.
+
+| Existing path | Evidence / limit | Action |
+|---|---|---|
+| MQTT processor reboot | Exact installed source accepts reboot independently; one current live schema1 SENSOR_FAULT/BATTERY_LOW_SHUTDOWN frame required | One QoS0, non-retained publish with a durable exclusive no-resend intent |
+| Ordinary/forced OTA and scheduled reboot | All retain canStartOta and reject the invalid-sensor condition | No duplicate OTA or threshold/configuration workaround |
+| Reset emergency / config / maintenance | No supported sensor-register reset or recovery OTA flag; setConfig does not replace BatteryPolicy | No actuator/protection-release commands |
+| LAN web server | Only Wi-Fi provisioning routes; no firmware uploader | No speculative upload |
+| Existing Tailnet / jump host | Windows Tailnet has NAS and Android tablet online, no field subnet route or configured field jump host | No new network route, keys or router change |
+| Power cycle | Wiring describes a manual toggle/PWM solar charger; no documented network power switch | HA registry checked separately; never toggle an unidentified relay |
+| Bootloader rollback | Installed publication41197607762 uses Arduino3.3.11/libs5.5.5+b774170ff46. Matching SDK enables rollback, but default verifyOta=true confirms pending images during initArduino before app sensor checks; installed app exposes no rollback command | No reboot loop or assumed remote partition switch; actual flash OTA state is not readable here |
+
+Preflight uses the exact installed controller/BatteryPolicy, not the0.2.1 candidate. Five protected/invalid boot scenarios keep Main off and deny motor/OTA for299s, including restored protection with12.6V awaiting dwell. A negative control without restored protection and valid critical voltage can deliberately take the existing one-shot fail-open branch: this is not a general claim that all reboot conditions are non-actuating. Physical relay output and MCU NVS marker readback remain unverified. Eleven local operator cases reject wrong/stale/healthy/moving frames.
+
+At01:09:04KST one existing reboot command was sent after fresh fault-frame admission. A non-retained online event and a live frame with uptime12931ms confirm a new0.2.0 boot; battery/current remain null, sensor_valid0/state5/protected. Exactly one reboot publish, zero OTA/motion publishes, no resend. This rules out successful recovery by that warm restart; it does not identify the failing INA219 register. The manifest hold and preserved images stay in place.
+
+Follow-up read-only job727813a7 at01:17:24KST finds no registered dedicated SmartBox power switch (25 related HA entities, MQTT only). Passive90s receives no new telemetry; its retained current status reports uptime300933ms, the same0.2.0/SENSOR_FAULT/null power. Independently, the NAS collector/observer receipt is88.6s old at01:16:43KST, so continued measured invalidity is not inferred solely from a retained message. This corroborates at least five minutes of post-reboot execution without voltage restoration; retained and live observations remain labelled separately. Candidate/collector/API and release hold are preserved. No compatible remote firmware admission or sensor supply-cycle route is currently demonstrated.

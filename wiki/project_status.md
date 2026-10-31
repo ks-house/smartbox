@@ -164,3 +164,9 @@ Physical lid/electrical/rollback qualification remains distinct.
 - 기존 연속 측정 API 복귀, 읽기 성공/프로파일/보정/범위 검증과 단계별 진단을 추가했다.
 - 현재0.2.0의 센서 오류가 강제/자동 OTA를 함께 차단하는 복구 경로 결함도 확인했다. 후보는 명시적·만료·단발·출력 격리 유지 복구 경로를 분리하지만 현재 바이너리에 소급 적용할 수 없다.
 - [수정 후보와 증거 경계](ina219_regression.md)를 따른다. 실제 장치는 여전히0.2.0/SENSOR_FAULT이며 후보 설치·정상 측정 복구는 완료하지 않았다.
+
+### 2026-11-01 KST — additional remote recovery attempt
+
+- Exact installed0.2.0 accepts a separate MQTT reboot despite OTA lockout. Owner-authorized one-shot recovery reboot at01:09:04KST uses fresh protected sensor-fault admission, QoS0/non-retained and a durable no-resend intent. Fresh online + uptime12931ms confirms new boot; later retained status uptime300933ms and a fresh collector receipt still report sensor invalid/null voltage. This did not restore measurement or install0.2.1.
+- No registered dedicated HA power switch, field Tailnet route/jump host or installed Wi-Fi uploader was found. Scheduled reboot/config/protection release cannot supply the missing OTA admission. Matching installed Arduino3.3.11 SDK default confirms an image before sensor health and no app rollback command exists; actual OTA flash state remains unqueried.
+- Keep PR22 Draft/unmerged, version manifest held and power observer active. See [remote path evidence](ina219_regression.md#additional-remote-recovery-investigation-2026-11-01-kst). No further autonomous restart/OTA/motion trial is queued.
