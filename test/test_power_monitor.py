@@ -69,4 +69,13 @@ class PowerMonitorTests(unittest.TestCase):
     def test_bad_sample_ages_do_not_become_normal(self):
         for age in [float('nan'),-1,float('inf')]:
             self.assertNotEqual('NORMAL',m.evaluate(sample(sample_age_ms=age),1020)['status'])
+    def test_legacy_stale_frame_is_offline_not_permanently_fresh_legacy(self):
+        current=m.evaluate(sample(schema=0),1091)
+        self.assertEqual('OFFLINE',current['status']);self.assertIsNone(current['voltage_v'])
+        self.assertEqual('LEGACY_FIRMWARE',m.evaluate(sample(schema=0),1090)['status'])
+    def test_legacy_to_offline_alert_is_once_without_claiming_measurement(self):
+        state,event=m.advance({},m.evaluate(sample(schema=0),1020),1020)
+        state,event=m.advance(state,m.evaluate(sample(schema=0),1091),1091)
+        self.assertEqual('OFFLINE',event['status']);self.assertIsNone(event['voltage_v'])
+        state,event=m.advance(state,m.evaluate(sample(schema=0),1100),1100);self.assertIsNone(event)
 if __name__=='__main__':unittest.main()

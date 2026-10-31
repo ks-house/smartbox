@@ -75,7 +75,13 @@ def existing_config(docker,recipient):
     result.update(recipient=recipient,state_directory=str(STATE),interval_seconds=60)
     return result,source,hashlib.sha256(raw).hexdigest()
 
-def install(source,expected,recipient,apply=False):
+def validate_observer_admission(sample,current,bootstrap=False):
+    if type(bootstrap) is not bool:raise ValueError('explicit bootstrap decision required')
+    allowed={'NORMAL','LOW_BATTERY','ENERGY_SAVING','BATTERY_PROTECTED','RECOVERY_WAIT','POWER_SENSOR_FAULT','INITIALIZING','LEGACY_FIRMWARE','OFFLINE'}
+    if current.get('status') not in allowed:raise ValueError('healthy query and recognized source required')
+    if not bootstrap and (sample is None or sample.get('schema')!=1):raise ValueError('new installed telemetry schema required')
+
+def install(source,expected,recipient,apply=False,bootstrap=False):
     if os.geteuid()!=0:raise ValueError('owner-authorized root operator required')
     raw=validate_candidate(source,expected)
     sys.dont_write_bytecode=True
@@ -88,8 +94,10 @@ def install(source,expected,recipient,apply=False):
     if not apply:return {'preflight':True,'source_sha256':expected,'current':current}
     loaded=subprocess.run(['/bin/systemctl','show',SERVICE,'-p','LoadState'],capture_output=True,timeout=10)
     if loaded.stdout.strip()!=b'LoadState=not-found':raise ValueError('existing service binding must not be overwritten')
-    if sample is None or sample.get('schema')!=1:raise ValueError('new installed telemetry schema required')
-    return apply_candidate(raw,config,monitor,collector,collector_sha,expected)
+    validate_observer_admission(sample,current,bootstrap)
+    result=apply_candidate(raw,config,monitor,collector,collector_sha,expected)
+    result.update(bootstrap_mode=bootstrap,device_power_schema_confirmed=sample is not None and sample.get('schema')==1)
+    return result
 
 def apply_candidate(raw,config,monitor,collector,collector_sha,expected):
     if ROOT.exists() or STATE.exists() or UNIT.exists():raise ValueError('observer already exists; do not overwrite without an explicit upgrade plan')
@@ -124,7 +132,7 @@ def apply_candidate(raw,config,monitor,collector,collector_sha,expected):
         raise
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--source',type=Path,required=True);parser.add_argument('--expected-sha256',required=True);parser.add_argument('--recipient',required=True);parser.add_argument('--apply',action='store_true');args=parser.parse_args()
-    try:print(json.dumps(install(args.source,args.expected_sha256,args.recipient,args.apply)))
+    parser=argparse.ArgumentParser();parser.add_argument('--source',type=Path,required=True);parser.add_argument('--expected-sha256',required=True);parser.add_argument('--recipient',required=True);parser.add_argument('--apply',action='store_true');parser.add_argument('--bootstrap',action='store_true',help='allow healthy source with legacy/offline device; never bypass query validation');args=parser.parse_args()
+    try:print(json.dumps(install(args.source,args.expected_sha256,args.recipient,args.apply,args.bootstrap)))
     except Exception as e:print(json.dumps({'installed':False,'error_type':type(e).__name__}));raise SystemExit(1)
 if __name__=='__main__':main()
