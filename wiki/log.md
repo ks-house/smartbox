@@ -215,3 +215,13 @@ source_of_truth: true
 - Independent reviewer found5 Important/2 Minor issues; reproduce and fix direction-mode restoration, actual OTA no-update cleanup, atomic reservation/all movement rejection/immediate energy gate, actual INA219 profile/status freshness, HTTP200 error-stream classification and malformed age/display semantics.
 - Extend actual production AutoOtaManager/PowerManager host fixtures, pthread interlock test and register-level conversion failures/range/cohort/wrap tests. Preserve legacy bounded fail-open but reject out-of-profile12V readings above16V, apply stall magnitude, and let missed low-energy night checks catch up once when charged. No calibration or re-review bypass.
 - Final local37 native PASS,76 Python PASS/9 explicit environment skips and C6 dummy build PASS (RAM62220B/flash1347818B). The credential-free local binary remains unpublished; final main CI/artifact/installed/runtime acceptance pending.
+
+
+## [2026-10-31] fix | Repair stale OTA content origin and retain charged-install gate
+
+- Existing SmartBox manifest502 traced to custom guard172.17.0.2 while current Docker static service used0.3. New narrow handler repair retains the same content mount/auth/access/method policy and removes bridge-IP dependence; full nginx candidate and three real http-worker Unix-socket content checks PASS.
+- Fresh narrow review found missing runtime acceptance and manifest binding. Reproduce RED then fix with exact prior manifest/image capture, immediate pre-apply pair check, actual TLS content confirmation, integrity-binding preservation and exact rollback. Six focused tests PASS. Applied root receipt e316f95f; previous artifacts/guard retained privately. No new credentials/listener or unrelated service restart.
+- Hosted41194901015 PASS for authenticated exact prior0.1.0-ge0323a0/SHA333e23df download and anonymous/wrong-credential refusal; build/publication skipped. Grafana new dashboard retains old dashboard and distinguishes legacy unknown fields. New firmware publication/install and schema1 observer remain pending.
+- Fresh earlier live telemetry12.17V/legacyBATTERY_LOW_SHUTDOWN; owner explicitly waits for solar charging because external power is unavailable. Keep12.4V recovery/admission thresholds; do not lower them to force installation. Zero actuator/OTA commands. Final local/hosted gates follow this checkpoint.
+
+- Final expanded Python suite:82 total,73 executed PASS and9 explicit environment skips; native37 PASS; C6 dummy-only build PASS RAM62220B/flash1347818B. Generated version header restored. NAS observer preflight reuses existing Influx identity and correctly returns LEGACY_FIRMWARE with fresh source32.9s; no service installed or fake valid voltage.
