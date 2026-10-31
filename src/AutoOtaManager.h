@@ -3,6 +3,8 @@
 
 #include "SmartBoxController.h"
 #include "secrets.h"
+#include <atomic>
+#include <mutex>
 
 class AutoOtaManager {
 public:
@@ -27,27 +29,33 @@ public:
 private:
     enum OtaPhase { OTA_PHASE_IDLE, OTA_PHASE_VERSION, OTA_PHASE_FIRMWARE,
                     OTA_PHASE_REBOOT_PENDING };
-    static volatile OtaPhase otaPhase;
-    static volatile uint32_t otaAttempts;
-    static volatile int otaManifestHttpCode;
-    static volatile int otaUpdaterError;
+    static std::atomic<OtaPhase> otaPhase;
+    static std::atomic<uint32_t> otaAttempts;
+    static std::atomic<int> otaManifestHttpCode;
+    static std::atomic<int> otaUpdaterError;
     static SmartBoxController* controllerPtr;
     static unsigned long lastScheduleCheck;
     static int lastOtaRunDay;
     static unsigned long lastOtaRunTime;  // millis() of last OTA run (0 = never)
-    static volatile bool otaForceRequested;
-    static volatile bool otaInProgress;
+    static bool otaForceRequested;
+    static bool otaRecoveryRequested;
+    static std::mutex requestMutex;
+    static bool takeManualRequest(bool normalReady,bool& recovery);
+    static bool claimAutomaticRequest();
+    static uint32_t recoveryRequestAt,recoveryRequestTtl;
+    static bool recoveryRequestFresh();
+    static std::atomic<bool> otaInProgress;
     
-    static volatile OtaState otaState;
+    static std::atomic<OtaState> otaState;
     static char otaErrorMessage[128];
     
-    static void runOtaProcess(bool force);
+    static void runOtaProcess(bool force, bool sensorFaultRecovery=false);
     static String parseJsonField(const String& json, const String& key);
 
 public:
     static void init(SmartBoxController& controller);
     static void update();
-    static bool startOtaUpdate(bool force = false);
+    static bool startOtaUpdate(bool force = false, bool sensorFaultRecovery=false, uint32_t recoveryTtlMs=120000);
     static bool isOtaInProgress() { return otaInProgress; }
     
     static OtaState getOtaState() { return otaState; }

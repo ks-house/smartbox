@@ -84,3 +84,8 @@ At21:55KST retained status and HA battery discovery explicitly report0.2.0-g7a55
 NAS installation exposed systemd219, which rejects --now. The installer separates enable/start while preserving rollback. The failed attempt created only an empty program directory and two root-private state markers; an exact owner/mode/hash/absent-service check permits preserving that failed state by rename and removing only the empty created directory before retry. No collector, broker, HA or API restart.
 
 Observer acceptance at22:13:20KST confirms active service, pinned program98102212, fresh typed POWER_SENSOR_FAULT/no voltage claim, repeated60s observations, exactly one accepted local-owner event and empty retry queue. Collector bytes, held candidate image and API readiness are unchanged. Source98 Python total/89 executed PASS/9 explicit skips, native37 and C6 dummy build PASS. Dashboard receipt age now selects the latest voltage OR schema receipt; the real Influx query returns133.7s even while voltage remains null. This prevents measurement invalidity from being confused with no telemetry.
+
+
+## 0.2.1 correction candidate, not deployed
+
+User requests firmware-first remote investigation. See [INA219 regression](ina219_regression.md): restore the known continuous Adafruit read path with success/profile/calibration/range checks and numeric failure diagnostics; no synthetic voltage. A future explicit authenticated-controller maintenance request may recover from sensor-fault protection without releasing motors, while ordinary/automatic OTA keeps its existing gate. Unknown battery power is not certified by this option. Current0.2.0 cannot use the new option and no compatible live admission has been proved; release hold remains.

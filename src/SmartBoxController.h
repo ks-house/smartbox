@@ -101,6 +101,10 @@ private:
   // Calibration flag to enforce one-time complete open/hold/close cycle on boot
   bool isCalibrationPhase;
   mutable std::recursive_mutex dataMutex;
+  PowerReading latestPowerRead{NAN,NAN,false};
+  float lastVerifiedVoltage=NAN; // Admission evidence only; never publish as current voltage.
+  bool otaRecoveryReserved=false,otaRecoveryUsed=false;
+  uint32_t otaRecoveryAt=0;
 
   void updateDistanceBuffer();
   float getFilteredDistance();
@@ -143,11 +147,11 @@ public:
       std::lock_guard<std::recursive_mutex> lock(dataMutex);
       return batteryPolicy.snapshot(static_cast<uint32_t>(hw.getMillis()));
   }
-  bool canStartOta() const {
-      std::lock_guard<std::recursive_mutex> lock(dataMutex);
-      return currentState == STATE_IDLE && batteryPolicy.snapshot(static_cast<uint32_t>(hw.getMillis())).otaReady;
+  PowerReading powerReadDiagnostics() const {
+      std::lock_guard<std::recursive_mutex> lock(dataMutex);return latestPowerRead;
   }
-  bool tryBeginOta();
+  bool canStartOta(bool sensorFaultRecovery=false) const;
+  bool tryBeginOta(bool sensorFaultRecovery=false);
   bool canContinueOta() const;
   void servicePowerDuringOta();
   void finishOtaWithoutReboot();
@@ -165,7 +169,7 @@ public:
 #ifdef FIRMWARE_VERSION_OVERRIDE
   static constexpr const char *FIRMWARE_VERSION = FIRMWARE_VERSION_OVERRIDE;
 #else
-  static constexpr const char *FIRMWARE_VERSION = "0.2.0";
+  static constexpr const char *FIRMWARE_VERSION = "0.2.1";
 #endif
   const char *getFirmwareVersion() const { return FIRMWARE_VERSION; }
 

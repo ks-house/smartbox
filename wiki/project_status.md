@@ -156,3 +156,11 @@ Physical lid/electrical/rollback qualification remains distinct.
 ## 2026-10-31 automatic battery recovery candidate
 
 [Battery power management](battery_power_management.md) describes the owner-approved automatic recovery, profile validity, savings, OTA reservation and monitoring. Source verification passes37 native/76 Python (9 environment skips)/C6 dummy compilation. Reviewed production publication, installed recovery and monitoring acceptance remain separate; no local dummy image is eligible for deployment.
+
+
+## 회귀 수정 후보0.2.1 (미적용)
+
+- 업데이트 직전 정상 값과 이후 전부 무효인 이력을 근거로 커스텀 INA219 경로를 우선 회귀 지점으로 다룬다. 현장 센서 고장으로 단정하지 않는다.
+- 기존 연속 측정 API 복귀, 읽기 성공/프로파일/보정/범위 검증과 단계별 진단을 추가했다.
+- 현재0.2.0의 센서 오류가 강제/자동 OTA를 함께 차단하는 복구 경로 결함도 확인했다. 후보는 명시적·만료·단발·출력 격리 유지 복구 경로를 분리하지만 현재 바이너리에 소급 적용할 수 없다.
+- [수정 후보와 증거 경계](ina219_regression.md)를 따른다. 실제 장치는 여전히0.2.0/SENSOR_FAULT이며 후보 설치·정상 측정 복구는 완료하지 않았다.

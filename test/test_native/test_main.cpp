@@ -1,3 +1,4 @@
+#include "RecoveryOtaRequest.h"
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
 #endif
@@ -925,6 +926,72 @@ void test_12v_profile_overvoltage_cannot_enable_motor(void){
     TEST_ASSERT_FALSE(box.powerSnapshot().valid);TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(RELAY_MAIN_PIN));
 }
 
+
+class LegacyContinuousSource:public Ina219ContinuousSource {
+ public:
+  uint16_t config=0x399f,cal=4096;float bus=12.124f,shunt=0.04f,current=0.4f;int fail=0,configReads=0;
+  bool readConfiguration(uint16_t &v)override{++configReads;v=config;return fail!=1;}
+  bool readCalibration(uint16_t &v)override{v=cal;return fail!=2;}
+  bool readBusVoltage(float &v)override{v=bus;return fail!=3;}
+  bool readShuntVoltageMv(float &v)override{v=shunt;return fail!=4;}
+  bool readCurrentMa(float &v)override{v=current;return fail!=5;}
+};
+void test_ina_continuous_baseline_reproduces_field_units(void){
+ LegacyContinuousSource port;auto r=sampleIna219Continuous(port);
+ TEST_ASSERT_TRUE(r.valid);TEST_ASSERT_FLOAT_WITHIN(0.00002f,12.12404f,r.voltage);TEST_ASSERT_FLOAT_WITHIN(0.0001f,0.4f,r.currentMa);
+ TEST_ASSERT_EQUAL(1,r.driver);TEST_ASSERT_EQUAL(PowerReadFault::NONE,r.fault);TEST_ASSERT_EQUAL_UINT16(0x399f,r.configuration);TEST_ASSERT_EQUAL_UINT16(4096,r.calibration);
+}
+void test_ina_continuous_failed_reads_never_fabricate_power(void){
+ for(int i=1;i<=5;i++){LegacyContinuousSource p;p.fail=i;auto r=sampleIna219Continuous(p);TEST_ASSERT_FALSE(r.valid);TEST_ASSERT_TRUE(std::isnan(r.voltage));TEST_ASSERT_TRUE(std::isnan(r.currentMa));TEST_ASSERT_NOT_EQUAL(PowerReadFault::NONE,r.fault);}
+}
+void test_ina_continuous_profile_calibration_and_numeric_failures_are_diagnosed(void){
+ LegacyContinuousSource p;p.config=0x399b;auto r=sampleIna219Continuous(p);TEST_ASSERT_FALSE(r.valid);TEST_ASSERT_EQUAL(PowerReadFault::PROFILE_MISMATCH,r.fault);
+ p.config=0x399f;p.cal=0;r=sampleIna219Continuous(p);TEST_ASSERT_EQUAL(PowerReadFault::CALIBRATION_MISMATCH,r.fault);
+ for(float bad:{NAN,INFINITY,-1.0f,27.0f}){LegacyContinuousSource q;q.bus=bad;TEST_ASSERT_FALSE(sampleIna219Continuous(q).valid);}
+ LegacyContinuousSource q;q.current=NAN;TEST_ASSERT_FALSE(sampleIna219Continuous(q).valid);
+}
+void test_ina_continuous_bidirectional_read_does_not_require_triggered_cohort(void){
+ LegacyContinuousSource p;p.current=-0.6f;p.shunt=-0.06f;auto r=sampleIna219Continuous(p);TEST_ASSERT_TRUE(r.valid);TEST_ASSERT_FLOAT_WITHIN(0.00002f,12.12394f,r.voltage);
+ p.current=50.0f;r=sampleIna219Continuous(p);TEST_ASSERT_TRUE(r.valid); // Continuous registers may advance between independent reads.
+}
+
+
+void test_sensor_fault_recovery_ota_is_explicit_isolated_and_once_per_boot(void){
+ MockHardware hw;hw.setBatteryVoltage(NAN);SmartBoxController box(hw);box.init();box.update();
+ TEST_ASSERT_FALSE(box.canStartOta(true));hw.advanceMillis(120000);box.update();
+ TEST_ASSERT_FALSE(box.canStartOta());TEST_ASSERT_TRUE(box.canStartOta(true));TEST_ASSERT_TRUE(box.tryBeginOta(true));
+ TEST_ASSERT_EQUAL(STATE_OTA_UPDATING,box.getCurrentState());TEST_ASSERT_TRUE(box.canContinueOta());
+ box.forceOpen();box.forceClose();box.resetEmergency();box.startMaintenanceMode();box.stopMaintenanceMode();
+ TEST_ASSERT_EQUAL(STATE_OTA_UPDATING,box.getCurrentState());for(int pin:{6,7,8})TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(pin));
+ box.finishOtaWithoutReboot();TEST_ASSERT_EQUAL(STATE_BATTERY_LOW_SHUTDOWN,box.getCurrentState());TEST_ASSERT_FALSE(box.tryBeginOta(true));
+}
+void test_recovery_ota_cannot_bypass_known_critical_or_moving_or_stale_state(void){
+ MockHardware hw;hw.setBatteryVoltage(11.0f);SmartBoxController box(hw);box.init();for(int n=0;n<121;n++){hw.advanceMillis(1000);box.update();}TEST_ASSERT_FALSE(box.tryBeginOta(true));
+ MockHardware invalid;invalid.setBatteryVoltage(NAN);SmartBoxController b(invalid);b.init();b.update();invalid.advanceMillis(120000);b.update();invalid.advanceMillis(2001);TEST_ASSERT_FALSE(b.tryBeginOta(true));
+ MockHardware over;over.setBatteryVoltage(18.0f);SmartBoxController high(over);high.init();high.update();over.advanceMillis(120000);over.setBatteryVoltage(NAN);high.update();TEST_ASSERT_FALSE(high.tryBeginOta(true));
+ MockHardware good;good.setBatteryVoltage(12.6f);SmartBoxController moving(good);moving.init();for(int n=0;n<121;n++){good.advanceMillis(1000);moving.update();}moving.forceOpen();moving.update();TEST_ASSERT_FALSE(moving.tryBeginOta(true));
+}
+void test_recovery_ota_rechecks_known_voltage_and_expires_before_flash(void){
+ MockHardware hw;hw.setBatteryVoltage(NAN);SmartBoxController box(hw);box.init();box.update();hw.advanceMillis(120000);box.update();TEST_ASSERT_TRUE(box.tryBeginOta(true));
+ hw.setBatteryVoltage(10.8f);hw.advanceMillis(1000);box.servicePowerDuringOta();TEST_ASSERT_FALSE(box.canContinueOta());box.finishOtaWithoutReboot();for(int pin:{6,7,8})TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(pin));
+ MockHardware t;t.setBatteryVoltage(NAN);SmartBoxController timed(t);timed.init();timed.update();t.advanceMillis(120000);timed.update();TEST_ASSERT_TRUE(timed.tryBeginOta(true));t.advanceMillis(120001);timed.servicePowerDuringOta();TEST_ASSERT_FALSE(timed.canContinueOta());
+}
+
+void test_recovery_request_requires_fresh_bounded_owner_shape(void){
+ uint32_t ttl=99;const char* id="0123456789abcdef0123456789abcdef";
+ TEST_ASSERT_TRUE(validateRecoveryOtaRequest(id,1800000120,1800000000,ttl));TEST_ASSERT_EQUAL_UINT32(120000,ttl);
+ const uint64_t expired[]={1799999999ULL,1800000000ULL,1800000121ULL,UINT64_MAX};
+ for(uint64_t expires:expired){TEST_ASSERT_FALSE(validateRecoveryOtaRequest(id,expires,1800000000,ttl));TEST_ASSERT_EQUAL_UINT32(0,ttl);}
+ TEST_ASSERT_FALSE(validateRecoveryOtaRequest(nullptr,1800000010,1800000000,ttl));TEST_ASSERT_FALSE(validateRecoveryOtaRequest("bad",1800000010,1800000000,ttl));
+ TEST_ASSERT_FALSE(validateRecoveryOtaRequest("0123456789abcdef0123456789abcdeg",1800000010,1800000000,ttl));TEST_ASSERT_FALSE(validateRecoveryOtaRequest(id,1000,1,ttl));
+}
+
+void test_recovery_cannot_forget_known_critical_voltage_after_read_failure(void){
+ MockHardware hw;hw.setBatteryVoltage(11.0f);SmartBoxController box(hw);box.init();for(int n=0;n<121;n++){hw.advanceMillis(1000);box.update();}
+ hw.setBatteryVoltage(NAN);hw.advanceMillis(1000);box.update();TEST_ASSERT_FALSE(box.canStartOta(true));TEST_ASSERT_FALSE(box.tryBeginOta(true));
+ hw.setBatteryVoltage(12.6f);hw.advanceMillis(1000);box.update();hw.setBatteryVoltage(NAN);hw.advanceMillis(1000);box.update();TEST_ASSERT_TRUE(box.canStartOta(true));
+}
+
 #ifdef NATIVE_BUILD
 int main(int argc, char **argv) {
     UNITY_BEGIN();
@@ -963,6 +1030,15 @@ int main(int argc, char **argv) {
     RUN_TEST(test_ina_stale_conversion_and_overflow_are_not_valid);
     RUN_TEST(test_ina_saturation_and_incoherent_current_are_not_valid);
     RUN_TEST(test_ina_conversion_timeout_clock_wrap);
+    RUN_TEST(test_ina_continuous_baseline_reproduces_field_units);
+    RUN_TEST(test_ina_continuous_failed_reads_never_fabricate_power);
+    RUN_TEST(test_ina_continuous_profile_calibration_and_numeric_failures_are_diagnosed);
+    RUN_TEST(test_ina_continuous_bidirectional_read_does_not_require_triggered_cohort);
+    RUN_TEST(test_recovery_cannot_forget_known_critical_voltage_after_read_failure);
+    RUN_TEST(test_recovery_request_requires_fresh_bounded_owner_shape);
+    RUN_TEST(test_sensor_fault_recovery_ota_is_explicit_isolated_and_once_per_boot);
+    RUN_TEST(test_recovery_ota_cannot_bypass_known_critical_or_moving_or_stale_state);
+    RUN_TEST(test_recovery_ota_rechecks_known_voltage_and_expires_before_flash);
     RUN_TEST(test_atomic_ota_reservation_blocks_all_motion_commands);
     RUN_TEST(test_ota_cannot_suspend_an_opening_interlock);
     return UNITY_END();

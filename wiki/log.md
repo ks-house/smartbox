@@ -266,3 +266,13 @@ source_of_truth: true
 
 - Runtime retry33367ae2 succeeds under systemd219: observer active, existing identity reused, POWER_SENSOR_FAULT and pending0.22:13 final589aaefe verifies repeated observations, exactly one notification accepted22:08:16KST, collector/candidate/manifest-hold/API preserved. No device command.98 Python total/89 PASS/9 explicit skips, native37/C6 PASS; narrow static review has no Critical/Important findings.
 - Separate new dashboard-only receipt-age query uses latest battery_v OR power_schema. This fixes stale-age display when the valid new protocol deliberately omits voltage. Narrow review passes; actual Influx queryea506a57 returns133.7s. UI import and hosted exact-head check follow.
+
+
+## [2026-11-01] fix | Prepare firmware-first INA219 regression correction without claiming live repair
+
+- Owner correctly raises before/after regression and requests remote correction without field access. Remote history21 invalid/0 valid/no minimum voltage,206900B free heap and advancing uptime; old varying12.12V/current differs from nominal dummy. Exact0.2.0 reject stage is not exported, so do not declare hardware failure or an exact register cause.
+- Controlled production rollback to known Adafruit continuous0x399F/4096, per-read success/readback/finite/range checks,50ms baseline timeout/2ms first conversion/5s bounded re-probe. No fake nominal readings. Add numeric fault/config/calibration/driver diagnostics and a read-only request on existing topics.
+- Confirm in source that current0.2.0 rejects both forced and automatic OTA on invalid sensor; no alternate uploader exists. Candidate adds explicit authenticated control recovery with fresh nonce/TTL, no retained/replay, stable boot/protected HIZ/no motor/recent sample/once-per-boot reservation and final preflash checks. Automatic/normal OTA and GPIO/interlocks stay unchanged. It cannot retrofit current0.2.0; no device command or release unhold is performed.
+- Independent review2 Important findings reproduced RED/fixed GREEN: preserve unsafe verified voltage through NaN failure and check original TTL at the last flash gate. New queue coordination/cleanup issues also reproduced RED/fixed GREEN; targeted queue review has no new Critical/Important finding. Current focused native46 and actual updater16 tests PASS; full suite/C6 final gates follow.
+
+- Final local gates:107 Python tests total/98 executed PASS/9 explicit environment skips (including16 actual updater host scenarios), native46 PASS, ESP32-C6 public-dummy build PASS; RAM62324/327680B and flash1355650/6553600B. The final C6-only missing cstring include was corrected and the full suite rerun. Production image publication and field acceptance remain blocked; no local dummy binary is published.

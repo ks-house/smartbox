@@ -19,4 +19,16 @@ class ActualOtaTests(unittest.TestCase):
     def test_close_during_actual_updater_is_denied(self):self.run_case('close_flash')
     def test_busy_during_manifest_does_not_suspend_motion_timeout(self):self.run_case('busy_manifest')
     def test_missed_night_check_catches_up_once_when_charged(self):self.run_case('catchup')
+    def test_explicit_recovery_without_sensor_keeps_protection_on_no_update(self):self.run_case('recovery_no_update')
+    def test_recovery_failed_flash_keeps_protection_and_consumes_once(self):self.run_case('recovery_fail')
+    def test_recovery_manifest_failure_or_same_version_releases_reservation(self):
+        self.run_case('recovery_manifest_fail');self.run_case('recovery_current')
+    def test_recovery_preflash_known_low_voltage_never_flashes(self):self.run_case('recovery_known_low')
+    def test_normal_manual_update_still_rejects_sensor_fault(self):self.run_case('normal_sensor_fault')
+    def test_expired_recovery_never_contacts_or_flashes(self):
+        self.run_case('recovery_expiry_queued');self.run_case('recovery_expiry_after_manifest')
+    def test_recovery_expiry_at_final_preflash_gate_never_flashes(self):self.run_case('recovery_expiry_final')
+    def test_recovery_can_replace_unreserved_normal_or_expired_queue(self):
+        self.run_case('recovery_preempt_normal');self.run_case('recovery_replace_expired')
+    def test_concurrent_owner_recovery_requests_reserve_once(self):self.run_case('recovery_concurrent')
 if __name__=='__main__':unittest.main()

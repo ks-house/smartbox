@@ -33,3 +33,31 @@ PowerReading sampleIna219(Ina219Bus& bus) {
   if(!bus.writeRegister(0,profile)) return invalid(); // Explicit power-down between samples.
   return {voltage,float(current)*0.1f,true};
 }
+
+
+PowerReading sampleIna219Continuous(Ina219ContinuousSource& source) {
+  uint16_t config=0,cal=0;
+  const auto fail=[&](PowerReadFault fault) {
+    return PowerReading{NAN,NAN,false,fault,1,config,cal};
+  };
+  const auto profile=[&]() -> PowerReadFault {
+    if(!source.readConfiguration(config))return PowerReadFault::CONFIGURATION_IO;
+    if(config!=0x399f)return PowerReadFault::PROFILE_MISMATCH;
+    if(!source.readCalibration(cal))return PowerReadFault::CALIBRATION_IO;
+    if(cal!=4096)return PowerReadFault::CALIBRATION_MISMATCH;
+    return PowerReadFault::NONE;
+  };
+  auto fault=profile();if(fault!=PowerReadFault::NONE)return fail(fault);
+  float bus=NAN,shunt=NAN,current=NAN;
+  if(!source.readBusVoltage(bus))return fail(PowerReadFault::BUS_IO);
+  if(!source.readShuntVoltageMv(shunt))return fail(PowerReadFault::SHUNT_IO);
+  if(!source.readCurrentMa(current))return fail(PowerReadFault::CURRENT_IO);
+  fault=profile();if(fault!=PowerReadFault::NONE)return fail(fault);
+  if(!std::isfinite(bus)||!std::isfinite(shunt)||!std::isfinite(current))return fail(PowerReadFault::NONFINITE);
+  const float voltage=bus+shunt/1000.0f;
+  if(bus<=0 || bus>26 || voltage<=0 || voltage>26 || std::fabs(shunt)>=320 || std::fabs(current)>=3200)
+    return fail(PowerReadFault::RANGE);
+  // Continuous registers are read sequentially, as in the working Adafruit path.
+  // Do not assert a triggered-cohort equality or estimate whole-battery power.
+  return {voltage,current,true,PowerReadFault::NONE,1,config,cal};
+}

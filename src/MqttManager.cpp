@@ -1,3 +1,5 @@
+#include "RecoveryOtaRequest.h"
+#include <time.h>
 #include "MqttManager.h"
 #include "SmartBoxController.h"
 #include "WifiManager.h"
@@ -142,6 +144,10 @@ void MqttManager::onMqttMessage(char* topic, char* payload, int retain, int qos,
             RLOG_E("[MQTT] JSON parse failed: %s\n", error.c_str());
             return;
         }
+        const bool recovery=doc["recovery"].is<bool>() && doc["recovery"].as<bool>();
+        if(recovery && doc["command"].is<const char*>() && strcmp(doc["command"].as<const char*>(),"trigger_ota")==0 && (retain || dup)) {
+            publishLog(LogLevel::WARN,"[MQTT] Retained/duplicate recovery request rejected");return;
+        }
         handleCommand(doc);
     }
 }
@@ -170,7 +176,13 @@ void MqttManager::handleCommand(const JsonDocument& doc) {
         });
     } else if (strcmp(cmd, "trigger_ota") == 0) {
         RLOG_I("[MQTT] Manual OTA Update triggered via MQTT\n");
-        if (AutoOtaManager::startOtaUpdate(true)) {
+        const bool recovery=doc["recovery"].is<bool>() && doc["recovery"].as<bool>();
+        uint32_t ttl=120000;
+        if(recovery && (!doc["request_id"].is<const char*>() || !doc["expires_at"].is<uint64_t>() ||
+            !validateRecoveryOtaRequest(doc["request_id"].as<const char*>(),doc["expires_at"].as<uint64_t>(),uint64_t(time(nullptr)),ttl))) {
+            publishLog(LogLevel::WARN,"[MQTT] Recovery request requires fresh TTL and request id");return;
+        }
+        if (AutoOtaManager::startOtaUpdate(true,recovery,ttl)) {
             publishLog(LogLevel::INFO, "[MQTT] NAS HTTPS OTA update initiated successfully");
         } else {
             publishLog(LogLevel::ERROR, "[MQTT] Failed to initiate NAS HTTPS OTA update");
@@ -201,6 +213,8 @@ void MqttManager::handleCommand(const JsonDocument& doc) {
             RLOG_I("[MQTT] Dynamic Debug Logging DISABLED\n");
             publishLog(LogLevel::INFO, "[MQTT] Dynamic Debug Logging DISABLED");
         }
+    } else if (strcmp(cmd, "get_power_diagnostics") == 0) {
+        publishTelemetry();
     } else if (strcmp(cmd, "set_config") == 0) {
         handleSetConfig(doc);
     } else {
@@ -380,6 +394,12 @@ void MqttManager::publishTelemetry() {
     else doc["battery_v"] = nullptr;
     doc["firmware"] = m_controller.getFirmwareVersion();
     doc["power_schema"] = 1;
+    const auto read=m_controller.powerReadDiagnostics();
+    doc["power_read_fault_code"]=static_cast<unsigned>(read.fault);
+    doc["power_read_driver"]=read.driver;
+    doc["power_read_config"]=read.configuration;
+    doc["power_read_calibration"]=read.calibration;
+    doc["power_recovery_ota_allowed"]=m_controller.canStartOta(true)?1:0;
     doc["power_sensor_valid"] = power.valid ? 1 : 0;
     doc["power_state_code"] = static_cast<unsigned>(power.state);
     doc["power_state"] = BatteryPolicy::name(power.state);

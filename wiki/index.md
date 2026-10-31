@@ -3,13 +3,13 @@ title: SmartBox wiki index
 type: index
 project: smartbox
 status: active
-updated: 2026-08-12
+updated: 2026-11-01
 source_of_truth: true
 ---
 
 # SmartBox Wiki
 
-> 저장소 기준: `main` commit `9f2facb` (2026-07-23). 코드 구현, 검증 증거, 현장 배포 상태를 서로 구분한다.
+> 현장0.2.0-g7a55dd8은 측정 무효 상태이며0.2.1은 회귀 수정 후보다. 코드 구현·시험·실제 적용 상태는 [현재 상태](project_status.md)에서 구분한다.
 
 ## 먼저 읽기
 
@@ -62,3 +62,5 @@ source_of_truth: true
 - [ota_diagnostic_acceptance.md](ota_diagnostic_acceptance.md): bounded manifest failure, authentication/expiry fixture and actual installed-device recovery gate.
 
 - [battery_power_management.md](battery_power_management.md): automatic low-voltage recovery, measurement validity, bounded savings and NAS/HA monitoring with installed-evidence boundaries.
+
+- [ina219_regression.md](ina219_regression.md): field-before/after evidence, continuous-reader rollback candidate, numeric failure diagnostics and the confirmed0.2.0 recovery-OTA lockout.

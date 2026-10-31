@@ -3,9 +3,17 @@
 
 #include "HardwareInterface.h"
 #include "Ina219Sampler.h"
+#include <Adafruit_INA219.h>
+#include <Adafruit_I2CDevice.h>
 
 class Esp32Hardware : public HardwareInterface {
 private:
+    Adafruit_INA219 ina219;
+    Adafruit_I2CDevice registers{0x40, &Wire};
+    bool powerReady=false;
+    PowerReading lastPowerError{NAN,NAN,false,PowerReadFault::NOT_INITIALIZED,1};
+    unsigned long lastPowerProbe=0;
+    bool initializePowerReader();
     uint8_t trigPin;
     uint8_t echoPin;
 

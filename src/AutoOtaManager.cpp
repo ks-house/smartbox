@@ -2,6 +2,7 @@
 #include "WifiManager.h"
 #include <Arduino.h>
 #include <time.h>
+#include <cstring>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
@@ -23,17 +24,22 @@ SmartBoxController* AutoOtaManager::controllerPtr = nullptr;
 unsigned long AutoOtaManager::lastScheduleCheck = 0;
 int AutoOtaManager::lastOtaRunDay = -1;
 unsigned long AutoOtaManager::lastOtaRunTime = 0; // 0 = never run
-volatile bool AutoOtaManager::otaForceRequested = false;
-volatile bool AutoOtaManager::otaInProgress = false;
+bool AutoOtaManager::otaForceRequested = false;
+bool AutoOtaManager::otaRecoveryRequested = false;
+std::mutex AutoOtaManager::requestMutex;
+uint32_t AutoOtaManager::recoveryRequestAt=0,AutoOtaManager::recoveryRequestTtl=0;
+bool AutoOtaManager::recoveryRequestFresh(){return uint32_t(millis()-recoveryRequestAt)<recoveryRequestTtl;}
+std::atomic<bool> AutoOtaManager::otaInProgress{false};
 
-volatile AutoOtaManager::OtaState AutoOtaManager::otaState = AutoOtaManager::OTA_STATE_IDLE;
+std::atomic<AutoOtaManager::OtaState> AutoOtaManager::otaState{AutoOtaManager::OTA_STATE_IDLE};
 char AutoOtaManager::otaErrorMessage[128] = "";
-volatile AutoOtaManager::OtaPhase AutoOtaManager::otaPhase = AutoOtaManager::OTA_PHASE_IDLE;
-volatile uint32_t AutoOtaManager::otaAttempts = 0;
-volatile int AutoOtaManager::otaManifestHttpCode = 0;
-volatile int AutoOtaManager::otaUpdaterError = 0;
+std::atomic<AutoOtaManager::OtaPhase> AutoOtaManager::otaPhase{AutoOtaManager::OTA_PHASE_IDLE};
+std::atomic<uint32_t> AutoOtaManager::otaAttempts{0};
+std::atomic<int> AutoOtaManager::otaManifestHttpCode{0};
+std::atomic<int> AutoOtaManager::otaUpdaterError{0};
 
 AutoOtaManager::OtaDiagnostics AutoOtaManager::getDiagnostics() {
+    std::lock_guard<std::mutex> lock(requestMutex);
     const char* phase = "IDLE";
     switch (otaPhase) {
         case OTA_PHASE_VERSION: phase = "VERSION"; break;
@@ -47,12 +53,14 @@ AutoOtaManager::OtaDiagnostics AutoOtaManager::getDiagnostics() {
 
 
 void AutoOtaManager::init(SmartBoxController& controller) {
+    std::lock_guard<std::mutex> lock(requestMutex);
     controllerPtr = &controller;
     Serial.println("[OTA] HTTPS authentication client schema=1");
     lastScheduleCheck = 0;
     lastOtaRunTime = 0;
     lastOtaRunDay = -1;
     otaForceRequested = false;
+    otaRecoveryRequested = false;
     otaInProgress = false;
     otaState = OTA_STATE_IDLE;
     otaPhase = OTA_PHASE_IDLE;
@@ -82,15 +90,16 @@ void AutoOtaManager::update() {
         return;
     }
     
-    if (!controllerPtr->canStartOta()) return;
-
-    // Check if dynamic force update requested
-    if (otaForceRequested) {
-        otaForceRequested = false;
-        runOtaProcess(true);
-        return;
+    const bool normalReady=controllerPtr->canStartOta();
+    bool recovery=false;
+    if(takeManualRequest(normalReady,recovery)) {
+        if(recovery && !recoveryRequestFresh()) {
+            otaState=OTA_STATE_FAILED;strncpy(otaErrorMessage,"RECOVERY_REQUEST_EXPIRED",sizeof(otaErrorMessage)-1);otaInProgress=false;return;
+        }
+        runOtaProcess(true,recovery);return;
     }
-    
+    if(!normalReady)return;
+
     unsigned long now = millis();
     // Non-blocking check every 30 seconds
     if (now - lastScheduleCheck < 30000) {
@@ -100,6 +109,7 @@ void AutoOtaManager::update() {
 
     // --- First-boot check: always run OTA version check once after bootup ---
     if (lastOtaRunTime == 0) {
+        if(!claimAutomaticRequest())return;
         lastOtaRunTime = now;
         struct tm bootTimeInfo;
         if (getLocalTime(&bootTimeInfo, 0)) lastOtaRunDay = bootTimeInfo.tm_year * 400 + bootTimeInfo.tm_yday;
@@ -123,6 +133,7 @@ void AutoOtaManager::update() {
         // Use day-of-year as guard to run only once per calendar day
         const int calendarDay = timeinfo.tm_year * 400 + timeinfo.tm_yday;
         if (lastOtaRunDay != calendarDay) {
+            if(!claimAutomaticRequest())return;
             lastOtaRunDay = calendarDay;
             lastOtaRunTime = now;
             Serial.printf("[AUTO-OTA] Scheduled daily OTA check at %02d:00 (config.otaHour=%d, day=%d).\n",
@@ -132,24 +143,33 @@ void AutoOtaManager::update() {
     }
 }
 
-bool AutoOtaManager::startOtaUpdate(bool force) {
-    if (controllerPtr == nullptr) {
-        Serial.println("[OTA] Error: controllerPtr is null");
-        return false;
-    }
-    
-    if (force && controllerPtr->canStartOta()) {
-        otaForceRequested = true;
-        otaState = OTA_STATE_CHECKING;
-        memset(otaErrorMessage, 0, sizeof(otaErrorMessage));
-        Serial.println("[OTA] Force OTA update requested via flag.");
-        return true;
-    }
-    return false;
+bool AutoOtaManager::takeManualRequest(bool normalReady,bool& recovery) {
+    std::lock_guard<std::mutex> lock(requestMutex);
+    if(otaInProgress || !otaForceRequested || (!otaRecoveryRequested && !normalReady))return false;
+    recovery=otaRecoveryRequested;otaForceRequested=false;otaRecoveryRequested=false;otaInProgress=true;return true;
+}
+bool AutoOtaManager::claimAutomaticRequest() {
+    std::lock_guard<std::mutex> lock(requestMutex);
+    if(otaInProgress || otaForceRequested)return false;otaInProgress=true;return true;
+}
+bool AutoOtaManager::startOtaUpdate(bool force,bool sensorFaultRecovery,uint32_t recoveryTtlMs) {
+    if(!controllerPtr || !force || (sensorFaultRecovery && (recoveryTtlMs==0 || recoveryTtlMs>120000)))return false;
+    // Never hold the request lock while acquiring the controller/GPIO lock.
+    if(!controllerPtr->canStartOta(sensorFaultRecovery))return false;
+    std::lock_guard<std::mutex> lock(requestMutex);
+    if(otaInProgress)return false;
+    if(otaForceRequested && !(sensorFaultRecovery && (!otaRecoveryRequested || !recoveryRequestFresh())))return false;
+    otaRecoveryRequested=sensorFaultRecovery;
+    if(sensorFaultRecovery){recoveryRequestAt=millis();recoveryRequestTtl=recoveryTtlMs;}
+    otaForceRequested=true;otaState=OTA_STATE_CHECKING;std::memset(otaErrorMessage,0,sizeof(otaErrorMessage));return true;
 }
 
-void AutoOtaManager::runOtaProcess(bool force) {
-    if (!controllerPtr->canStartOta()) return;
+void AutoOtaManager::runOtaProcess(bool force, bool sensorFaultRecovery) {
+    if(sensorFaultRecovery) {
+        if(!recoveryRequestFresh() || !controllerPtr->tryBeginOta(true)) {
+            otaState=OTA_STATE_FAILED;strncpy(otaErrorMessage,"RECOVERY_NOT_ADMITTED",sizeof(otaErrorMessage)-1);otaInProgress=false;return;
+        }
+    } else if(!controllerPtr->canStartOta()){otaState=OTA_STATE_FAILED;otaInProgress=false;return;}
     otaAttempts = otaAttempts + 1;
     otaPhase = OTA_PHASE_VERSION;
     otaManifestHttpCode = 0;
@@ -205,19 +225,20 @@ void AutoOtaManager::runOtaProcess(bool force) {
     }
     http.end();
     
-    if (needsUpdate && !controllerPtr->canStartOta()) {
-        otaState = OTA_STATE_FAILED; otaInProgress = false;
+    if (needsUpdate && !(sensorFaultRecovery ? (recoveryRequestFresh() && controllerPtr->canContinueOta()) : controllerPtr->canStartOta())) {
+        otaState = OTA_STATE_FAILED;
         strncpy(otaErrorMessage, "POWER_NOT_READY", sizeof(otaErrorMessage)-1);
-        return;
+        if(sensorFaultRecovery)controllerPtr->finishOtaWithoutReboot();
+        otaInProgress=false;return;
     }
     if (needsUpdate) {
         Serial.println("[OTA] Step 2: Preparing hardware for flashing...");
         
         // Critical Safety Interlock
-        if (!controllerPtr->tryBeginOta()) {
-            otaState = OTA_STATE_FAILED; otaInProgress = false;
+        if (!sensorFaultRecovery && !controllerPtr->tryBeginOta()) {
+            otaState = OTA_STATE_FAILED;
             strncpy(otaErrorMessage, "POWER_OR_BUSY", sizeof(otaErrorMessage)-1);
-            return;
+            otaInProgress=false;return;
         }
         Serial.println("[OTA] Pre-OTA Safety Interlock: All relays isolated.");
         Serial.println("[OTA] FSM transitioned to STATE_OTA_UPDATING.");
@@ -228,7 +249,7 @@ void AutoOtaManager::runOtaProcess(bool force) {
             delay(50);
         }
         delay(500); // Allow physical contacts to fully separate
-        if (!controllerPtr->canContinueOta()) {
+        if (!controllerPtr->canContinueOta() || (sensorFaultRecovery && !recoveryRequestFresh())) {
             otaState = OTA_STATE_FAILED;
             strncpy(otaErrorMessage, "POWER_NOT_READY", sizeof(otaErrorMessage)-1);
             controllerPtr->finishOtaWithoutReboot();
@@ -249,7 +270,7 @@ void AutoOtaManager::runOtaProcess(bool force) {
         
         httpUpdate.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
         httpUpdate.setAuthorization(SECRET_OTA_USER, SECRET_OTA_PASS);
-        if (!controllerPtr->canContinueOta()) {
+        if (!controllerPtr->canContinueOta() || (sensorFaultRecovery && !recoveryRequestFresh())) {
 #ifndef NATIVE_BUILD
             esp_task_wdt_add(NULL);
 #endif
@@ -299,6 +320,7 @@ void AutoOtaManager::runOtaProcess(bool force) {
         }
     }
     
+    if(sensorFaultRecovery && controllerPtr->isOtaMode())controllerPtr->finishOtaWithoutReboot();
     otaInProgress = false;
     Serial.println("[OTA] Update process completed.");
 }
