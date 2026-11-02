@@ -18,7 +18,7 @@ $toolMeta=@{esptool_config_sha256=(Get-FileHash (Join-Path $kit 'tools/esptool.c
 function Context {
  $c=@{calls=(New-Object Collections.Generic.List[object]);flash='16MB';secure=$false;wrongChip=$false;badLayout=$false;failRead=$false;failVerify=$false;changeNvs=$false;mac='aa:bb:cc:dd:ee:ff';writes=0;root=$kit;table=$table}
  $runner={param([string[]]$Arguments)
-  $c.calls.Add(@($Arguments));$a=@($Arguments);$cmd=$a|Where-Object {$_ -in @('get-security-info','flash-id','read-mac','read-flash','write-flash','verify-flash')}|Select-Object -First 1
+  $c.calls.Add(@($Arguments));$a=@($Arguments);$bi=[Array]::IndexOf($a,'--baud');if($bi -lt 0 -or $a[$bi+1] -ne '115200'){throw 'Persistent stub reconnect starts at115200; reject speed drift'};$cmd=$a|Where-Object {$_ -in @('get-security-info','flash-id','read-mac','read-flash','write-flash','verify-flash')}|Select-Object -First 1
   switch($cmd){
    'get-security-info' {if($c.wrongChip){throw 'wrong chip'};return ('Secure Boot: '+$(if($c.secure){'Enabled'}else{'Disabled'})+[Environment]::NewLine+'Flash Encryption: Disabled')}
    'flash-id' {return "Detected flash size: $($c.flash)"}
@@ -47,5 +47,7 @@ $write=$pair[0].calls|Where-Object {$_ -contains 'write-flash'};Assert (($write 
 $pair=Context;$restored=Invoke-SmartBoxRecovery -KitDirectory $kit -Port COM77 -Apply -MotorDisconnected -UsbOnly -RestoreBackup $result.backup_directory -Runner $pair[1];Assert $restored.nvs_unchanged 'restore changed NVS'
 $pair=Context;$pair[0].mac='11:22:33:44:55:66';$failed=$false;try{Invoke-SmartBoxRecovery -KitDirectory $kit -Port COM77 -Apply -MotorDisconnected -UsbOnly -RestoreBackup $result.backup_directory -Runner $pair[1]|Out-Null}catch{$failed=$true};Assert ($failed -and $pair[0].writes -eq 0) 'restore accepted other device'
 $failed=$false;try{Invoke-SmartBoxRecovery -KitDirectory $kit -Port COM77 -Apply|Out-Null}catch{$failed=$true};Assert $failed 'missing physical prerequisites accepted'
+$pair=Context;$failed=$false;try{Invoke-SmartBoxRecovery -KitDirectory $kit -Port COM77 -Apply -MotorDisconnected -UsbOnly -Baud 460800 -Runner $pair[1]|Out-Null}catch{$failed=$true};Assert ($failed -and $pair[0].calls.Count -eq 0) 'unsupported persistent-session baud contacted device'
 $bytes=[IO.File]::ReadAllBytes((Join-Path $kit 'firmware.bin'));$bytes[40]=1;[IO.File]::WriteAllBytes((Join-Path $kit 'firmware.bin'),$bytes);$failed=$false;try{Get-SmartBoxKit $kit|Out-Null}catch{$failed=$true};Assert $failed 'corrupt kit accepted'
-Write-Output 'FIELD_RECOVERY_TESTS_PASS=13'
+
+Write-Output 'FIELD_RECOVERY_TESTS_PASS=14'

@@ -1,4 +1,4 @@
-param([string]$Port,[switch]$Apply,[switch]$MotorDisconnected,[switch]$UsbOnly,[string]$RestoreBackup,[ValidateSet(115200,460800)][int]$Baud=460800)
+param([string]$Port,[switch]$Apply,[switch]$MotorDisconnected,[switch]$UsbOnly,[string]$RestoreBackup,[ValidateSet(115200)][int]$Baud=115200)
 $ErrorActionPreference='Stop'
 try {
  Import-Module (Join-Path $PSScriptRoot 'FieldRecovery.psm1') -Force

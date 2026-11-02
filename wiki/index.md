@@ -3,13 +3,13 @@ title: SmartBox wiki index
 type: index
 project: smartbox
 status: active
-updated: 2026-11-01
+updated: 2026-11-02
 source_of_truth: true
 ---
 
 # SmartBox Wiki
 
-> 현장0.2.0-g7a55dd8은 측정 무효 상태이며0.2.1은 회귀 수정 후보다. 코드 구현·시험·실제 적용 상태는 [현재 상태](project_status.md)에서 구분한다.
+> 보드 단독 USB에서0.2.1-g4a57756 설치·실제 기동을 확인했다. 센서가 없는 벤치이므로 현장 측정/충전/구동 수용은 남아 있다. [현재 상태](project_status.md)와 [USB 적용 기록](bench_usb_acceptance.md)을 구분해 확인한다.
 
 ## 먼저 읽기
 
@@ -66,3 +66,5 @@ source_of_truth: true
 - [ina219_regression.md](ina219_regression.md): field-before/after evidence, continuous-reader rollback candidate, numeric failure diagnostics and the confirmed0.2.0 recovery-OTA lockout.
 
 - [field_recovery.md](field_recovery.md): owner-private offline USB firmware kit, equipment, guarded app0/otadata recovery and physical acceptance procedure.
+
+- [bench_usb_acceptance.md](bench_usb_acceptance.md):2026-11-02 actual16MB USB installation/boot evidence, fixed115200 session contract and remaining sensor/field gates.

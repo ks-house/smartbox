@@ -30,9 +30,9 @@ function Get-SmartBoxKit([string]$KitDirectory) {
 }
 function Invoke-SmartBoxRecovery {
  [CmdletBinding()]
- param([Parameter(Mandatory=$true)][string]$KitDirectory,[string]$Port,[switch]$Apply,[switch]$MotorDisconnected,[switch]$UsbOnly,[string]$RestoreBackup,[ValidateSet(115200,460800)][int]$Baud=460800,[scriptblock]$Runner)
+ param([Parameter(Mandatory=$true)][string]$KitDirectory,[string]$Port,[switch]$Apply,[switch]$MotorDisconnected,[switch]$UsbOnly,[string]$RestoreBackup,[ValidateSet(115200)][int]$Baud=115200,[scriptblock]$Runner)
  $kit=Get-SmartBoxKit $KitDirectory;$m=$kit.manifest
- if(-not $Apply){return @{state='plan_only';version=$m.version;chip='esp32c6';flash_bytes=16777216;write_addresses=@('0xe000','0x10000');preserve=@('bootloader','partition_table','nvs','app1');device_contacted=$false}}
+ if(-not $Apply){return @{state='plan_only';baud=115200;version=$m.version;chip='esp32c6';flash_bytes=16777216;write_addresses=@('0xe000','0x10000');preserve=@('bootloader','partition_table','nvs','app1');device_contacted=$false}}
  if(-not $MotorDisconnected -or -not $UsbOnly -or $Port -notmatch '^COM[1-9][0-9]*$'){throw 'Apply requires explicit motor isolation, USB-only board power and COM port'}
  if(-not $Runner){$toolPath=$kit.tool;$configPath=$kit.config;$workingDirectory=$kit.directory;$Runner={param([string[]]$Arguments)
   $start=New-Object Diagnostics.ProcessStartInfo;$start.FileName=$toolPath;$start.WorkingDirectory=$workingDirectory;$start.EnvironmentVariables['ESPTOOL_CFGFILE']=$configPath;$start.UseShellExecute=$false;$start.CreateNoWindow=$true;$start.RedirectStandardOutput=$true;$start.RedirectStandardError=$true

@@ -296,3 +296,11 @@ source_of_truth: true
 - Korean field guide covers data cables/meter/R100 INA219 spare, single-source USB power, physical motor isolation,3.3V I2C logic, real Vin+ supply versus expected unpowered0V, sensor fault branches and12.4V/300s recovery acceptance. Correct INA219 VCC/pull-up wording in wiring guide without claiming field wiring fault. General NAS backup remains deferred. CP210x vendor download unavailable; native USB field path and official driver reference provided.
 
 - Native USB field C6 build PASS with16MB app/bootloader headers; source HWCDC review confirms zero-wait output and no host-wait loop. Focused independent review finds no remaining Critical/Important under the explicit supervised vendor-retry contract. Offline9 Python and13 Windows guard cases remain green; physical USB enumeration/runtime timing is pending.
+
+## [2026-11-02] fix | Apply actual USB recovery and correct persistent-stub baud
+
+- Owner confirms SmartBox motor12V/external5V removed and USB-only power. COM5 CH343 identifies actualC6 rev0.2/16MB and security-disabled. First460800 attempt fails before writes; default-reset115200 then no-reset115200 succeeds. Reproduce session speed drift in host transport tests, pin wrapper/module115200 and reject unsupported speed before transport.14 Windows guards PASS.
+- Original changed app0 sectors and first64KiB/otadata saved privately before one successful guarded write.0.2.1-g4a57756/1403584B/SHA6f58191c02128af4e98dba155179bbdac0314f35dae1a7b7323136db60b7cff6 written/verified. Original bootloader/table/NVS first0xe000 bytes unchanged. No erase-all or motor command.
+- Owner transfers to second nativeUSB COM6; same MCU identity and actual SYSTEM Firmware version plus five periodic POWER-DIAG samples confirm application boot. Owner confirms only bare board/no INA219; fault10/invalid readings do not prove a connected sensor fault. Real field voltage/charged recovery/actuation/OTA gates remain open. Preserve manifest hold and private backups; no NAS configuration change.
+
+- Final local follow-up:14 Windows transport guards,116 Python tests total/107 PASS/9 explicit environment skips, native46 PASS, normal UART and nativeUSB field C6 builds PASS. The installed credentialed image is unchanged; only recovery-tool baud defaults and acceptance records change.

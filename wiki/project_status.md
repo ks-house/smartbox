@@ -176,3 +176,7 @@ Physical lid/electrical/rollback qualification remains distinct.
 Owner requests an offline USB recovery kit; no new remote device action. Correction includes bounded version/typed INA219 Serial diagnostics and an explicit16MB image/bootloader header setting, previously inherited as8MB despite the16MB table. A native-USB field profile enables CDC with zero TX wait; normal UART profile is retained for ordinary builds. Actual hardware flash size, USB enumeration and commissioning remain pending.
 
 The private production bundle is built only on explicit exact-commit dispatch and uploaded only as AES256-GCM CMS ciphertext. The Windows tool defaults to offline verification, snapshots overwritten sectors/settings, writes app0+otadata only and keeps commissioning manual. [Equipment and field procedure](field_recovery.md). PR22 and release hold remain until real field acceptance.
+
+### 2026-11-02 — actual bare-board USB installation and boot confirmed
+
+Owner physically isolates motor/external board5V and connects the bare SmartBox. Actual ESP32-C6 rev0.2/16MB/security-disabled and unchanged original bootloader/table/NVS are verified.0.2.1-g4a57756 is written/readback-verified on COM5, and actual firmware-version plus periodic diagnostic logs confirm boot on nativeUSB COM6 of the same MCU. Sensor absent: fault10 is expected; field sensor/charging/motor/network/OTA acceptance remains pending. See [bench record](bench_usb_acceptance.md). Older0.2.0 deployment notes are history.
