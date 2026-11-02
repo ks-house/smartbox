@@ -304,3 +304,5 @@ source_of_truth: true
 - Owner transfers to second nativeUSB COM6; same MCU identity and actual SYSTEM Firmware version plus five periodic POWER-DIAG samples confirm application boot. Owner confirms only bare board/no INA219; fault10/invalid readings do not prove a connected sensor fault. Real field voltage/charged recovery/actuation/OTA gates remain open. Preserve manifest hold and private backups; no NAS configuration change.
 
 - Final local follow-up:14 Windows transport guards,116 Python tests total/107 PASS/9 explicit environment skips, native46 PASS, normal UART and nativeUSB field C6 builds PASS. The installed credentialed image is unchanged; only recovery-tool baud defaults and acceptance records change.
+
+- Synchronize the regression page current-status banner with actual bare-board installation; original incident observations remain historical and field measurement acceptance remains open.

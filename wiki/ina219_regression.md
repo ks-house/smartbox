@@ -1,6 +1,6 @@
 # INA219 regression correction candidate
 
-Status:0.2.1 source candidate, not installed. Deployed0.2.0-g7a55dd8 still reports SENSOR_FAULT. The owner requests remote correction and cannot inspect the field now.
+Latest status2026-11-02:0.2.1-g4a57756 was written/readback-verified on the actual16MB SmartBox and its version plus periodic nativeUSB diagnostics confirm boot. The owner connected only the bare board; INA219/field voltage/current/recovery acceptance remains pending. See [USB bench acceptance](bench_usb_acceptance.md). The0.2.0 SENSOR_FAULT observations below describe the original incident.
 
 ## Evidence and certainty
 
