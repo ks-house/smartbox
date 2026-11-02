@@ -180,3 +180,11 @@ The private production bundle is built only on explicit exact-commit dispatch an
 ### 2026-11-02 — actual bare-board USB installation and boot confirmed
 
 Owner physically isolates motor/external board5V and connects the bare SmartBox. Actual ESP32-C6 rev0.2/16MB/security-disabled and unchanged original bootloader/table/NVS are verified.0.2.1-g4a57756 is written/readback-verified on COM5, and actual firmware-version plus periodic diagnostic logs confirm boot on nativeUSB COM6 of the same MCU. Sensor absent: fault10 is expected; field sensor/charging/motor/network/OTA acceptance remains pending. See [bench record](bench_usb_acceptance.md). Older0.2.0 deployment notes are history.
+
+### 2026-11-02 — actual field measurement resumes after reinstallation
+
+Owner reports reinstallation. Logged-in Grafana Explore provides five actual collector receipts19:10:01/19:14:49/19:19:50/19:24:49/19:29:49KST with varying voltage11.98802/11.96804/12.00404/12.00004/12.00006V. Each frame valid1/fault0/driver1/config14751(0x399f)/calibration4096; sample age at latest publication831ms. Device uptime advances12853→1200884ms, consistent with the same boot for20min and5min reports. This accepts the corrected measurement path in the field, not absolute DMM calibration.
+
+Latest state3/PROTECTED, actuation_allowed0, recovery_count0, remaining300s, recovery_voltage12.4V. The release dwell has not started because voltage remains below12.4;300s is not a promise of recovery five minutes after this check. Since-boot minimum11.78005V, motor branch current0.1mA, Wi-Fi RSSI-57dBm. Motor-branch current cannot establish whole-battery/solar charging current. Actual charged recovery, motor/lid action and independent OTA health remain pending; no device command sent.
+
+Signed SSH status authenticates but fails at noninteractive sudo with password required. Grafana/database and current collector reads work, so do not misclassify this as device/network loss. No credentials/permissions/settings changed. The root-only observer/notification runtime state and exact current firmware string were not independently queried in this turn.

@@ -89,3 +89,7 @@ Observer acceptance at22:13:20KST confirms active service, pinned program9810221
 ## 0.2.1 correction candidate, not deployed
 
 User requests firmware-first remote investigation. See [INA219 regression](ina219_regression.md): restore the known continuous Adafruit read path with success/profile/calibration/range checks and numeric failure diagnostics; no synthetic voltage. A future explicit authenticated-controller maintenance request may recover from sensor-fault protection without releasing motors, while ordinary/automatic OTA keeps its existing gate. Unknown battery power is not certified by this option. Current0.2.0 cannot use the new option and no compatible live admission has been proved; release hold remains.
+
+### 2026-11-02 field observation
+
+After owner reinstallation the corrected continuous reader reports5 consecutive valid/fault0 frames. Latest collector receipt19:29:49KST:12.00006V, protected3/actuation0, threshold12.4V and300s dwell, recovery_count0; since-boot minimum11.78005V. Voltage/current are no longer null. Five-minute reporting and same-boot uptime progression establish current telemetry, while solar charging current/SOC/DMM accuracy and physical motor success are not measured by these frames. Leave thresholds and outputs unchanged; accept recovery only after the actual above-threshold dwell and observed state/count transition.

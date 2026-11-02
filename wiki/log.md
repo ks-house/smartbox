@@ -306,3 +306,12 @@ source_of_truth: true
 - Final local follow-up:14 Windows transport guards,116 Python tests total/107 PASS/9 explicit environment skips, native46 PASS, normal UART and nativeUSB field C6 builds PASS. The installed credentialed image is unchanged; only recovery-tool baud defaults and acceptance records change.
 
 - Synchronize the regression page current-status banner with actual bare-board installation; original incident observations remain historical and field measurement acceptance remains open.
+
+## [2026-11-02] test | Confirm field voltage measurement recovery and protected low-charge wait
+
+- Owner reinstalls SmartBox. Signed-maintenance SSH status fails at sudo password-required; NAS Tailnet online/Grafana health200. Use existing logged-in Grafana read-only Explore, no credential extraction or permission change.
+- Inspect data frame JSON from the displayed query:5 collector receipts19:10:01–19:29:49KST, valid1/fault0/driver1/config0x399f/cal4096; voltage11.96804–12.00404V, latest12.00006V. Uptime12853→1200884ms and5min cadence show same-boot20min execution. Sample age831ms; no stale retained status substituted.
+- State3/protected, actuation0, release threshold12.4V/dwell300s/count0. Field measurement accepted; charging/dwell/physical movement/OTA health remain open. Minimum11.78005V/current motor branch0.1mA/RSSI-57 recorded without claiming solar charging or whole-device energy.
+- Exact firmware string and root-only monitor/notification state not independently available through this numeric query. Preserve prior USB boot evidence separately. No motor/OTA/reboot/diagnostic publish; no operating settings changed. Save UI dataframe receipt and dashboard proof, close temporary Explore tab.
+
+- Documentation checks: native46 PASS, default ESP32-C6 build PASS; relative links and no secret/artifact staging checked. No product behavior changes in this observation.

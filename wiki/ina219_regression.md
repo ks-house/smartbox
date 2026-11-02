@@ -1,6 +1,6 @@
 # INA219 regression correction candidate
 
-Latest status2026-11-02:0.2.1-g4a57756 was written/readback-verified on the actual16MB SmartBox and its version plus periodic nativeUSB diagnostics confirm boot. The owner connected only the bare board; INA219/field voltage/current/recovery acceptance remains pending. See [USB bench acceptance](bench_usb_acceptance.md). The0.2.0 SENSOR_FAULT observations below describe the original incident.
+Latest field status2026-11-02: owner reinstalled the USB-updated board. Five successive collector receipts19:10:01–19:29:49KST report sensor_valid1, driver1/fault0/config0x399f/calibration4096 and real varying voltage/current. Field measurement recovery is accepted at the telemetry level. Latest12.00006V remains below the actual12.4V/300s release condition, state3/protected and recovery_count0. DMM calibration, charged automatic recovery and physical actuation are still unverified. Version literal is not exposed by the selected numeric query; prior direct USB boot attests0.2.1-g4a57756. See [current status](project_status.md) and [USB acceptance](bench_usb_acceptance.md).
 
 ## Evidence and certainty
 
