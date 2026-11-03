@@ -359,3 +359,10 @@ source_of_truth: true
 
 - Real encrypted/private0.2.2-gdb96897 image assembled and authenticated; actual Windows plan exposed a second historical0.2.1-only version pin in Get-SmartBoxKit. Parametrize the complete host fixture for new release and reproduce rejection RED; allow semantic release version while retaining exact clean commit/image/layout/hash checks.14 cases PASS for0.2.2 and14 for0.2.1, actual plan passes with device_contacted=false.
 - Both hosted runs41591578580/41591748462 PASS at firmware commitdb96897; normal production publisher skipped. Actual image1410336B/SHA86fbf0dfee64a245cafd13839ecb05e2c1c435a93ea1efd7f3affb4d54427bb9 remains uninstalled. Owner-only new kit/receipt/hash list preserve all prior0.2.1 kits/backups. USB first adoption or old OTA conditions are still required; no physical close acceptance claimed.
+
+
+## [2026-11-03] compile | Prepare OTA pair while owner cannot connect USB
+
+- Owner cannot connect USB and requests OTA preparation. Use existing write_release_metadata contract to prepare the authenticated0.2.2-gdb96897 firmware/version/hash/build identity pair privately on WSL and owner-only Windows. Exact bytes remain1410336B/SHA86fbf0dfee64a245cafd13839ecb05e2c1c435a93ea1efd7f3affb4d54427bb9; no NAS staging, operating publication, trigger or installation.
+- Latest host-tool source38bb0ca CI41592656496 PASS, including Windows guards and both C6 profiles; firmware/private CI41591578580/41591748462 already PASS atdb96897. Windows and WSL candidate receipts explicitly preserve false nas_staged/ota_triggered/installed. Add ordered readiness/pair preservation/authenticated-readback/single-trigger/new-boot acceptance runbook.
+- Existing0.2.1 valid-low-protection OTA limitation cannot be retrofitted by a candidate manifest. Source-level forced maintenance becomes available only after first compatible installation. Signed-root sudo failure and disabled browser prevent live readiness verification; do not infer current voltage from prior telemetry or send speculative OTA. USB remains deferred as requested.

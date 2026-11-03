@@ -43,7 +43,9 @@ Files: new bounded owner-request validator, MqttManager.cpp/.h, AutoOtaManager.c
 
 ### Task3: Review, publication and installation boundary
 
-- [ ] Fresh whole-change reviewer against spec/plan; fix Important findings with RED/GREEN.
-- [ ] Python/native/UART+nativeUSB C6, docs links/diff/secrets checks. Restore generated header; never publish dummy binaries.
-- [ ] Update PR22/issue19 in UTF8 with verified readback, push reviewed branch when GH authenticated. Do not unhold operating manifest or claim installed.
-- [ ] Determine compatible initial installation and current NAS access. If blocked by installed0.2.1 gating, report USB/voltage prerequisite exactly; preserve artifacts.
+- [x] Fresh whole-change reviewer against spec/plan; fix Important findings with RED/GREEN.
+- [x] Python/native/UART+nativeUSB C6, docs links/diff/secrets checks. Restore generated header; never publish dummy binaries.
+- [x] Update PR22/issue19 in UTF8 with verified readback, push reviewed branch when GH authenticated. Do not unhold operating manifest or claim installed.
+- [x] Determine compatible initial installation and current NAS access. If blocked by installed0.2.1 gating, report USB/voltage prerequisite exactly; preserve artifacts.
+
+Execution complete for source/review/private OTA preparation. Actual field installation, physical close and charging acceptance remain blocked/pending; no checkbox above claims those outcomes. User cannot connect USB; see readiness runbook.
