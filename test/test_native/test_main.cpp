@@ -1,4 +1,5 @@
 #include "RecoveryOtaRequest.h"
+#include "OwnerRequestGate.h"
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
 #endif
@@ -994,6 +995,52 @@ void test_recovery_cannot_forget_known_critical_voltage_after_read_failure(void)
 
 
 
+
+void test_force_ota_requires_stable_above_floor_and_never_unlatches_protection(void) {
+ MockHardware hw;hw.setBatteryVoltage(11.8f);SmartBoxController box(hw);box.setInitialState(STATE_BATTERY_LOW_SHUTDOWN);box.init();box.update();
+ for(int i=0;i<119;i++){hw.advanceMillis(1000);box.update();}TEST_ASSERT_FALSE(box.canStartOta(false,true));
+ hw.advanceMillis(1000);box.update();TEST_ASSERT_TRUE(box.canStartOta(false,true));TEST_ASSERT_FALSE(box.canStartOta());
+ TEST_ASSERT_TRUE(box.tryBeginOta(false,true));box.forceOpen();TEST_ASSERT_FALSE(box.requestChargingClose());TEST_ASSERT_EQUAL(STATE_OTA_UPDATING,box.getCurrentState());
+ for(int pin:{6,7,8})TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(pin));TEST_ASSERT_TRUE(box.canContinueOta());
+ box.finishOtaWithoutReboot();TEST_ASSERT_TRUE(box.powerSnapshot().protectedMode);TEST_ASSERT_FALSE(box.tryBeginOta(false,true));
+}
+void test_force_ota_dip_gap_bad_sensor_and_motion_remain_blocked(void) {
+ MockHardware hw;hw.setBatteryVoltage(11.8f);SmartBoxController box(hw);box.setInitialState(STATE_BATTERY_LOW_SHUTDOWN);box.init();box.update();
+ for(int i=0;i<130;i++){hw.advanceMillis(1000);box.update();}TEST_ASSERT_TRUE(box.canStartOta(false,true));
+ hw.setBatteryVoltage(11.6f);hw.advanceMillis(1000);box.update();TEST_ASSERT_FALSE(box.tryBeginOta(false,true));
+ hw.setBatteryVoltage(11.8f);for(int i=0;i<29;i++){hw.advanceMillis(1000);box.update();}TEST_ASSERT_FALSE(box.tryBeginOta(false,true));
+ hw.advanceMillis(3001);box.update();TEST_ASSERT_FALSE(box.tryBeginOta(false,true));
+ for(int i=0;i<31;i++){hw.advanceMillis(1000);box.update();}TEST_ASSERT_TRUE(box.canStartOta(false,true));
+ TEST_ASSERT_TRUE(box.requestChargingClose());TEST_ASSERT_FALSE(box.tryBeginOta(false,true));
+}
+
+class TestOwnerStore:public OwnerRequestStore {
+ public:bool readable=true,writable=true;uint64_t value=0;
+ bool load(uint64_t& result) override {result=value;return readable;}
+ bool save(uint64_t next) override {if(!writable)return false;value=next;return true;}
+};
+void test_owner_command_requires_durable_write_and_rejects_replay_after_restart(void) {
+ OwnerRequestGate gate;TestOwnerStore store;uint32_t ttl=0;const char* id="00000000000000000000000000000011";
+ store.writable=false;TEST_ASSERT_FALSE(acceptStoredOwnerRequest(gate,store,id,1800000060,1800000000,false,false,ttl));TEST_ASSERT_EQUAL_UINT32(0,ttl);
+ OwnerRequestGate retry;store.writable=true;TEST_ASSERT_TRUE(acceptStoredOwnerRequest(retry,store,id,1800000061,1800000001,false,false,ttl));
+ OwnerRequestGate reboot;TEST_ASSERT_FALSE(acceptStoredOwnerRequest(reboot,store,id,1800000061,1800000002,false,false,ttl));
+ OwnerRequestGate broken;store.readable=false;TEST_ASSERT_FALSE(acceptStoredOwnerRequest(broken,store,id,1800000062,1800000002,false,false,ttl));
+}
+
+void test_owner_command_gate_rejects_retained_dup_replay_and_persisted_watermark(void) {
+ OwnerRequestGate gate;uint32_t ttl=0;const char* a="00000000000000000000000000000001";const char* b="00000000000000000000000000000002";
+ TEST_ASSERT_FALSE(gate.accept(a,1800000060,1800000000,true,false,ttl));
+ TEST_ASSERT_FALSE(gate.accept(a,1800000060,1800000000,false,true,ttl));
+ TEST_ASSERT_FALSE(gate.accept("bad",1800000060,1800000000,false,false,ttl));
+ TEST_ASSERT_TRUE(gate.accept(a,1800000060,1800000000,false,false,ttl));TEST_ASSERT_EQUAL_UINT32(60000,ttl);
+ TEST_ASSERT_FALSE(gate.accept(a,1800000070,1800000000,false,false,ttl));
+ TEST_ASSERT_FALSE(gate.accept(b,1800000060,1800000000,false,false,ttl));
+ OwnerRequestGate afterBoot;afterBoot.restoreWatermark(gate.expiryWatermark());
+ TEST_ASSERT_FALSE(afterBoot.accept(a,1800000060,1800000001,false,false,ttl));
+ TEST_ASSERT_TRUE(afterBoot.accept(b,1800000061,1800000001,false,false,ttl));
+ TEST_ASSERT_FALSE(afterBoot.accept("00000000000000000000000000000003",1800000200,1800000001,false,false,ttl));
+}
+
 void test_charging_close_runs_once_and_keeps_protected_no_auto_open(void) {
  MockHardware hw;hw.setBatteryVoltage(12.0f);SmartBoxController box(hw);box.setInitialState(STATE_BATTERY_LOW_SHUTDOWN);box.init();box.update();hw.clearEventHistory();
  TEST_ASSERT_TRUE(box.requestChargingClose());TEST_ASSERT_TRUE(box.isMotorRunning());
@@ -1062,6 +1109,10 @@ void test_lower_recovery_threshold_keeps_dwell_and_gap_guard(void) {
 #ifdef NATIVE_BUILD
 int main(int argc, char **argv) {
     UNITY_BEGIN();
+    RUN_TEST(test_force_ota_requires_stable_above_floor_and_never_unlatches_protection);
+    RUN_TEST(test_force_ota_dip_gap_bad_sensor_and_motion_remain_blocked);
+    RUN_TEST(test_owner_command_requires_durable_write_and_rejects_replay_after_restart);
+    RUN_TEST(test_owner_command_gate_rejects_retained_dup_replay_and_persisted_watermark);
     RUN_TEST(test_charging_close_runs_once_and_keeps_protected_no_auto_open);
     RUN_TEST(test_charging_close_does_not_disable_cutoff_or_measurement_guard);
     RUN_TEST(test_charging_close_sensor_failure_and_reverse_stall_stop);

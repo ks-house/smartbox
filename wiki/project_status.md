@@ -14,6 +14,9 @@ applies_to:
 
 # 현재 프로젝트 상태
 
+> 2026-11-03 source candidate0.2.2 adds owner close-only/forced OTA and12.0V/300s recovery. [Current contract](battery_power_management.md#2026-11-03-후보022-충전용-닫기와-강제-ota). Installed evidence remains0.2.1 USB boot/Nov2 field measurement; no0.2.2 install or physical close acceptance yet.
+
+
 > MCU publication baseline: `7a55dd8253fc50681897b0ebe67292499bb10657` (0.2.0-g7a55dd8; installed acceptance unconfirmed)
 >
 > 이 문서는 checkout에서 확인한 구현을 설명한다. 현장 설치 또는 실기기 합격을 자동으로 뜻하지 않는다.

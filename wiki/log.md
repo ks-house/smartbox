@@ -333,3 +333,13 @@ source_of_truth: true
 - Owner approves design and additionally requests lower protection criterion: release max(12.0V,cutoff+0.7V)/300s; default11.3V motor cutoff retained. New12.0V dwell regression failed on original policy then passed.
 - Controller explicit charging close remains within existing BATTERY_LOW_SHUTDOWN, one attempt per boot, <=3800ms, actual pre-drive and post-contact fresh power reads, low-voltage/invalid read/current-magnitude stop, fully isolated terminal outputs and latched protection. Standard force_close/open unchanged. New behavioral tests fail against nonfunctional interface then pass; no automatic physical stroke requested.
 - Native53 PASS, Python116 total/107 PASS/9 environment skips, default C6 build PASS. This checkpoint is source only; MQTT command/forced OTA integration follows. Existing deployed0.2.1 still has old admission. Generated header restored; no operating firmware/manifest/service/permission changes.
+
+
+## [2026-11-03] code | Add durable owner commands and explicit forced OTA
+
+- New close_for_charging/force_ota commands validate32hex IDs, bounded absolute expiry, retained/duplicate rejection and monotonic expiry watermark persisted before actuation. A storage boundary regression proves load/save failure and replay after reconstructed boot reject. HA command_template emits fresh per-press IDs/60s expiry under existing broker control ACL; two discovery buttons and numeric result/admission fields added.
+- Forced OTA requires fresh valid voltage above max(11.7V,cutoff+0.4V) for30s, uptime120s, stopped motor and atomic isolation. It permits reinstalling the same manifest version and bypasses general recovery latch only for explicit maintenance; final original TTL/power check, failed-state protection and shared once-per-boot reservation retained. Automatic and legacy sensor-fault recovery compatibility remain.
+- Upstream pinned Arduino Update source _verifyEnd validates the completed inactive image before esp_ota_set_boot_partition. No claim of guaranteed mid-stream cancellation or postboot health rollback. Normal operating manifest hold and prior image remain unchanged.
+- New forced updater four scenarios fail before implementation then pass; native57 PASS and actual-updater20 PASS. Full Python120 total/111 PASS/9 environment skips. Final both-profile builds and independent review follow. No device command/publish, physical close or installed0.2.2 claim.
+
+- Final pre-review integration checks: native57 PASS; Python120 total/111 executed PASS/9 environment skips; UART and nativeUSB C6 builds PASS. Power/close reporting caches update only after accepted telemetry publish; no permanent1Hz status loop introduced. Generated version header restored.

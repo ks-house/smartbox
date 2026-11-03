@@ -21,14 +21,25 @@ void ESPFixture::restart(){++reboots;}
 void faultPower(){hardware->setBatteryVoltage(11.0f);for(int i=0;i<17;i++){hardware->advanceMillis(200);controller->servicePowerDuringOta();}}
 void delay(unsigned long ms){hardware->advanceMillis(ms);if(ms==500 && (scenario=="contact_fault" || scenario=="recovery_known_low"))faultPower();}
 void fixtureManifestHook(){if(scenario=="recovery_expiry_after_manifest"){hardware->advanceMillis(1500);controller->servicePowerDuringOta();}if(scenario=="reboot_guard"){int before=timeCalls;PowerManager::update();rebootGuardLeaked=timeCalls!=before;}if(scenario=="busy_manifest"){controller->forceOpen();controller->update();}}
-void fixtureBeforeFlashHook(){if(scenario=="recovery_expiry_final"){hardware->advanceMillis(600);controller->servicePowerDuringOta();}if(scenario=="last_admission_fault")faultPower();}
-int fixtureFlashResult(){return scenario=="recovery_fail" ? -1 : 0;}
+void fixtureBeforeFlashHook(){if(scenario=="force_last_fault")faultPower();if(scenario=="recovery_expiry_final"){hardware->advanceMillis(600);controller->servicePowerDuringOta();}if(scenario=="last_admission_fault")faultPower();}
+int fixtureFlashResult(){return (scenario=="recovery_fail" || scenario=="force_fail") ? -1 : 0;}
 void fixtureFlashHook(){if(scenario=="no_update_fault")faultPower();if(scenario=="close_flash")controller->forceClose();}
 void stable(float v,int seconds){hardware->setBatteryVoltage(v);for(int i=0;i<seconds;i++){hardware->advanceMillis(1000);controller->update();}}
 int main(int argc,char** argv){
  scenario=argc>1?argv[1]:"";MockHardware hw;hardware=&hw;hw.setBatteryVoltage(12.6f);SmartBoxController box(hw);controller=&box;box.init();stable(12.6f,35);AutoOtaManager::init(box);PowerManager::init(box);
  bool ok=true;
- if(scenario.rfind("recovery_",0)==0 || scenario=="normal_sensor_fault"){
+ if(scenario.rfind("force_",0)==0){
+   stable(11.0f,10);stable(11.8f,125);
+   if(scenario=="force_current")fixtureManifest=String("{\"version\":\"")+box.getFirmwareVersion()+"\"}";
+   if(scenario=="force_manifest_fail")fixtureHttpCode=404;
+   ok=AutoOtaManager::startOtaUpdate(true,false,scenario=="force_expiry"?1000:120000,true);
+   if(scenario=="force_expiry"){hw.advanceMillis(1500);box.update();}
+   AutoOtaManager::update();
+   const bool expectedFlash=scenario=="force_current" || scenario=="force_fail";
+   ok=ok && fixtureFlashes==(expectedFlash?1:0) && box.getCurrentState()==STATE_BATTERY_LOW_SHUTDOWN && box.powerSnapshot().protectedMode;
+   for(int pin:{6,7,8})ok=ok && hw.getPinMode(pin)==INPUT;
+   if(scenario!="force_expiry")ok=ok && !AutoOtaManager::startOtaUpdate(true,false,120000,true);
+ }else if(scenario.rfind("recovery_",0)==0 || scenario=="normal_sensor_fault"){
    if(scenario=="recovery_preempt_normal")ok=AutoOtaManager::startOtaUpdate(true);
    stable(NAN,125);
    box.registerStateCallback([](State previous,State next){if(previous==STATE_OTA_UPDATING && next==STATE_BATTERY_LOW_SHUTDOWN && !AutoOtaManager::isOtaInProgress())cleanupBusyLeaked=true;});

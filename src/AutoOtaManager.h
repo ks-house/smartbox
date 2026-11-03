@@ -39,8 +39,9 @@ private:
     static unsigned long lastOtaRunTime;  // millis() of last OTA run (0 = never)
     static bool otaForceRequested;
     static bool otaRecoveryRequested;
+    static bool otaMaintenanceRequested;
     static std::mutex requestMutex;
-    static bool takeManualRequest(bool normalReady,bool& recovery);
+    static bool takeManualRequest(bool normalReady,bool& recovery,bool& maintenance);
     static bool claimAutomaticRequest();
     static uint32_t recoveryRequestAt,recoveryRequestTtl;
     static bool recoveryRequestFresh();
@@ -49,13 +50,13 @@ private:
     static std::atomic<OtaState> otaState;
     static char otaErrorMessage[128];
     
-    static void runOtaProcess(bool force, bool sensorFaultRecovery=false);
+    static void runOtaProcess(bool force, bool sensorFaultRecovery=false,bool forceMaintenance=false);
     static String parseJsonField(const String& json, const String& key);
 
 public:
     static void init(SmartBoxController& controller);
     static void update();
-    static bool startOtaUpdate(bool force = false, bool sensorFaultRecovery=false, uint32_t recoveryTtlMs=120000);
+    static bool startOtaUpdate(bool force = false, bool sensorFaultRecovery=false, uint32_t recoveryTtlMs=120000,bool forceMaintenance=false);
     static bool isOtaInProgress() { return otaInProgress; }
     
     static OtaState getOtaState() { return otaState; }

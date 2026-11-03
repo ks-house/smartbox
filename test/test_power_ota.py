@@ -12,6 +12,11 @@ class ActualOtaTests(unittest.TestCase):
     def run_case(self,name):
         result=subprocess.run([str(self.binary),name],capture_output=True,text=True,timeout=10)
         self.assertEqual(0,result.returncode,result.stdout[-1200:]+result.stderr)
+    def test_forced_same_version_flashes_while_valid_protection_stays_latched(self):self.run_case('force_current')
+    def test_forced_failed_flash_retains_protection(self):self.run_case('force_fail')
+    def test_forced_expired_or_held_manifest_never_flashes(self):
+        self.run_case('force_expiry');self.run_case('force_manifest_fail')
+    def test_forced_final_voltage_fault_never_flashes(self):self.run_case('force_last_fault')
     def test_actual_no_update_preserves_protection(self):self.run_case('no_update_fault')
     def test_preflash_contact_delay_power_drop_never_flashes(self):self.run_case('contact_fault')
     def test_immediate_preflash_admission_is_current(self):self.run_case('last_admission_fault')

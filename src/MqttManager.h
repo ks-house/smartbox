@@ -6,6 +6,8 @@
 #include <Ticker.h>
 #include <ArduinoJson.h>
 #include "RemoteLogger.h"
+#include "OwnerRequestGate.h"
+#include <mutex>
 
 class SmartBoxController; // Forward declaration
 struct TelemetryData; // Forward declaration
@@ -43,7 +45,8 @@ private:
     void onMqttConnect(bool sessionPresent);
     void onMqttDisconnect();
     void onMqttMessage(char* topic, char* payload, int retain, int qos, bool dup);
-    void handleCommand(const JsonDocument& doc);
+    void handleCommand(const JsonDocument& doc,uint32_t ownerTtl=0);
+    bool admitOwnerCommand(const JsonDocument& doc,bool retained,bool duplicate,uint32_t& ttl);
     void handleSetConfig(const JsonDocument& doc);
 
     static const char* stateToString(int state);
@@ -53,6 +56,9 @@ private:
     Ticker m_reconnectTimer;
     Ticker m_rebootTimer;
 
+    OwnerRequestGate m_ownerRequests;
+    std::mutex m_ownerRequestMutex;
+    int m_lastChargingCloseState=-1;
     int m_lastPowerState = -1;
     unsigned long m_lastPowerAttempt = 0;
     bool m_debugLoggingActive;

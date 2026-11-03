@@ -4,21 +4,24 @@
 
 void BatteryPolicy::restoreProtection() {
   latched_=true; state_=BatteryState::PROTECTED;
-  recoveryTiming_=false; lowTiming_=false; healthyTiming_=false; stateTiming_=false;
+  recoveryTiming_=false; lowTiming_=false; healthyTiming_=false; forceHealthyTiming_=false; stateTiming_=false;
 }
 void BatteryPolicy::sample(uint32_t now,float voltage,bool valid,float cutoff) {
   const bool gap=sampled_ && uint32_t(now-sampleAt_)>kMaxSampleGapMs;
-  if(gap) {lowTiming_=false; recoveryTiming_=false; healthyTiming_=false; stateTiming_=false;}
+  if(gap) {lowTiming_=false; recoveryTiming_=false; healthyTiming_=false; forceHealthyTiming_=false; stateTiming_=false;}
   sampled_=true; sampleAt_=now;
   cutoff_=std::isfinite(cutoff) && cutoff>0 && cutoff<25 ? cutoff : 11.3f;
   recovery_=std::max(12.0f,cutoff_+0.7f);
+  forceFloor_=std::max(11.7f,cutoff_+0.4f);
   valid_=valid && std::isfinite(voltage) && voltage>0 && voltage<=16.0f;
   voltage_=voltage;
   if(!valid_) {
     latched_=true; state_=BatteryState::SENSOR_FAULT;
-    lowTiming_=false; recoveryTiming_=false; healthyTiming_=false; stateTiming_=false;
+    lowTiming_=false; recoveryTiming_=false; healthyTiming_=false; forceHealthyTiming_=false; stateTiming_=false;
     return;
   }
+  if(voltage>=forceFloor_) {if(!forceHealthyTiming_){forceHealthyTiming_=true;forceHealthyAt_=now;}}
+  else forceHealthyTiming_=false;
   if(minimum_==0 || voltage<minimum_) minimum_=voltage;
   if(voltage>=recovery_) {
     if(!healthyTiming_) {healthyTiming_=true; healthyAt_=now;}
@@ -63,7 +66,7 @@ BatterySnapshot BatteryPolicy::snapshot(uint32_t now) const {
   return {state,fresh,blocked,fresh && !latched_ && voltage_>=cutoff_,
     fresh && !latched_ && healthyTiming_ && uint32_t(now-healthyAt_)>=30000,
     voltage_,minimum_,recovery_,latched_ ? (elapsed>=kRecoveryMs ? 0 : kRecoveryMs-elapsed) : 0,
-    recoveries_,age,interval};
+    recoveries_,age,interval,fresh && forceHealthyTiming_ && uint32_t(now-forceHealthyAt_)>=30000,forceFloor_};
 }
 const char* BatteryPolicy::name(BatteryState state) {
   switch(state) {

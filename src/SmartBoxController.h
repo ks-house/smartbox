@@ -111,7 +111,7 @@ private:
   mutable std::recursive_mutex dataMutex;
   PowerReading latestPowerRead{NAN,NAN,false};
   float lastVerifiedVoltage=NAN; // Admission evidence only; never publish as current voltage.
-  bool otaRecoveryReserved=false,otaRecoveryUsed=false;
+  bool otaRecoveryReserved=false,otaRecoveryUsed=false,otaMaintenanceReserved=false;
   uint32_t otaRecoveryAt=0;
 
   void updateDistanceBuffer();
@@ -158,8 +158,8 @@ public:
   PowerReading powerReadDiagnostics() const {
       std::lock_guard<std::recursive_mutex> lock(dataMutex);return latestPowerRead;
   }
-  bool canStartOta(bool sensorFaultRecovery=false) const;
-  bool tryBeginOta(bool sensorFaultRecovery=false);
+  bool canStartOta(bool sensorFaultRecovery=false,bool forceMaintenance=false) const;
+  bool tryBeginOta(bool sensorFaultRecovery=false,bool forceMaintenance=false);
   bool canContinueOta() const;
   void servicePowerDuringOta();
   void finishOtaWithoutReboot();
@@ -180,7 +180,7 @@ public:
 #ifdef FIRMWARE_VERSION_OVERRIDE
   static constexpr const char *FIRMWARE_VERSION = FIRMWARE_VERSION_OVERRIDE;
 #else
-  static constexpr const char *FIRMWARE_VERSION = "0.2.1";
+  static constexpr const char *FIRMWARE_VERSION = "0.2.2";
 #endif
   const char *getFirmwareVersion() const { return FIRMWARE_VERSION; }
 

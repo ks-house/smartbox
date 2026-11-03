@@ -26,6 +26,7 @@ int AutoOtaManager::lastOtaRunDay = -1;
 unsigned long AutoOtaManager::lastOtaRunTime = 0; // 0 = never run
 bool AutoOtaManager::otaForceRequested = false;
 bool AutoOtaManager::otaRecoveryRequested = false;
+bool AutoOtaManager::otaMaintenanceRequested = false;
 std::mutex AutoOtaManager::requestMutex;
 uint32_t AutoOtaManager::recoveryRequestAt=0,AutoOtaManager::recoveryRequestTtl=0;
 bool AutoOtaManager::recoveryRequestFresh(){return uint32_t(millis()-recoveryRequestAt)<recoveryRequestTtl;}
@@ -60,7 +61,7 @@ void AutoOtaManager::init(SmartBoxController& controller) {
     lastOtaRunTime = 0;
     lastOtaRunDay = -1;
     otaForceRequested = false;
-    otaRecoveryRequested = false;
+    otaRecoveryRequested = false;otaMaintenanceRequested=false;
     otaInProgress = false;
     otaState = OTA_STATE_IDLE;
     otaPhase = OTA_PHASE_IDLE;
@@ -91,12 +92,12 @@ void AutoOtaManager::update() {
     }
     
     const bool normalReady=controllerPtr->canStartOta();
-    bool recovery=false;
-    if(takeManualRequest(normalReady,recovery)) {
-        if(recovery && !recoveryRequestFresh()) {
+    bool recovery=false,maintenance=false;
+    if(takeManualRequest(normalReady,recovery,maintenance)) {
+        if((recovery || maintenance) && !recoveryRequestFresh()) {
             otaState=OTA_STATE_FAILED;strncpy(otaErrorMessage,"RECOVERY_REQUEST_EXPIRED",sizeof(otaErrorMessage)-1);otaInProgress=false;return;
         }
-        runOtaProcess(true,recovery);return;
+        runOtaProcess(true,recovery,maintenance);return;
     }
     if(!normalReady)return;
 
@@ -143,30 +144,31 @@ void AutoOtaManager::update() {
     }
 }
 
-bool AutoOtaManager::takeManualRequest(bool normalReady,bool& recovery) {
+bool AutoOtaManager::takeManualRequest(bool normalReady,bool& recovery,bool& maintenance) {
     std::lock_guard<std::mutex> lock(requestMutex);
-    if(otaInProgress || !otaForceRequested || (!otaRecoveryRequested && !normalReady))return false;
-    recovery=otaRecoveryRequested;otaForceRequested=false;otaRecoveryRequested=false;otaInProgress=true;return true;
+    if(otaInProgress || !otaForceRequested || (!otaRecoveryRequested && !otaMaintenanceRequested && !normalReady))return false;
+    recovery=otaRecoveryRequested;maintenance=otaMaintenanceRequested;otaForceRequested=false;otaRecoveryRequested=false;otaMaintenanceRequested=false;otaInProgress=true;return true;
 }
 bool AutoOtaManager::claimAutomaticRequest() {
     std::lock_guard<std::mutex> lock(requestMutex);
     if(otaInProgress || otaForceRequested)return false;otaInProgress=true;return true;
 }
-bool AutoOtaManager::startOtaUpdate(bool force,bool sensorFaultRecovery,uint32_t recoveryTtlMs) {
-    if(!controllerPtr || !force || (sensorFaultRecovery && (recoveryTtlMs==0 || recoveryTtlMs>120000)))return false;
+bool AutoOtaManager::startOtaUpdate(bool force,bool sensorFaultRecovery,uint32_t recoveryTtlMs,bool forceMaintenance) {
+    if(!controllerPtr || !force || (sensorFaultRecovery && forceMaintenance) || ((sensorFaultRecovery || forceMaintenance) && (recoveryTtlMs==0 || recoveryTtlMs>120000)))return false;
     // Never hold the request lock while acquiring the controller/GPIO lock.
-    if(!controllerPtr->canStartOta(sensorFaultRecovery))return false;
+    if(!controllerPtr->canStartOta(sensorFaultRecovery,forceMaintenance))return false;
     std::lock_guard<std::mutex> lock(requestMutex);
     if(otaInProgress)return false;
-    if(otaForceRequested && !(sensorFaultRecovery && (!otaRecoveryRequested || !recoveryRequestFresh())))return false;
-    otaRecoveryRequested=sensorFaultRecovery;
-    if(sensorFaultRecovery){recoveryRequestAt=millis();recoveryRequestTtl=recoveryTtlMs;}
+    if(otaForceRequested && !((sensorFaultRecovery || forceMaintenance) && ((!otaRecoveryRequested && !otaMaintenanceRequested) || !recoveryRequestFresh())))return false;
+    otaRecoveryRequested=sensorFaultRecovery;otaMaintenanceRequested=forceMaintenance;
+    if(sensorFaultRecovery || forceMaintenance){recoveryRequestAt=millis();recoveryRequestTtl=recoveryTtlMs;}
     otaForceRequested=true;otaState=OTA_STATE_CHECKING;std::memset(otaErrorMessage,0,sizeof(otaErrorMessage));return true;
 }
 
-void AutoOtaManager::runOtaProcess(bool force, bool sensorFaultRecovery) {
-    if(sensorFaultRecovery) {
-        if(!recoveryRequestFresh() || !controllerPtr->tryBeginOta(true)) {
+void AutoOtaManager::runOtaProcess(bool force, bool sensorFaultRecovery,bool forceMaintenance) {
+    const bool maintenance=sensorFaultRecovery || forceMaintenance;
+    if(maintenance) {
+        if(!recoveryRequestFresh() || !controllerPtr->tryBeginOta(sensorFaultRecovery,forceMaintenance)) {
             otaState=OTA_STATE_FAILED;strncpy(otaErrorMessage,"RECOVERY_NOT_ADMITTED",sizeof(otaErrorMessage)-1);otaInProgress=false;return;
         }
     } else if(!controllerPtr->canStartOta()){otaState=OTA_STATE_FAILED;otaInProgress=false;return;}
@@ -207,7 +209,7 @@ void AutoOtaManager::runOtaProcess(bool force, bool sensorFaultRecovery) {
         } else {
             String currentVersion = controllerPtr->getFirmwareVersion();
             Serial.printf("[OTA] Current Version: %s, Remote Version: %s\n", currentVersion.c_str(), remoteVersion.c_str());
-            if (remoteVersion != currentVersion) {
+            if (forceMaintenance || remoteVersion != currentVersion) {
                 Serial.println("[OTA] Version mismatch detected. Update is required.");
                 needsUpdate = true;
                 otaState = OTA_STATE_UPDATING;
@@ -225,17 +227,17 @@ void AutoOtaManager::runOtaProcess(bool force, bool sensorFaultRecovery) {
     }
     http.end();
     
-    if (needsUpdate && !(sensorFaultRecovery ? (recoveryRequestFresh() && controllerPtr->canContinueOta()) : controllerPtr->canStartOta())) {
+    if (needsUpdate && !(maintenance ? (recoveryRequestFresh() && controllerPtr->canContinueOta()) : controllerPtr->canStartOta())) {
         otaState = OTA_STATE_FAILED;
         strncpy(otaErrorMessage, "POWER_NOT_READY", sizeof(otaErrorMessage)-1);
-        if(sensorFaultRecovery)controllerPtr->finishOtaWithoutReboot();
+        if(maintenance)controllerPtr->finishOtaWithoutReboot();
         otaInProgress=false;return;
     }
     if (needsUpdate) {
         Serial.println("[OTA] Step 2: Preparing hardware for flashing...");
         
         // Critical Safety Interlock
-        if (!sensorFaultRecovery && !controllerPtr->tryBeginOta()) {
+        if (!maintenance && !controllerPtr->tryBeginOta()) {
             otaState = OTA_STATE_FAILED;
             strncpy(otaErrorMessage, "POWER_OR_BUSY", sizeof(otaErrorMessage)-1);
             otaInProgress=false;return;
@@ -249,7 +251,7 @@ void AutoOtaManager::runOtaProcess(bool force, bool sensorFaultRecovery) {
             delay(50);
         }
         delay(500); // Allow physical contacts to fully separate
-        if (!controllerPtr->canContinueOta() || (sensorFaultRecovery && !recoveryRequestFresh())) {
+        if (!controllerPtr->canContinueOta() || (maintenance && !recoveryRequestFresh())) {
             otaState = OTA_STATE_FAILED;
             strncpy(otaErrorMessage, "POWER_NOT_READY", sizeof(otaErrorMessage)-1);
             controllerPtr->finishOtaWithoutReboot();
@@ -320,7 +322,7 @@ void AutoOtaManager::runOtaProcess(bool force, bool sensorFaultRecovery) {
         }
     }
     
-    if(sensorFaultRecovery && controllerPtr->isOtaMode())controllerPtr->finishOtaWithoutReboot();
+    if(maintenance && controllerPtr->isOtaMode())controllerPtr->finishOtaWithoutReboot();
     otaInProgress = false;
     Serial.println("[OTA] Update process completed.");
 }

@@ -29,17 +29,17 @@
 
 Files: src/BatteryPolicy.h/.cpp, src/SmartBoxController.h/.cpp, test/test_native/test_main.cpp.
 Interfaces: requestChargingClose() result enum; chargingCloseSnapshot(); force readiness in BatterySnapshot.
-- [ ] Add behavioral tests for12.0V dwell/dip, protected12V close1stroke, no auto-open, immediate fault/low cutoff stop, current magnitude/time/interlock, reject moving/OTA/emergency, no repeated request. Run native tests RED.
-- [ ] Implement isolated protected-close substate serviced before general protected handling, return to same protection without emergency opening. Keep previous force_close behavior. Run native GREEN/full baseline.
-- [ ] Commit explicit files with wiki checkpoint.
+- [x] Add behavioral tests for12.0V dwell/dip, protected12V close1stroke, no auto-open, immediate fault/low cutoff stop, current magnitude/time/interlock, reject moving/OTA/emergency, no repeated request. Run native tests RED.
+- [x] Implement isolated protected-close substate serviced before general protected handling, return to same protection without emergency opening. Keep previous force_close behavior. Run native GREEN/full baseline.
+- [x] Commit explicit files with wiki checkpoint.
 
 ### Task2: MQTT command and forced updater
 
 Files: new bounded owner-request validator, MqttManager.cpp/.h, AutoOtaManager.cpp/.h, Controller/BatteryPolicy, host actual-updater fixture tests and native request tests.
-- [ ] Add request TTL/replay/retained and forced OTA admission/normal/recovery queue compatibility tests; actual updater same-version forced path, final TTL/power denial and failure-state preservation. Watch RED.
-- [ ] Implement close_for_charging and force_ota commands, HA buttons, terminal/rejection reporting, numeric telemetry. Keep old trigger_ota/recovery contracts. Start forced OTA only after30s above floor,120s uptime and isolated nonmoving protection or idle; per-boot reservation shared with recovery.
-- [ ] Preserve previous bootable slot and final preflash guards; inspect real updater cancellation boundary and disclose any power-loss limitation. GREEN full suites/build both profiles.
-- [ ] Commit explicit files and manuals/wiki.
+- [x] Add request TTL/replay/retained and forced OTA admission/normal/recovery queue compatibility tests; actual updater same-version forced path, final TTL/power denial and failure-state preservation. Watch RED.
+- [x] Implement close_for_charging and force_ota commands, HA buttons, terminal/rejection reporting, numeric telemetry. Keep old trigger_ota/recovery contracts. Start forced OTA only after30s above floor,120s uptime and isolated nonmoving protection or idle; per-boot reservation shared with recovery.
+- [x] Preserve previous bootable slot and final preflash guards; inspect real updater cancellation boundary and disclose any power-loss limitation. GREEN full suites/build both profiles.
+- [x] Commit explicit files and manuals/wiki.
 
 ### Task3: Review, publication and installation boundary
 
