@@ -191,3 +191,8 @@ Owner reports reinstallation. Logged-in Grafana Explore provides five actual col
 Latest state3/PROTECTED, actuation_allowed0, recovery_count0, remaining300s, recovery_voltage12.4V. The release dwell has not started because voltage remains below12.4;300s is not a promise of recovery five minutes after this check. Since-boot minimum11.78005V, motor branch current0.1mA, Wi-Fi RSSI-57dBm. Motor-branch current cannot establish whole-battery/solar charging current. Actual charged recovery, motor/lid action and independent OTA health remain pending; no device command sent.
 
 Signed SSH status authenticates but fails at noninteractive sudo with password required. Grafana/database and current collector reads work, so do not misclassify this as device/network loss. No credentials/permissions/settings changed. The root-only observer/notification runtime state and exact current firmware string were not independently queried in this turn.
+
+
+## 2026-11-03 field operation follow-up
+
+[Measured operation](field_power_operation_20261103.md) confirms actual0.2.2 field measurement/network. One requested close is interrupted by11.211V under-load cutoff; later requested open remains protected. Full lid position/charging remain unknown, not accepted.

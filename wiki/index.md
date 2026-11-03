@@ -9,7 +9,7 @@ source_of_truth: true
 
 # SmartBox Wiki
 
->2026-11-03: 같은 SmartBox에0.2.2-gdb96897 USB 기록/readback을 확인했다. nativeUSB에서 실제0.2.2 버전과30초 루프 실행까지 확인했다. 센서 없는 보드 시험이며 실물 닫힘·충전 수용과 구분한다. 전일 현장0.2.1의 약12.00V 관측은 과거 증거다. [USB 수용 기록](bench_usb_acceptance.md)과 [현재 상태](project_status.md)를 참조한다.
+>2026-11-03 field0.2.2 is online with valid measurement. Owner-requested close is admitted then stops at11.211V under load; later requested open remains protected/actuation0. Physical lid position is unknown. See [field operation](field_power_operation_20261103.md).
 
 ## 먼저 읽기
 
@@ -72,3 +72,5 @@ source_of_truth: true
 - [충전용 닫기 전용 복구 설계안](../docs/superpowers/specs/2026-11-03-low-power-close-design.md): owner-approved0.2.2 installed/booted on bare board; protection, close-only, forced OTA and12.0V/300s automatic-open recovery boundary; field acceptance pending.
 
 - [충전 복구 OTA 준비와 최초 적용 조건](charging_ota_readiness.md): verified private0.2.2 OTA candidate; later USB bench adoption accepted; NAS staging/OTA trigger and field acceptance remain deferred.
+
+- [2026-11-03 field close/open operation](field_power_operation_20261103.md): one close LOW_VOLTAGE_STOP, later open not observed, sensor healthy and physical position pending.
