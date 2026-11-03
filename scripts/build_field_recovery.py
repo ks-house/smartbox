@@ -26,8 +26,13 @@ def validate_layout(raw):
  expected={'nvs':(1,2,0x9000,0x5000,0),'otadata':(1,0,0xe000,0x2000,0),'app0':(0,0x10,0x10000,0x640000,0),'app1':(0,0x11,0x650000,0x640000,0)}
  if any(entries.get(k)!=v for k,v in expected.items()):raise ValueError('reviewed16MB dual-OTA layout required')
  return {'app0':0x10000,'app0_length':0x640000,'app1':0x650000,'app1_length':0x640000,'otadata':0xe000,'otadata_length':0x2000,'nvs':0x9000,'nvs_length':0x5000,'partition_table':0x8000}
+def source_version(header,commit):
+ if not re.fullmatch(r'[a-f0-9]{40}',commit):raise ValueError('exact source commit required')
+ values=re.findall(r'FIRMWARE_VERSION\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"',header)
+ if len(values)!=1:raise ValueError('one literal source firmware version required')
+ return values[0]+'-g'+commit[:7]
 def validate_image(raw,version,commit):
- if not re.fullmatch(r'[a-f0-9]{40}',commit) or not re.fullmatch(r'0\.2\.1-g[a-f0-9]{7,40}',version) or not commit.startswith(version.split('-g')[1]):raise ValueError('clean exact correction identity required')
+ if not re.fullmatch(r'[a-f0-9]{40}',commit) or not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+-g[a-f0-9]{7,40}',version) or not commit.startswith(version.split('-g')[1]):raise ValueError('clean exact correction identity required')
  if not 256<len(raw)<=0x640000 or raw[0]!=0xe9 or raw[3]>>4!=4 or int.from_bytes(raw[12:14],'little')!=13 or (version.encode()+bytes([0])) not in raw:raise ValueError('matching ESP32-C6 application required')
 def validate_recipient(raw):
  if b'PRIVATE KEY' in raw or raw.count(b'-----BEGIN CERTIFICATE-----')!=1 or len(raw)>16384:raise ValueError('one public recipient certificate required')
@@ -42,7 +47,7 @@ def main():
  if actual!=commit or commit!=os.environ['FIELD_EXPECTED_SHA'] or subprocess.check_output(['git','status','--porcelain'],text=True).strip():raise ValueError('clean exact requested source required')
  if os.environ.get('GITHUB_EVENT_NAME')!='workflow_dispatch' or os.environ.get('FIELD_OPERATION')!='prepare-field-recovery':raise ValueError('explicit field build dispatch required')
  header=root/'include/secrets.h';generated=root/'src/git_version.h';previous=generated.read_bytes() if generated.exists() else None
- output=Path(os.environ['RUNNER_TEMP'])/'field-encrypted';output.mkdir(mode=0o700);version='0.2.1-g'+commit[:7]
+ output=Path(os.environ['RUNNER_TEMP'])/'field-encrypted';output.mkdir(mode=0o700);version=source_version((root/'src/SmartBoxController.h').read_text(),commit)
  with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   work=Path(temp);cert=work/'recipient.pem';cert.write_bytes(base64.b64decode(os.environ['FIELD_RECIPIENT_B64'],validate=True));validate_recipient(cert.read_bytes());os.umask(0o077)
   try:

@@ -343,3 +343,13 @@ source_of_truth: true
 - New forced updater four scenarios fail before implementation then pass; native57 PASS and actual-updater20 PASS. Full Python120 total/111 PASS/9 environment skips. Final both-profile builds and independent review follow. No device command/publish, physical close or installed0.2.2 claim.
 
 - Final pre-review integration checks: native57 PASS; Python120 total/111 executed PASS/9 environment skips; UART and nativeUSB C6 builds PASS. Power/close reporting caches update only after accepted telemetry publish; no permanent1Hz status loop introduced. Generated version header restored.
+
+- Private field builder had a historical hard-coded0.2.1 identity that would reject the requested0.2.2 image. New release-image regression reproduces rejection; derive exact base version from the single source literal and retain commit/image binding, rather than relabeling a prior image. Focused source/identity regressions follow. Old installed kit/receipts are preserved.
+
+
+## [2026-11-03] fix | Recheck original forced OTA expiry immediately before flash
+
+- Fresh read-only whole-change reviewer identifies one Important: the last preflash TTL condition still covers only sensor-fault recovery. Actual updater fixture reproduces force TTL1000ms/contact500ms/final delay600ms entering flash after expiry. Add forced final-expiry scenario RED, extend final condition to both maintenance modes, then run GREEN/full suites. No re-review cycle or device command.
+- Synchronize newly written current-status wording to approved/implemented0.2.2 source and12.0V recovery; old operating0.2.1 acceptance remains separate. Private builder now derives semantic version from the source literal;11 exact-image/layout/encryption tests PASS including0.2.2 and ambiguous-source rejection.
+
+- Final fix-pass validation: final forced-expiry regression GREEN (zero flash), full Python123 total/114 executed PASS/9 environment skips, native57 PASS, both UART/nativeUSB C6 builds PASS. Relative Markdown file links/diff check and example-only local provisioning PASS. Fresh reviewer found no Critical and one Important, now covered by RED→GREEN regression; no additional review round. Physical installation/lid/charging/live HA template/NVS hardware/hosted CI acceptance remain separate.

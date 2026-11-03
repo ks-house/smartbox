@@ -51,6 +51,15 @@ class FieldBundleTests(unittest.TestCase):
   m=self.load();version='0.2.1-gaaaaaaa';raw=bytearray(512);raw[0]=0xe9;raw[3]=64;raw[12]=13;raw[32:32+len(version)+1]=version.encode()+bytes([0]);m.validate_image(raw,version,'a'*40)
 
 
+ def test_builder_uses_source_identity_and_rejects_ambiguous_or_dirty_inputs(self):
+  m=self.load();header='static constexpr const char *FIRMWARE_VERSION = "0.2.2";'
+  self.assertEqual('0.2.2-gaaaaaaa',m.source_version(header,'a'*40))
+  self.assertRaises(ValueError,m.source_version,header+'\n'+header,'a'*40)
+  self.assertRaises(ValueError,m.source_version,header,'bad')
+
+ def test_new_release_keeps_its_actual_version_in_private_bundle(self):
+  m=self.load();version='0.2.2-gaaaaaaa';raw=bytearray(512);raw[0]=233;raw[3]=64;raw[12]=13;raw[32:32+len(version)+1]=version.encode()+bytes([0]);m.validate_image(raw,version,'a'*40)
+
  def test_eight_mb_header_cannot_be_packaged_as_16mb(self):
   m=self.load();version='0.2.1-gaaaaaaa';raw=bytearray(512);raw[0]=233;raw[3]=48;raw[12]=13;raw[32:32+len(version)+1]=version.encode()+bytes([0]);self.assertRaises(ValueError,m.validate_image,raw,version,'a'*40)
 

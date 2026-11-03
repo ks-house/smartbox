@@ -97,12 +97,12 @@ After owner reinstallation the corrected continuous reader reports5 consecutive 
 
 ## 2026-11-03 요청: 충전용 닫기 전용 복구
 
-소유자는 뚜껑을 닫아야 충전된다고 보고했고, 보호 전체 OFF 대신 닫기 전용 복구를 선택했다. [설계안](../docs/superpowers/specs/2026-11-03-low-power-close-design.md)은 보호 래치를 유지하는 1회 닫기, 회복 전 자동 열기 금지 및 12.4V/300초 후 새 감지 재개를 제안한다. 아직 미구현·미설치·물리 닫힘 미확인이다. 기존 0.2.1은 보호 중 force_close와 유효 저전압 OTA를 허용하지 않는다.
+소유자는 뚜껑을 닫아야 충전된다고 보고했고, 보호 전체 OFF 대신 닫기 전용 복구를 선택했다. [설계안](../docs/superpowers/specs/2026-11-03-low-power-close-design.md)은 사용자 승인 후0.2.2 후보 소스에 구현했다. 보호 래치를 유지하는1회 닫기, 강제 OTA, 회복 전 자동 열기 금지와12.0V/300초 후 새 감지 재개가 대상이며 현장 설치·물리 닫힘은 미확인이다. 기존 0.2.1은 보호 중 force_close와 유효 저전압 OTA를 허용하지 않는다.
 
 
 ### 2026-11-03 implementation checkpoint
 
-Approved source now lowers release to max(12.0V,cutoff+0.7V) for300s and implements an isolated close-only Controller path, one attempt per boot. Existing cutoff11.3V remains; invalid/below-cutoff power blocks admission and stops motion. Maximum3800ms, signed-current magnitude guard and relay interlock remain. Terminal stroke timing never confirms actual physical lid position. Deployed0.2.1 retains old12.4V gate until updated; command/updater integration is pending at this checkpoint.
+Approved source now lowers release to max(12.0V,cutoff+0.7V) for300s and implements an isolated close-only Controller path, one attempt per boot. Existing cutoff11.3V remains; invalid/below-cutoff power blocks admission and stops motion. Maximum3800ms, signed-current magnitude guard and relay interlock remain. Terminal stroke timing never confirms actual physical lid position. Deployed0.2.1 retains old12.4V gate until updated; this paragraph is the historical Task1 checkpoint; command/updater integration is implemented in the subsequent0.2.2 candidate below.
 
 
 ## 2026-11-03 후보0.2.2: 충전용 닫기와 강제 OTA

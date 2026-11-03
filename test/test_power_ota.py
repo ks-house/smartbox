@@ -16,6 +16,7 @@ class ActualOtaTests(unittest.TestCase):
     def test_forced_failed_flash_retains_protection(self):self.run_case('force_fail')
     def test_forced_expired_or_held_manifest_never_flashes(self):
         self.run_case('force_expiry');self.run_case('force_manifest_fail')
+    def test_forced_original_ttl_rechecked_at_final_flash_gate(self):self.run_case('force_expiry_final')
     def test_forced_final_voltage_fault_never_flashes(self):self.run_case('force_last_fault')
     def test_actual_no_update_preserves_protection(self):self.run_case('no_update_fault')
     def test_preflash_contact_delay_power_drop_never_flashes(self):self.run_case('contact_fault')

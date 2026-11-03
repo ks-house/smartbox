@@ -272,7 +272,7 @@ void AutoOtaManager::runOtaProcess(bool force, bool sensorFaultRecovery,bool for
         
         httpUpdate.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
         httpUpdate.setAuthorization(SECRET_OTA_USER, SECRET_OTA_PASS);
-        if (!controllerPtr->canContinueOta() || (sensorFaultRecovery && !recoveryRequestFresh())) {
+        if (!controllerPtr->canContinueOta() || (maintenance && !recoveryRequestFresh())) {
 #ifndef NATIVE_BUILD
             esp_task_wdt_add(NULL);
 #endif

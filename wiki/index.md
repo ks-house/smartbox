@@ -69,4 +69,4 @@ source_of_truth: true
 
 - [bench_usb_acceptance.md](bench_usb_acceptance.md):2026-11-02 actual16MB USB installation/boot evidence, fixed115200 session contract and remaining sensor/field gates.
 
-- [충전용 닫기 전용 복구 설계안](../docs/superpowers/specs/2026-11-03-low-power-close-design.md): owner-selected approach, pending design approval; protection and automatic-open recovery boundary.
+- [충전용 닫기 전용 복구 설계안](../docs/superpowers/specs/2026-11-03-low-power-close-design.md): owner-approved0.2.2 source candidate; protection, close-only, forced OTA and12.0V/300s automatic-open recovery boundary; installation pending.
