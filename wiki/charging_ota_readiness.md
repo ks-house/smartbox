@@ -1,5 +1,7 @@
 # SmartBox OTA 적용 준비
 
+> 후속2026-11-03: 소유자가 나중에 USB를 연결하여0.2.2-gdb96897 기록/readback 및 bare-board 실제 부팅을 완료했다. 아래 기존0.2.1 최초 적용 제약은 준비 당시 경계다. NAS OTA 게시/trigger와 현장 센서·닫힘·충전 검증은 하지 않았다.
+
 실제 인증 이미지0.2.2-gdb96897 / source db968971041973ef887aab69b7be71c2134abd83
 1410336 bytes / SHA256 86fbf0dfee64a245cafd13839ecb05e2c1c435a93ea1efd7f3affb4d54427bb9
 

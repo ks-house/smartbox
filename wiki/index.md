@@ -9,7 +9,7 @@ source_of_truth: true
 
 # SmartBox Wiki
 
-> 현장 재설치 뒤 정상 전압 자료5회와 수정 측정 드라이버 동작을 확인했다. 최신19:29:49KST 약12.00V로 보호 해제 조건12.4V/300초를 충족하지 않아 정지 유지 중이다. [현재 상태](project_status.md)에서 측정 복구와 남은 충전/구동 수용을 구분한다.
+>2026-11-03: 같은 SmartBox에0.2.2-gdb96897 USB 기록/readback을 확인했다. nativeUSB에서 실제0.2.2 버전과30초 루프 실행까지 확인했다. 센서 없는 보드 시험이며 실물 닫힘·충전 수용과 구분한다. 전일 현장0.2.1의 약12.00V 관측은 과거 증거다. [USB 수용 기록](bench_usb_acceptance.md)과 [현재 상태](project_status.md)를 참조한다.
 
 ## 먼저 읽기
 
@@ -69,6 +69,6 @@ source_of_truth: true
 
 - [bench_usb_acceptance.md](bench_usb_acceptance.md):2026-11-02 actual16MB USB installation/boot evidence, fixed115200 session contract and remaining sensor/field gates.
 
-- [충전용 닫기 전용 복구 설계안](../docs/superpowers/specs/2026-11-03-low-power-close-design.md): owner-approved0.2.2 source candidate; protection, close-only, forced OTA and12.0V/300s automatic-open recovery boundary; installation pending.
+- [충전용 닫기 전용 복구 설계안](../docs/superpowers/specs/2026-11-03-low-power-close-design.md): owner-approved0.2.2 installed/booted on bare board; protection, close-only, forced OTA and12.0V/300s automatic-open recovery boundary; field acceptance pending.
 
-- [충전 복구 OTA 준비와 최초 적용 조건](charging_ota_readiness.md): verified private0.2.2 candidate; NAS staging/trigger/install remain deferred, USB unavailable.
+- [충전 복구 OTA 준비와 최초 적용 조건](charging_ota_readiness.md): verified private0.2.2 OTA candidate; later USB bench adoption accepted; NAS staging/OTA trigger and field acceptance remain deferred.

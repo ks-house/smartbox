@@ -118,3 +118,8 @@ Approved source now lowers release to max(12.0V,cutoff+0.7V) for300s and impleme
 - 새 데이터: power_charging_close_state(0없음/1실행/2시간종료/3저전압/4센서/5과전류/6기한만료/7중단), power_charging_close_used, power_force_ota_allowed, power_force_ota_voltage_v. 기존 schema1 필드는 유지한다.
 
 현재0.2.1은 유효한 저전압 보호 중 force_close 및 OTA를 거절한다. 새 기능을 소급 등록하는 원격 설정은 없다. 최초 적용은 USB 또는 기존 설치 조건 확보가 필요하며 운영 manifest hold는 별도 승인/검증 전 유지한다.
+
+
+## 2026-11-03 USB adoption accepted
+
+Same physical SmartBox receives exact0.2.2-gdb96897 via guarded USB write/readback with original boot/table/NVS prefix preserved during programming. NativeUSB actual firmware line and30s continued execution accepted. Owner confirms bare board/no INA219, so fault10 is not connected-field measurement failure evidence. Connected voltage/physical charging close/new HA buttons/recovery/network/OTA health remain field Gates; see [bench evidence](bench_usb_acceptance.md).

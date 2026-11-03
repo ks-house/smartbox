@@ -366,3 +366,17 @@ source_of_truth: true
 - Owner cannot connect USB and requests OTA preparation. Use existing write_release_metadata contract to prepare the authenticated0.2.2-gdb96897 firmware/version/hash/build identity pair privately on WSL and owner-only Windows. Exact bytes remain1410336B/SHA86fbf0dfee64a245cafd13839ecb05e2c1c435a93ea1efd7f3affb4d54427bb9; no NAS staging, operating publication, trigger or installation.
 - Latest host-tool source38bb0ca CI41592656496 PASS, including Windows guards and both C6 profiles; firmware/private CI41591578580/41591748462 already PASS atdb96897. Windows and WSL candidate receipts explicitly preserve false nas_staged/ota_triggered/installed. Add ordered readiness/pair preservation/authenticated-readback/single-trigger/new-boot acceptance runbook.
 - Existing0.2.1 valid-low-protection OTA limitation cannot be retrofitted by a candidate manifest. Source-level forced maintenance becomes available only after first compatible installation. Signed-root sudo failure and disabled browser prevent live readiness verification; do not infer current voltage from prior telemetry or send speculative OTA. USB remains deferred as requested.
+
+
+## [2026-11-03] test | Write and verify corrected0.2.2 on owner-connected SmartBox
+
+- Owner explicitly confirms SmartBox/USB-only with motor12V and external5V removed. Read-only identification matches the prior C6 MCU; kit21 file hashes and exact credentialed0.2.2-gdb96897/1410336B/SHA86fbf0dfee64a245cafd13839ecb05e2c1c435a93ea1efd7f3affb4d54427bb9 verified before Apply.
+- One115200 guarded write invocation completes written_verified; original app0/first64KiB/otadata backup20261103-181213-95755dff is hashed and preserved. Old0.2.1 literal confirmed in backup. New app/selection data explicitly verify, before/after0..0xe000 match and NVS remains unchanged. Only e000/10000 writes, no erase-all or app1 operation; no motion/OTA request.
+- NativeUSB transfer requested for actual boot confirmation; board remains in download mode at this checkpoint. Current sensor attachment/field power/physical motion/charging/OTA health are not assumed. Native57/default C6 build PASS for wiki policy; generated header restored and dummy output not installed.
+
+
+## [2026-11-03] test | Confirm0.2.2 native USB boot on owner-confirmed bare board
+
+- Owner moves to nativeUSB; COM6 parent MCU identity matches prior UART device.30s read-only serial capture confirms SYSTEM Firmware0.2.2-gdb96897, completed initialization/FSM loop, isolated-output log and five periodic power diagnostic observations. Owner confirms INA219 is not attached: driver1/fault10/config0/cal0/valid0 is expected and not a diagnosed field sensor failure.
+- Zero further ROM/reset/fatal/panic markers after the expected version within this capture. One initial USB reset and an existing TWDT already initialized message are retained as observations; effective watchdog settings and long-term health are not inferred. Retained configured cutoff11.3/actuator3800/stall5000 observed without printing network credentials in wiki.
+- USB installation/new-version boot is accepted; physical field sensor/close/charging/HA/network/OTA Gates stay open. INSTALL-RECEIPT records actual evidence separately from historical build receipt. No actor/OTA command, service or operating publication. Native57/default C6 checks passed this turn and generated header restored; dummy local build not installed.
