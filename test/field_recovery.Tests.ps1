@@ -1,11 +1,11 @@
-param([string]$ModulePath=(Join-Path $PSScriptRoot '../tools/field_recovery/FieldRecovery.psm1'))
+param([string]$ModulePath=(Join-Path $PSScriptRoot '../tools/field_recovery/FieldRecovery.psm1'),[string]$FirmwareVersion='0.2.2-gaaaaaaa')
 $ErrorActionPreference='Stop'
 if (-not (Test-Path -LiteralPath $ModulePath)) { throw 'Field recovery module is missing (expected RED)' }
 Import-Module $ModulePath -Force
 function Assert($Condition,$Message){if(-not $Condition){throw $Message}}
 $root=Join-Path ([IO.Path]::GetTempPath()) ('smartbox-test-'+[guid]::NewGuid().ToString('N'));New-Item -ItemType Directory $root|Out-Null
 $kit=Join-Path $root 'kit';New-Item -ItemType Directory $kit|Out-Null;New-Item -ItemType Directory (Join-Path $kit 'tools')|Out-Null
-$version='0.2.1-gaaaaaaa';$image=New-Object byte[] 512;$image[0]=233;$image[3]=64;$image[12]=13;[Array]::Copy([Text.Encoding]::ASCII.GetBytes($version),0,$image,32,$version.Length)
+$version=$FirmwareVersion;$image=New-Object byte[] 512;$image[0]=233;$image[3]=64;$image[12]=13;[Array]::Copy([Text.Encoding]::ASCII.GetBytes($version),0,$image,32,$version.Length)
 [IO.File]::WriteAllBytes((Join-Path $kit 'firmware.bin'),$image);[IO.File]::WriteAllBytes((Join-Path $kit 'boot_app0.bin'),(New-Object byte[] 8192));[IO.File]::WriteAllBytes((Join-Path $kit 'bootloader.bin'),[byte[]](233,1,2));[IO.File]::WriteAllBytes((Join-Path $kit 'tools/esptool.exe'),[byte[]](1))
 $stream=New-Object IO.MemoryStream;$writer=New-Object IO.BinaryWriter($stream)
 foreach($r in @(@('nvs',1,2,0x9000,0x5000),@('otadata',1,0,0xe000,0x2000),@('app0',0,16,0x10000,0x640000),@('app1',0,17,0x650000,0x640000))){$writer.Write([uint16]0x50aa);$writer.Write([byte]$r[1]);$writer.Write([byte]$r[2]);$writer.Write([uint32]$r[3]);$writer.Write([uint32]$r[4]);$label=New-Object byte[] 16;[Array]::Copy([Text.Encoding]::ASCII.GetBytes($r[0]),$label,$r[0].Length);$writer.Write($label);$writer.Write([uint32]0)}

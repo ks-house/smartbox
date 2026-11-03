@@ -14,7 +14,7 @@ function Get-SmartBoxKit([string]$KitDirectory) {
  if((Get-FileHash -LiteralPath $mp).Hash -ne $k.manifest_sha256){throw 'Manifest hash mismatch'}
  $m=Get-Content -LiteralPath $mp -Raw|ConvertFrom-Json
  if($m.schema -ne 1 -or $m.purpose -ne 'field_usb_recovery' -or -not $m.production_provisioned -or $m.chip -ne 'esp32c6' -or $m.build_environment -ne 'esp32-c6-field-recovery' -or -not $m.native_usb_serial -or $m.chip_id -ne 13 -or $m.flash_bytes -ne 16777216){throw 'Reviewed ESP32-C6/16MB recovery kit required'}
- if($m.version -notmatch '^0\.2\.1-g([a-f0-9]{7,40})$' -or $m.commit -notmatch '^[a-f0-9]{40}$' -or -not $m.commit.StartsWith(($m.version -split '-g')[1])){throw 'Clean matching source/version required'}
+ if($m.version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+-g([a-f0-9]{7,40})$' -or $m.commit -notmatch '^[a-f0-9]{40}$' -or -not $m.commit.StartsWith(($m.version -split '-g')[1])){throw 'Clean matching source/version required'}
  $expected=@{app0=65536;app0_length=6553600;app1=6619136;app1_length=6553600;otadata=57344;otadata_length=8192;nvs=36864;nvs_length=20480;partition_table=32768}
  foreach($name in $expected.Keys){if($m.layout.$name -ne $expected[$name]){throw 'Unreviewed layout'}}
  $names=@($m.files.PSObject.Properties.Name|Sort-Object)

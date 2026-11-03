@@ -353,3 +353,9 @@ source_of_truth: true
 - Synchronize newly written current-status wording to approved/implemented0.2.2 source and12.0V recovery; old operating0.2.1 acceptance remains separate. Private builder now derives semantic version from the source literal;11 exact-image/layout/encryption tests PASS including0.2.2 and ambiguous-source rejection.
 
 - Final fix-pass validation: final forced-expiry regression GREEN (zero flash), full Python123 total/114 executed PASS/9 environment skips, native57 PASS, both UART/nativeUSB C6 builds PASS. Relative Markdown file links/diff check and example-only local provisioning PASS. Fresh reviewer found no Critical and one Important, now covered by RED→GREEN regression; no additional review round. Physical installation/lid/charging/live HA template/NVS hardware/hosted CI acceptance remain separate.
+
+
+## [2026-11-03] fix | Accept verified new release identity in Windows field tool
+
+- Real encrypted/private0.2.2-gdb96897 image assembled and authenticated; actual Windows plan exposed a second historical0.2.1-only version pin in Get-SmartBoxKit. Parametrize the complete host fixture for new release and reproduce rejection RED; allow semantic release version while retaining exact clean commit/image/layout/hash checks.14 cases PASS for0.2.2 and14 for0.2.1, actual plan passes with device_contacted=false.
+- Both hosted runs41591578580/41591748462 PASS at firmware commitdb96897; normal production publisher skipped. Actual image1410336B/SHA86fbf0dfee64a245cafd13839ecb05e2c1c435a93ea1efd7f3affb4d54427bb9 remains uninstalled. Owner-only new kit/receipt/hash list preserve all prior0.2.1 kits/backups. USB first adoption or old OTA conditions are still required; no physical close acceptance claimed.

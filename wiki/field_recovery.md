@@ -129,3 +129,10 @@
 ## 2026-11-02 보드 단독 USB 적용 기록
 
 [벤치 적용 결과](bench_usb_acceptance.md): 실제C6/16MB를 확인하고0.2.1-g4a57756을 기록·검증한 뒤 네이티브USB에서 버전/반복 진단 로그를 확인했습니다. 사용자가 보드만 연결했다고 확인했으므로 sensor fault10은 센서 미연결 조건과 일치합니다. 현장 전압 측정·충전 재개·모터 검증은 남아 있습니다.
+
+
+## 2026-11-03 charging recovery candidate prepared
+
+Private encrypted build41591748462 and exact-source public CI41591578580 PASS at db968971041973ef887aab69b7be71c2134abd83. Actual image0.2.2-gdb96897,1410336B,SHA25686fbf0dfee64a245cafd13839ecb05e2c1c435a93ea1efd7f3affb4d54427bb9. Authenticated artifact digest/CMS decrypt, image checksum/hash, C6/16MB/nativeUSB and old dual-slot layout verified. Owner-private new Windows kit is distinct from the previous installed0.2.1 kit and backups.
+
+Windows recovery version guard originally also pinned0.2.1 and rejected the genuine0.2.2 bundle. Reproduce with real plan and parametrized test fixture, then retain clean semantic version/matching commit/image/hash checks without a minor-version pin.14 Windows guard cases PASS for each0.2.1 and0.2.2; actual new kit returns plan_only/device_contacted=false at115200. This changes the host tool only; the credentialed image bytes/source commit remain db96897. No actual flash, reset, motor request or operating publication in this task.
