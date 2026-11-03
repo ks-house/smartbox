@@ -315,3 +315,21 @@ source_of_truth: true
 - Exact firmware string and root-only monitor/notification state not independently available through this numeric query. Preserve prior USB boot evidence separately. No motor/OTA/reboot/diagnostic publish; no operating settings changed. Save UI dataframe receipt and dashboard proof, close temporary Explore tab.
 
 - Documentation checks: native46 PASS, default ESP32-C6 build PASS; relative links and no secret/artifact staging checked. No product behavior changes in this observation.
+
+
+## [2026-11-03] compile | Specify owner-requested close-only charging recovery
+
+- Owner reports the field lid must close for solar charging and explicitly chooses close-only recovery rather than general protection disable. Inspect installed-source forceClose/servicePower/OTA admission: protective latch currently denies close, maintenance and valid-low-voltage OTA. No existing configuration command clears this latch.
+- Draft explicit one-shot close with valid above-cutoff sensor evidence, retained/replay/expiry rejection, preserved relay interlocks/current/time guards, retained protection and normal detection only after existing charged dwell. Design remains pending approval; no product code/install/actuator/OTA/reboot or permission changes.
+- Signed-maintenance status still fails sudo password-required after SSH authentication; browser inventory reports local browser disabled. No fresh field voltage claim and no reused prior receipt as current state.
+
+- Owner additionally requests forced OTA. Extend the proposal with explicit same-version/low-protection maintenance admission, short authenticated request lifetime and one-per-boot reservation, preserving TLS/auth/held-manifest refusal and previous bootable slot. Actual synchronous updater interruption must be verified, not assumed. No firmware or device changes yet.
+
+- Baseline before implementation: native46 PASS; Python116 total/107 executed PASS/9 environment skips; default ESP32-C6 C6 build PASS. Python guard apply output belongs to isolated test fixture, not a NAS operation. Restore generated version header. Product behavior and deployed image remain unchanged.
+
+
+## [2026-11-03] code | Implement one-shot charging close and lower qualified recovery
+
+- Owner approves design and additionally requests lower protection criterion: release max(12.0V,cutoff+0.7V)/300s; default11.3V motor cutoff retained. New12.0V dwell regression failed on original policy then passed.
+- Controller explicit charging close remains within existing BATTERY_LOW_SHUTDOWN, one attempt per boot, <=3800ms, actual pre-drive and post-contact fresh power reads, low-voltage/invalid read/current-magnitude stop, fully isolated terminal outputs and latched protection. Standard force_close/open unchanged. New behavioral tests fail against nonfunctional interface then pass; no automatic physical stroke requested.
+- Native53 PASS, Python116 total/107 PASS/9 environment skips, default C6 build PASS. This checkpoint is source only; MQTT command/forced OTA integration follows. Existing deployed0.2.1 still has old admission. Generated header restored; no operating firmware/manifest/service/permission changes.

@@ -708,7 +708,7 @@ void test_battery_recovery_dip_restarts_stable_window(void) {
     for(int i=0;i<40;i++){hw.advanceMillis(200);box.update();}
     hw.setBatteryVoltage(12.6f);
     for(int i=0;i<200;i++){hw.advanceMillis(1000);box.update();}
-    hw.setBatteryVoltage(12.3f); hw.advanceMillis(1000); box.update();
+    hw.setBatteryVoltage(11.9f); hw.advanceMillis(1000); box.update();
     hw.setBatteryVoltage(12.6f);
     for(int i=0;i<150;i++){hw.advanceMillis(1000);box.update();}
     TEST_ASSERT_EQUAL(STATE_BATTERY_LOW_SHUTDOWN,box.getCurrentState());
@@ -992,9 +992,83 @@ void test_recovery_cannot_forget_known_critical_voltage_after_read_failure(void)
  hw.setBatteryVoltage(12.6f);hw.advanceMillis(1000);box.update();hw.setBatteryVoltage(NAN);hw.advanceMillis(1000);box.update();TEST_ASSERT_TRUE(box.canStartOta(true));
 }
 
+
+
+void test_charging_close_runs_once_and_keeps_protected_no_auto_open(void) {
+ MockHardware hw;hw.setBatteryVoltage(12.0f);SmartBoxController box(hw);box.setInitialState(STATE_BATTERY_LOW_SHUTDOWN);box.init();box.update();hw.clearEventHistory();
+ TEST_ASSERT_TRUE(box.requestChargingClose());TEST_ASSERT_TRUE(box.isMotorRunning());
+ TEST_ASSERT_EQUAL(LOW,hw.getPinValue(8));TEST_ASSERT_EQUAL(HIGH,hw.getPinValue(7));
+ TEST_ASSERT_FALSE(box.requestChargingClose());
+ hw.advanceMillis(3800);box.update();
+ TEST_ASSERT_FALSE(box.isMotorRunning());TEST_ASSERT_EQUAL(ChargingCloseState::STROKE_FINISHED,box.chargingCloseState());
+ for(int pin:{6,7,8})TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(pin));
+ TEST_ASSERT_TRUE(box.powerSnapshot().protectedMode);TEST_ASSERT_FALSE(box.requestChargingClose());
+ hw.setDistanceCm(10);hw.clearEventHistory();
+ for(int i=0;i<20;i++){hw.advanceMillis(200);box.forceOpen();box.update();}
+ TEST_ASSERT_EQUAL(STATE_BATTERY_LOW_SHUTDOWN,box.getCurrentState());
+ for(const auto& e:hw.getEventHistory())TEST_ASSERT_FALSE(e.pin==6 && e.type==EVENT_MODE && e.value==OUTPUT);
+}
+void test_charging_close_does_not_disable_cutoff_or_measurement_guard(void) {
+ for(float v:{11.0f,NAN,17.0f}) {
+ MockHardware hw;hw.setBatteryVoltage(v);SmartBoxController box(hw);box.setInitialState(STATE_BATTERY_LOW_SHUTDOWN);box.init();box.update();
+ TEST_ASSERT_FALSE(box.requestChargingClose());TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(6));
+ }
+ MockHardware hw;hw.setBatteryVoltage(12);SmartBoxController box(hw);box.setInitialState(STATE_BATTERY_LOW_SHUTDOWN);box.init();box.update();TEST_ASSERT_TRUE(box.requestChargingClose());
+ hw.setBatteryVoltage(11.2f);hw.advanceMillis(200);box.update();
+ TEST_ASSERT_EQUAL(ChargingCloseState::LOW_VOLTAGE,box.chargingCloseState());
+ for(int pin:{6,7,8})TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(pin));
+ for(int i=0;i<30;i++){hw.advanceMillis(200);box.update();}TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(6));
+}
+void test_charging_close_sensor_failure_and_reverse_stall_stop(void) {
+ for(bool badSensor:{false,true}) {
+ MockHardware hw;hw.setBatteryVoltage(12);SmartBoxController box(hw);box.setInitialState(STATE_BATTERY_LOW_SHUTDOWN);box.init();box.update();TEST_ASSERT_TRUE(box.requestChargingClose());
+ if(badSensor)hw.setBatteryVoltage(NAN);else hw.setMotorCurrent(-4000);
+ for(int i=0;i<5;i++){hw.advanceMillis(200);box.update();}
+ TEST_ASSERT_EQUAL(badSensor ? ChargingCloseState::SENSOR_FAULT : ChargingCloseState::OVERCURRENT,box.chargingCloseState());
+ for(int pin:{6,7,8})TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(pin));TEST_ASSERT_TRUE(box.powerSnapshot().protectedMode);
+ }
+}
+class ChargingContactDropHardware:public MockHardware {
+ public:bool drop=false;void delayMs(unsigned long ms) override {MockHardware::delayMs(ms);if(drop && ms==100)setBatteryVoltage(10.9f);}
+};
+void test_charging_close_rechecks_power_after_contact_separation(void) {
+ ChargingContactDropHardware hw;hw.setBatteryVoltage(12);SmartBoxController box(hw);box.setInitialState(STATE_BATTERY_LOW_SHUTDOWN);box.init();box.update();hw.drop=true;hw.clearEventHistory();
+ TEST_ASSERT_FALSE(box.requestChargingClose());
+ for(const auto& e:hw.getEventHistory())TEST_ASSERT_FALSE(e.pin==6 && e.type==EVENT_MODE && e.value==OUTPUT);
+ TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(6));
+}
+void test_charging_close_maximum_time_and_expiry_do_not_energize_again(void) {
+ MockHardware hw;hw.setBatteryVoltage(12);SmartBoxController box(hw);box.setInitialState(STATE_BATTERY_LOW_SHUTDOWN);box.init();box.update();BoxConfig cfg=box.getConfig();cfg.actuatorTime=60000;box.setConfig(cfg);
+ TEST_ASSERT_TRUE(box.requestChargingClose());hw.advanceMillis(3800);box.update();TEST_ASSERT_FALSE(box.isMotorRunning());
+ MockHardware h;h.setBatteryVoltage(12);SmartBoxController b(h);b.setInitialState(STATE_BATTERY_LOW_SHUTDOWN);b.init();b.update();h.clearEventHistory();TEST_ASSERT_FALSE(b.requestChargingClose(100));
+ for(const auto& e:h.getEventHistory())TEST_ASSERT_FALSE(e.pin==6 && e.type==EVENT_MODE && e.value==OUTPUT);
+}
+void test_charging_close_cannot_leave_ota_or_emergency_or_moving_state(void) {
+ MockHardware hw;hw.setBatteryVoltage(12.6f);SmartBoxController box(hw);box.init();box.transitionTo(STATE_OTA_UPDATING);TEST_ASSERT_FALSE(box.requestChargingClose());TEST_ASSERT_EQUAL(STATE_OTA_UPDATING,box.getCurrentState());
+ box.transitionTo(STATE_EMERGENCY_STOP);TEST_ASSERT_FALSE(box.requestChargingClose());
+ box.transitionTo(STATE_HOLD);TEST_ASSERT_FALSE(box.requestChargingClose());
+ TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(6));
+}
+
+void test_lower_recovery_threshold_keeps_dwell_and_gap_guard(void) {
+ BatteryPolicy policy;policy.restoreProtection();
+ for(uint32_t now=0;now<300000;now+=1000) policy.sample(now,12.0f,true,11.3f);
+ TEST_ASSERT_TRUE(policy.snapshot(299000).protectedMode);
+ policy.sample(300000,12.0f,true,11.3f);
+ TEST_ASSERT_FALSE(policy.snapshot(300000).protectedMode);
+ TEST_ASSERT_EQUAL_UINT32(1,policy.snapshot(300000).recoveryCount);
+}
+
 #ifdef NATIVE_BUILD
 int main(int argc, char **argv) {
     UNITY_BEGIN();
+    RUN_TEST(test_charging_close_runs_once_and_keeps_protected_no_auto_open);
+    RUN_TEST(test_charging_close_does_not_disable_cutoff_or_measurement_guard);
+    RUN_TEST(test_charging_close_sensor_failure_and_reverse_stall_stop);
+    RUN_TEST(test_charging_close_rechecks_power_after_contact_separation);
+    RUN_TEST(test_charging_close_maximum_time_and_expiry_do_not_energize_again);
+    RUN_TEST(test_charging_close_cannot_leave_ota_or_emergency_or_moving_state);
+    RUN_TEST(test_lower_recovery_threshold_keeps_dwell_and_gap_guard);
     RUN_TEST(test_relay_glitch_protection);
     RUN_TEST(test_relay_interlock_and_guard_delay);
     RUN_TEST(test_stall_current_detection);

@@ -21,6 +21,8 @@ public:
 extern MockSerial Serial;
 #endif
 
+enum class ChargingCloseState : uint8_t { NONE=0, RUNNING=1, STROKE_FINISHED=2, LOW_VOLTAGE=3, SENSOR_FAULT=4, OVERCURRENT=5, EXPIRED=6, CANCELLED=7 };
+
 enum State {
   STATE_IDLE,
   STATE_OPEN_START,
@@ -81,6 +83,12 @@ private:
   unsigned long lastPowerReading = 0;
   bool lowBatteryOpening = false;
   bool servicePower();
+  bool chargingCloseActive=false, chargingCloseUsed=false;
+  ChargingCloseState chargingCloseResult=ChargingCloseState::NONE;
+  uint32_t chargingCloseAt=0,chargingCloseRequestAt=0,chargingCloseTtl=0;
+  int chargingCloseStalls=0;
+  void stopChargingClose(ChargingCloseState reason);
+  bool chargingClosePowerSafe() const;
   float batteryVoltage;
   float motorCurrent;
   float currentDistance;
@@ -155,6 +163,9 @@ public:
   bool canContinueOta() const;
   void servicePowerDuringOta();
   void finishOtaWithoutReboot();
+  bool requestChargingClose(uint32_t ttlMs=120000);
+  ChargingCloseState chargingCloseState() const;
+  bool chargingCloseAttemptUsed() const {std::lock_guard<std::recursive_mutex> lock(dataMutex);return chargingCloseUsed;}
   void forceOpen();
   void forceClose();
   void resetEmergency();

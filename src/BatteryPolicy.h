@@ -34,7 +34,7 @@ class BatteryPolicy {
   uint32_t stateAt_=0;
   bool valid_=false, latched_=false, sampled_=false;
   bool lowTiming_=false, recoveryTiming_=false, healthyTiming_=false;
-  float voltage_=0, minimum_=0, cutoff_=11.3f, recovery_=12.4f;
+  float voltage_=0, minimum_=0, cutoff_=11.3f, recovery_=12.0f;
   uint32_t sampleAt_=0, lowAt_=0, recoveryAt_=0, healthyAt_=0, recoveries_=0;
 };
 #endif

@@ -4,7 +4,7 @@ Status: source implementation and isolated validation; publication/installation 
 
 ## Power policy
 
-The system retains its12V lead-acid profile and default11.3V/3s guard. Warning=cutoff+0.7V, saving=cutoff+0.4V. Noncritical changes qualify for15s and have0.1V exit hysteresis to avoid repeated radio publications near a threshold. Recovery requires max(12.4V,cutoff+0.8V) continuously for300s with fresh valid samples; a gap>2s, invalid sample or voltage dip restarts qualification. These are software policy defaults, not measured SOC or a battery-manufacturer acceptance claim.
+The system retains its12V lead-acid profile and default11.3V/3s guard. Warning=cutoff+0.7V, saving=cutoff+0.4V. Noncritical changes qualify for15s and have0.1V exit hysteresis to avoid repeated radio publications near a threshold. Recovery requires max(12.0V,cutoff+0.7V) continuously for300s with fresh valid samples; a gap>2s, invalid sample or voltage dip restarts qualification. These are software policy defaults, not measured SOC or a battery-manufacturer acceptance claim.
 
 A confirmed critical episode preserves the existing single3800ms fail-open stroke and interlock. Invalid/missing INA219 instead isolates immediately, including failure during that stroke; it never returns synthetic12.2V/0mA. Recovery leaves outputs isolated, clears pending movement/median/debounce and enters idle with3s blind time. Fresh normal detection may then run the existing FSM. Recovery alone does not force a lid stroke or prove physical position.
 
@@ -93,3 +93,13 @@ User requests firmware-first remote investigation. See [INA219 regression](ina21
 ### 2026-11-02 field observation
 
 After owner reinstallation the corrected continuous reader reports5 consecutive valid/fault0 frames. Latest collector receipt19:29:49KST:12.00006V, protected3/actuation0, threshold12.4V and300s dwell, recovery_count0; since-boot minimum11.78005V. Voltage/current are no longer null. Five-minute reporting and same-boot uptime progression establish current telemetry, while solar charging current/SOC/DMM accuracy and physical motor success are not measured by these frames. Leave thresholds and outputs unchanged; accept recovery only after the actual above-threshold dwell and observed state/count transition.
+
+
+## 2026-11-03 요청: 충전용 닫기 전용 복구
+
+소유자는 뚜껑을 닫아야 충전된다고 보고했고, 보호 전체 OFF 대신 닫기 전용 복구를 선택했다. [설계안](../docs/superpowers/specs/2026-11-03-low-power-close-design.md)은 보호 래치를 유지하는 1회 닫기, 회복 전 자동 열기 금지 및 12.4V/300초 후 새 감지 재개를 제안한다. 아직 미구현·미설치·물리 닫힘 미확인이다. 기존 0.2.1은 보호 중 force_close와 유효 저전압 OTA를 허용하지 않는다.
+
+
+### 2026-11-03 implementation checkpoint
+
+Approved source now lowers release to max(12.0V,cutoff+0.7V) for300s and implements an isolated close-only Controller path, one attempt per boot. Existing cutoff11.3V remains; invalid/below-cutoff power blocks admission and stops motion. Maximum3800ms, signed-current magnitude guard and relay interlock remain. Terminal stroke timing never confirms actual physical lid position. Deployed0.2.1 retains old12.4V gate until updated; command/updater integration is pending at this checkpoint.
