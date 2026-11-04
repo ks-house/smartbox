@@ -478,3 +478,14 @@ source_of_truth: true
 
 - Extend only exact-cohort normalCLOSING; retain500ms forced deadline, invalid/raw values, all continuity resets and no new admission during deferred readings. Rename shared pending/deadline members to motor names. Protected close/BLOW, voltage/TTL, sensor faults and OTA unchanged.
 - Two new closing behaviors reproduce RED then GREEN. Native83 PASS, Python144 total/135 executed PASS/9 opt-in skips, default/nativeUSB C6 PASS. Independent review83 PASS/no findings; separate obstacle/reversal harness confirms immediate closing stop and no powered reversal with invalid readings. Generated header restored, dummy image not installed.0.2.7 candidate; operating publication/install/physical closing remain separate.
+
+## [2026-11-04] test | Accept0.2.7 installed and one normal close without SENSOR_RECHECK
+
+- PR26 exacte8e20be CI41813670982 PASS/merged798af34. Operating41814300613 and authenticated41814786933 verify0.2.7-g798af34/1422368B/SHA6dc572361108ef0d28d89005f90eea306b41c7c387bdb7bd6682fcb45c19626b, TLS/4auth/8denial. One ordinaryOTA19:33:44 yields actual new boot/version19:36:19, healthy12.17206V/valid1/NORMAL/IDLE/UP_TO_DATE.
+- One requested normal force_close: HA19:37:26 CLOSE_START ->19:37:27 CLOSING ->19:37:31 IDLE, matching MCU77783/77988/81989. Under-load1037.6~1364.1mA/11.61856~11.74357V; no SENSOR_RECHECK. Post12.16003V/0.5mA/valid1/fault0/hold0/IDLE. Retained last RANGE9/episode1/raw10.036V/320mV/3200mA records allowed transient, not a continuing fault or a measured true maximum current.
+- Firmware installation and close-command completion accepted; physical fully closed and solar charging await separate confirmation. Owner already confirmed actual opening on0.2.6. Explicit close1/normalOTA1/extra open0/forcedOTA0/reboot0; no repeat actuation or security/service changes. Source/native83/Python144(135executed/9opt-in skip)/dual-C6 and resolved independent reviews preserved. HA closing history proof saved locally; issue19 stays open for physical/charging/rating acceptance.
+
+## [2026-11-04] test | Owner confirms actual fully closed lid after0.2.7 command
+
+- Owner replies “완전히 닫혔음” to the19:37 single-close result. Accept physical closing in addition to source/CI/publication/installation/FSM/current proof. Prior physical-close-pending checkpoint is resolved; prior0.2.6 actual opening was also owner-confirmed.
+- No further physical command/OTA/reboot. Preserve actual RANGE startup history as bounded invalid data, not a measured peak or continuing sensor shutdown. Issue19 remains open for separate solar/net charging, current range/component ratings and long-term recovery acceptance. Update current wiki and final PR/issue descriptions; preserve historical records and primary checkout.
