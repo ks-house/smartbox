@@ -31,3 +31,20 @@ MQTT는 기존 smartbox/telemetry/status에서 warning_schema1, low_warning_acti
 - Updater6개 RED→GREEN:정확한 code 교체/idempotence,잘못된 원본 거절,stop/start/post-check 실패 복구,구형 worker state를 새 정책으로 오인하지 않음.
 - Python144 total/135 executed PASS/9 opt-in 환경 skip, 두 C6 build PASS. 독립 리뷰 지적 없음, 별도로84 power tests PASS.
 - 실제0.2.4 설치, 새 warning payload/저장, NAS 교체/서비스 수용은 아직 별도다. 실물 배터리를 방전시켜 경고를 만들거나 테스트 알림을 운영으로 보내지 않는다.
+
+## 실제 펌웨어 설치 수용과 NAS 인증 대기
+
+PR23 headd986764587cc47dfae93b2b8ed68207077eb3975는 CI41782317800 성공 후 기존 관리자용 병합 경로로 main de3aa1a3cd7f9313ff8d8d23a408eae68305eec8에 병합했다. 보안 규칙은 변경하지 않았다. 정상CI/SFTP 게시41782840664와 별도 인증 다운로드41783350078는 모두PASS했다. 운영0.2.4-gde3aa1a/1419664B/SHA256e12e1b3413c683e9758c54ed9aa3375e905b87411879457fb70573107062d227다.
+
+인증 HA에서 새0.2.3 진단12.56805V/valid1/fault0/IDLE/NORMAL/age145ms/idle0.3mA/OTAready1을 확인하고 exclusive intent 뒤15:08:27KST 일반 trigger_ota를QoS0/non-retained로1회 발행했다. 이후 새0.2.4/새 uptime11322→120297ms 이상, 센서 정상/IDLE/NORMAL, 자동 manifest200/UP_TO_DATE를 확인했다. 실제 장치 wire warning_schema1/active0/elapsed0/voltage11/required300 및 shutdown voltage11/dwell3을 읽었다. 새 경고 조건의 실제 코드·설정 전송은 수용한다. 물리적으로 방전시켜5분 경고를 만든 시험은 하지 않았다.
+
+**NAS owner 알림 규칙 교체는 아직 미완료다.** 기존 root monitor는 아직 구형 코드98102212로 간주하며 새 서비스 실행 증거가 없다. root 권한을 추가하지 않고 기존 인증 DSM에서 비활성 수동 작업을 준비했으나 NAS 자체가 작업 저장에 DSM 계정 password를 요구했다. 해당 인증 창은 소유자에게 handoff했다. Task는 아직 저장/실행을 확인하지 않았고 monitor/service/config는 바꾸지 않았다. 후보 공개 source 파일만 웹 루트 밖 docker 공유 폴더에 upload했다.
+
+기존 Task Scheduler 입력 상한8192 때문에 처음 embedded payload12280은 UI 검증에서 거절되어 생성되지 않았다. 고정 updater는 캡처된 bytes로 유지하고 candidate source는 고정 경로/O_NOFOLLOW/크기/hash 검사 뒤에만 사용하는5965byte 작업으로 준비했다. 최종 taskSHA919b7d9ac74730edc89d6b60ef1aaaad42d736ac62bea61fb27ef6ed8fb726fd. Candidate/new monitorSHA1d1d900b2b7e4c8dfb843115759db7063e870b4841db4a0b99ff7a4efedcd8f2, updaterSHA5191c405973e84d4726ea742fe0d64b054cb4f2349ce9896b79dd5ccb0f41188, expected oldSHA98102212eb54e86f149b3e0c3aa0792524a5876cd24dae756f6fca2c307df580, expected unitSHA332a96d15f39853748ce49b274db623ccbfec81558478cfb711a205e0ca0ea70.
+
+### 인증 뒤 남은 실행 순서
+
+1. 기존 NAS password 제출이 끝나 새 SmartBox warning11V300s20261104 task가 **비활성/root**로 저장된 것을 확인한다. 기존 Wake PC 작업은 건드리지 않는다.
+2. 준비된 task의 codeSHA와 candidate source/기존 program/unit pin을 대조하고 해당 task만 수동1회 실행한다. Firmware 재설치는 필요하지 않다. Probe가 새 warning-schema cohort를 읽어야 service 교체가 진행된다.
+3. File Station docker 공유의 smartbox-warning-policy-20261104-result.json을 읽는다. updated/already_current, 새SHA/config 보존/service_active/current status를 확인한다. 실패이면 error_type/안전 reason과 원본 보존/rollback을 먼저 확인하고 무작정 반복하지 않는다.
+4. 새 worker warning_policy_schema1/신선한 observed_at과 새 경고 flag 수용을 확인한 뒤 NAS 알림 조건까지 완료로 기록한다. 현재 이 단계는 미수행이며 장치 펌웨어 적용과 혼동하지 않는다.

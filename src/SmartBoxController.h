@@ -34,7 +34,8 @@ enum State {
   STATE_BATTERY_LOW_SHUTDOWN,
   STATE_STARTUP_OPEN,
   STATE_OTA_UPDATING,
-  STATE_MAINTENANCE
+  STATE_MAINTENANCE,
+  STATE_SENSOR_RECHECK
 };
 
 // Tuning Constants
@@ -56,6 +57,13 @@ struct BoxConfig {
   int otaHour = 0; // Changed to 0 (midnight) for safe catch-up check
   int telemetryIntervalMin = 10; // Default: 10 minutes
   unsigned long maxHoldTime = 180000; // 3 minutes
+};
+
+struct PowerDiagnosticsFrame {
+  BatterySnapshot power;
+  PowerReading reading,lastFault;
+  uint32_t faultCount,faultAgeMs;
+  float motorCurrent;
 };
 
 typedef void (*StateChangeCallback)(State prevState, State newState);
@@ -110,6 +118,8 @@ private:
   bool isCalibrationPhase;
   mutable std::recursive_mutex dataMutex;
   PowerReading latestPowerRead{NAN,NAN,false};
+  PowerReading lastPowerFaultRead{NAN,NAN,false};
+  uint32_t lastPowerFaultAt=0,powerFaultEpisodes=0;
   float lastVerifiedVoltage=NAN; // Admission evidence only; never publish as current voltage.
   bool otaRecoveryReserved=false,otaRecoveryUsed=false,otaMaintenanceReserved=false;
   uint32_t otaRecoveryAt=0;
@@ -158,6 +168,12 @@ public:
   PowerReading powerReadDiagnostics() const {
       std::lock_guard<std::recursive_mutex> lock(dataMutex);return latestPowerRead;
   }
+  PowerDiagnosticsFrame powerDiagnosticsFrame() const {
+      std::lock_guard<std::recursive_mutex> lock(dataMutex);
+      const uint32_t now=uint32_t(hw.getMillis());
+      return {batteryPolicy.snapshot(now),latestPowerRead,lastPowerFaultRead,powerFaultEpisodes,
+              powerFaultEpisodes ? now-lastPowerFaultAt : UINT32_MAX,motorCurrent};
+  }
   bool canStartOta(bool sensorFaultRecovery=false,bool forceMaintenance=false) const;
   bool tryBeginOta(bool sensorFaultRecovery=false,bool forceMaintenance=false);
   bool canContinueOta() const;
@@ -180,7 +196,7 @@ public:
 #ifdef FIRMWARE_VERSION_OVERRIDE
   static constexpr const char *FIRMWARE_VERSION = FIRMWARE_VERSION_OVERRIDE;
 #else
-  static constexpr const char *FIRMWARE_VERSION = "0.2.4";
+  static constexpr const char *FIRMWARE_VERSION = "0.2.5";
 #endif
   const char *getFirmwareVersion() const { return FIRMWARE_VERSION; }
 

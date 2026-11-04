@@ -13,6 +13,8 @@ struct PowerReading {
     PowerReadFault fault=PowerReadFault::NONE;
     uint8_t driver=0;
     uint16_t configuration=0,calibration=0;
+  float rawBusV=NAN,rawShuntMv=NAN,rawCurrentMa=NAN;
+  uint8_t rangeMask=0;
 };
 
 #ifdef NATIVE_BUILD

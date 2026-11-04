@@ -408,6 +408,7 @@ const char* MqttManager::stateToString(int state) {
         case STATE_STARTUP_OPEN: return "STARTUP_OPEN";
         case STATE_OTA_UPDATING: return "OTA_UPDATING";
         case STATE_MAINTENANCE: return "MAINTENANCE";
+        case STATE_SENSOR_RECHECK: return "SENSOR_RECHECK";
         default: return "UNKNOWN";
     }
 }
@@ -432,11 +433,28 @@ void MqttManager::publishTelemetry() {
     JsonDocument doc;
     doc["timestamp"] = millis();
     doc["fsm_state"] = stateToString(static_cast<int>(m_controller.getCurrentState()));
-    const auto power = m_controller.powerSnapshot();
+    const auto frame=m_controller.powerDiagnosticsFrame();
+    const auto power = frame.power;
     if (power.valid) doc["battery_v"] = power.voltage;
     else doc["battery_v"] = nullptr;
     doc["firmware"] = m_controller.getFirmwareVersion();
     doc["power_schema"] = 1;
+    doc["power_persistent_hold"] = power.persistentHold ? 1 : 0;
+    doc["power_sensor_recheck_remaining_ms"] = power.sensorRecheckRemainingMs;
+    const auto previousFault=frame.lastFault;
+    const auto faultCount=frame.faultCount;
+    doc["power_fault_episodes"] = faultCount;
+    doc["power_last_fault_code"] = faultCount ? static_cast<unsigned>(previousFault.fault) : 0;
+    if(faultCount)doc["power_last_fault_age_ms"]=frame.faultAgeMs;
+    else doc["power_last_fault_age_ms"]=nullptr;
+    doc["power_last_fault_range_mask"] = faultCount ? previousFault.rangeMask : 0;
+    if(faultCount && std::isfinite(previousFault.rawBusV))doc["power_last_fault_raw_bus_v"]=previousFault.rawBusV;
+    else doc["power_last_fault_raw_bus_v"]=nullptr;
+    if(faultCount && std::isfinite(previousFault.rawShuntMv))doc["power_last_fault_raw_shunt_mv"]=previousFault.rawShuntMv;
+    else doc["power_last_fault_raw_shunt_mv"]=nullptr;
+    if(faultCount && std::isfinite(previousFault.rawCurrentMa))doc["power_last_fault_raw_current_ma"]=previousFault.rawCurrentMa;
+    else doc["power_last_fault_raw_current_ma"]=nullptr;
+
     doc["power_warning_schema"] = 1;
     doc["power_low_warning_active"] = power.lowWarning ? 1 : 0;
     doc["power_low_warning_elapsed_s"] = power.lowWarningElapsedMs / 1000;
@@ -444,7 +462,7 @@ void MqttManager::publishTelemetry() {
     doc["power_low_warning_required_s"] = BatteryPolicy::kLowWarningMs / 1000;
     doc["power_shutdown_voltage_v"] = m_controller.getConfig().voltageShutdownLimit;
     doc["power_shutdown_dwell_s"] = 3;
-    const auto read=m_controller.powerReadDiagnostics();
+    const auto read=frame.reading;
     doc["power_read_fault_code"]=static_cast<unsigned>(read.fault);
     doc["power_read_driver"]=read.driver;
     doc["power_read_config"]=read.configuration;
@@ -468,7 +486,7 @@ void MqttManager::publishTelemetry() {
     doc["power_charging_close_state"]=closeState;
     doc["power_charging_close_used"]=m_controller.chargingCloseAttemptUsed()?1:0;
     doc["current_scope"] = "MOTOR_BRANCH";
-    doc["motor_current_ma"] = m_controller.getMotorCurrent(); // FEAT-2: 모터 전류 추가
+    doc["motor_current_ma"] = frame.motorCurrent; // FEAT-2: 모터 전류 추가
     doc["distance_cm"] = m_controller.getDistance();
     doc["wifi_rssi"] = WiFi.RSSI();
     doc["free_heap"] = ESP.getFreeHeap();
