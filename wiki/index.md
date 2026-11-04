@@ -9,6 +9,8 @@ source_of_truth: true
 
 # SmartBox Wiki
 
+> 신규0.2.4 후보: [11.0V 이하 연속5분 배터리 경고](battery_warning_20261104.md). 기존 구동 보호와 분리하며 아직 설치/감시기 적용 전이다.
+
 > 2026-11-04 운영0.2.3-g1c09394 OTA 설치·새 부팅·유효 센서/통신 수용. 첫 스트림 오류 뒤 재시도 성공. [설치 증거와 남은 실물 Gate](ota_adoption_20261104.md). raw cutoff 읽기와 실제 저전압/충전 시험은 별도다.
 
 >2026-11-03 field0.2.2 is online with valid measurement. Owner-requested close is admitted then stops at11.211V under load; later requested open remains protected/actuation0. Physical lid position is unknown. See [field operation](field_power_operation_20261103.md).
@@ -81,3 +83,4 @@ source_of_truth: true
 
 - [11.0V 이하 보호 변경](low_voltage_threshold_20261104.md):0.2.3 후보, inclusive 경계·충전용 닫기·legacy NVS 전환과 수용 경계.
 \n- [0.2.3 OTA 설치 수용](ota_adoption_20261104.md): 첫 스트림 실패 보존, 재검증 뒤 새 버전/새 uptime/센서/UP_TO_DATE 확인 및 실물 Gate 분리.\n\n- [2026-11-04 충전용 닫기](field_close_20261104.md): 새0.2.3에서 명시1회 close_state2 정상 구동 종료, 부하/정지 전류 확인; 실물 위치/충전은 별도.\n
+- [11V/5분 배터리 경고](battery_warning_20261104.md): 장치 연속 측정 증명, NAS 경고 필터 및 고정 감시기 교체·수용 범위.

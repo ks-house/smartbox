@@ -353,7 +353,7 @@ void MqttManager::update() {
     }
 
     const auto power = m_controller.powerSnapshot();
-    if (m_mqttClient.connected() && (static_cast<int>(power.state) != m_lastPowerState || static_cast<int>(m_controller.chargingCloseState())!=m_lastChargingCloseState) &&
+    if (m_mqttClient.connected() && (static_cast<int>(power.state) != m_lastPowerState || static_cast<int>(m_controller.chargingCloseState())!=m_lastChargingCloseState || power.lowWarning!=m_lastLowWarning) &&
         millis() - m_lastPowerAttempt >= 1000) {
         m_lastPowerAttempt = millis();
         publishTelemetry();
@@ -437,6 +437,13 @@ void MqttManager::publishTelemetry() {
     else doc["battery_v"] = nullptr;
     doc["firmware"] = m_controller.getFirmwareVersion();
     doc["power_schema"] = 1;
+    doc["power_warning_schema"] = 1;
+    doc["power_low_warning_active"] = power.lowWarning ? 1 : 0;
+    doc["power_low_warning_elapsed_s"] = power.lowWarningElapsedMs / 1000;
+    doc["power_low_warning_voltage_v"] = BatteryPolicy::kLowWarningVoltage;
+    doc["power_low_warning_required_s"] = BatteryPolicy::kLowWarningMs / 1000;
+    doc["power_shutdown_voltage_v"] = m_controller.getConfig().voltageShutdownLimit;
+    doc["power_shutdown_dwell_s"] = 3;
     const auto read=m_controller.powerReadDiagnostics();
     doc["power_read_fault_code"]=static_cast<unsigned>(read.fault);
     doc["power_read_driver"]=read.driver;
@@ -486,7 +493,7 @@ void MqttManager::publishTelemetry() {
     doc["ip"] = WiFi.localIP().toString();
     output = ""; serializeJson(doc, output);
     const int sent = m_mqttClient.publish("smartbox/status", 1, true, output.c_str());
-    if (sent > 0) {m_lastPowerState = static_cast<int>(power.state);m_lastChargingCloseState=closeState;}
+    if (sent > 0) {m_lastPowerState = static_cast<int>(power.state);m_lastChargingCloseState=closeState;m_lastLowWarning=power.lowWarning;}
 }
 
 void MqttManager::publishBatchTelemetry(const TelemetryData* data, int count, const char* batchType) {

@@ -58,6 +58,7 @@ private:
 
     OwnerRequestGate m_ownerRequests;
     std::mutex m_ownerRequestMutex;
+    bool m_lastLowWarning=false;
     int m_lastChargingCloseState=-1;
     int m_lastPowerState = -1;
     unsigned long m_lastPowerAttempt = 0;

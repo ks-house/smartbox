@@ -18,9 +18,14 @@ import uuid
 
 ROOT=Path('/usr/local/lib/smartbox-power-monitor')
 NOTIFIER='/usr/syno/bin/synodsmnotify'
-STATES={0:'NORMAL',1:'LOW_BATTERY',2:'ENERGY_SAVING',3:'BATTERY_PROTECTED',4:'RECOVERY_WAIT',5:'POWER_SENSOR_FAULT',6:'INITIALIZING'}
+STATES={0:'NORMAL',1:'POWER_CAUTION',2:'ENERGY_SAVING',3:'BATTERY_PROTECTED',4:'RECOVERY_WAIT',5:'POWER_SENSOR_FAULT',6:'INITIALIZING'}
 FIELDS={'power_schema':'schema','power_sensor_valid':'valid','power_state_code':'state',
- 'power_report_interval_s':'interval_s','power_sample_age_ms':'sample_age_ms','battery_v':'voltage'}
+ 'power_report_interval_s':'interval_s','power_sample_age_ms':'sample_age_ms','battery_v':'voltage',
+ 'power_warning_schema':'warning_schema','power_low_warning_active':'warning_active',
+ 'power_low_warning_elapsed_s':'warning_elapsed_s','power_low_warning_voltage_v':'warning_voltage_v',
+ 'power_low_warning_required_s':'warning_required_s'}
+WARNING_FIELDS=('warning_schema','warning_active','warning_elapsed_s','warning_voltage_v','warning_required_s')
+POWER_ONLY_STATES={'NORMAL','POWER_CAUTION','ENERGY_SAVING','BATTERY_PROTECTED','RECOVERY_WAIT','INITIALIZING'}
 
 class SourceResponseError(RuntimeError):pass
 class SourceFormatError(ValueError):pass
@@ -45,19 +50,34 @@ def evaluate(sample,now,source_ok=True):
         age_ms=float(sample.get('sample_age_ms',999999))
         if sample.get('valid')!=1 or not math.isfinite(age_ms) or not 0<=age_ms<=2000 or not isinstance(voltage,(int,float)) or not math.isfinite(voltage) or not 0<voltage<=16:
             value['status']='POWER_SENSOR_FAULT';return value
-        value['voltage_v']=round(voltage,3);value['status']=STATES[code]
-        value['severity']='info' if code in (0,4,6) else 'warning'
+        value['voltage_v']=round(voltage,3);value['power_status']=STATES[code]
+        if any(k not in sample for k in WARNING_FIELDS) or sample['warning_schema']!=1:
+            value['status']='WARNING_POLICY_UNAVAILABLE';return value
+        active=sample['warning_active'];elapsed=sample['warning_elapsed_s']
+        if active not in (0,1) or not isinstance(elapsed,(int,float)) or not math.isfinite(elapsed) or not 0<=elapsed<=300 or int(elapsed)!=elapsed:
+            raise ValueError('invalid MCU warning qualification')
+        if sample['warning_voltage_v']!=11.0 or sample['warning_required_s']!=300:
+            raise ValueError('unexpected warning policy')
+        if bool(active)!=(elapsed==300) or (elapsed>0 and voltage>11.0):
+            raise ValueError('inconsistent warning proof')
+        value['battery_warning_active']=bool(active);value['warning_elapsed_s']=int(elapsed)
+        value['status']='LOW_BATTERY' if active else STATES[code]
+        value['severity']='warning' if active or code==5 else 'info'
         return value
     except (ValueError,TypeError,KeyError,OverflowError):
         value['status']='SOURCE_INVALID';return value
 
 def advance(previous,current,now):
-    state=dict(previous);status=current['status'];active=state.get('active','NORMAL')
+    state=dict(previous);mode=current['status']
+    # Power modes are observations, not owner low-battery notifications.
+    status='LOW_BATTERY' if current.get('battery_warning_active') is True else (
+        'NORMAL' if mode in POWER_ONLY_STATES else mode)
+    active=state.get('active','NORMAL')
     if state.get('candidate')!=status or now<state.get('candidate_since',now):
         state.update(candidate=status,candidate_since=now)
     event=None
-    dwell=60 if status in ('LOW_BATTERY','ENERGY_SAVING') else 0
-    if status!=active and now-state['candidate_since']>=dwell:
+    # The MCU already proves 300s of fresh samples. Repeated NAS reads add no time.
+    if status!=active:
         state['active']=status
         event={'id':uuid.uuid4().hex[:16],'status':'RECOVERED' if status=='NORMAL' else status,
                'severity':current['severity'],'at':int(now),'voltage_v':current['voltage_v']}
@@ -90,6 +110,7 @@ def parse_flux(text):
     if 'voltage' in values and values['voltage'][0]>at+0.001:
         return {'schema':0,'at':values['voltage'][0]}
     required=('schema','state','valid','interval_s','sample_age_ms')
+    if any(k in values for k in WARNING_FIELDS):required+=WARNING_FIELDS
     if any(k not in values or abs(values[k][0]-at)>0.001 for k in required):
         raise SourceFormatError('incomplete or mixed telemetry cohort')
     sample={k:v for k,(t,v) in values.items() if abs(t-at)<=0.001};sample['at']=at
@@ -126,7 +147,8 @@ def atomic(path,value):
     finally:
         if os.path.exists(tmp):os.unlink(tmp)
 
-MESSAGES={'LOW_BATTERY':'배터리 전압이 낮습니다. 충전 상태를 확인해 주세요.',
+MESSAGES={'LOW_BATTERY':'유효한 배터리 전압이 11.0V 이하로 5분 연속 유지됐습니다. 충전 상태를 확인해 주세요.',
+ 'WARNING_POLICY_UNAVAILABLE':'연속 저전압 경고 정책 자료가 없습니다. 설치 버전과 수집 경로를 확인해 주세요.',
  'ENERGY_SAVING':'배터리 절전 단계입니다. 감지는 유지하며 전송 빈도를 줄입니다.',
  'BATTERY_PROTECTED':'저전압 보호로 동작을 제한합니다. 충전 회복 후 자동 재개를 기다립니다.',
  'RECOVERY_WAIT':'충전 회복 전압의 안정성을 확인하고 있습니다.',
@@ -136,7 +158,7 @@ MESSAGES={'LOW_BATTERY':'배터리 전압이 낮습니다. 충전 상태를 확�
  'SOURCE_INVALID':'수집 자료의 시각 또는 형식이 올바르지 않습니다.',
  'LEGACY_FIRMWARE':'이 펌웨어에는 배터리 측정 유효성·보호 단계 정보가 없습니다.',
  'INITIALIZING':'배터리 상태를 초기 확인하고 있습니다.',
- 'RECOVERED':'SmartBox 감시 상태가 정상으로 돌아왔습니다. 최신 전압·자료 수신 상태를 확인해 주세요.'}
+ 'RECOVERED':'배터리 또는 통신 경고가 해제됐습니다. 장치의 보호 해제 여부는 별도로 확인해 주세요.'}
 
 def notify_owner(event,recipient):
     if not re.fullmatch(r'[A-Za-z0-9_-]{1,32}',recipient) or event['status'] not in MESSAGES or not re.fullmatch(r'[a-f0-9]{16}',event['id']):raise ValueError('closed notification')
@@ -153,7 +175,11 @@ def cycle(config,directory,now=None,fetch=fetch_sample,notifier=notify_owner):
     except SourceFormatError:current={'status':'SOURCE_INVALID','severity':'warning','voltage_v':None}
     except Exception:current=evaluate(None,now,source_ok=False)
     state,event=advance(previous,current,now)
-    pending=state.get('pending',[])
+    state['warning_policy_schema']=1
+    # Do not replay battery warnings queued by the superseded threshold policy.
+    pending=[e for e in state.get('pending',[])
+             if e.get('status') not in ('ENERGY_SAVING','BATTERY_PROTECTED','RECOVERY_WAIT','POWER_CAUTION')
+             and not (e.get('status')=='LOW_BATTERY' and current.get('battery_warning_active') is not True)]
     if event:
         pending.append(event)
         history=json.loads(regular(directory/'events.json')) if (directory/'events.json').exists() else []

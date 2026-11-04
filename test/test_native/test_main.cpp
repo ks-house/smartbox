@@ -1146,9 +1146,51 @@ void test_owner_11v_close_can_start_above_cutoff_but_not_at_it(void) {
  }
 }
 
+
+void test_low_warning_needs_11v_for_300s_despite_early_protection(void) {
+ BatteryPolicy p;
+ for(uint32_t now=0;now<300000;now+=1000){p.sample(now,11.0f,true,11.0f);TEST_ASSERT_FALSE(p.snapshot(now).lowWarning);}
+ TEST_ASSERT_TRUE(p.snapshot(299000).protectedMode);
+ p.sample(300000,11.0f,true,11.0f);TEST_ASSERT_TRUE(p.snapshot(300000).lowWarning);
+ TEST_ASSERT_EQUAL_UINT32(300000,p.snapshot(300000).lowWarningElapsedMs);
+ p.sample(301000,11.001f,true,11.0f);TEST_ASSERT_FALSE(p.snapshot(301000).lowWarning);
+ TEST_ASSERT_TRUE(p.snapshot(301000).protectedMode);
+}
+void test_low_warning_dip_invalid_or_gap_restart_continuity(void) {
+ for(int cause=0;cause<3;cause++){
+  BatteryPolicy p;uint32_t now=0;
+  for(;now<299000;now+=1000)p.sample(now,10.9f,true,11.0f);
+  if(cause==0)p.sample(now,11.1f,true,11.0f);
+  if(cause==1)p.sample(now,NAN,false,11.0f);
+  if(cause==2){now+=2001;p.sample(now,10.9f,true,11.0f);}
+  const uint32_t restart=cause==2?now:now+1000;
+  for(now=restart;now<restart+300000;now+=1000){p.sample(now,10.9f,true,11.0f);TEST_ASSERT_FALSE(p.snapshot(now).lowWarning);}
+  p.sample(now,10.9f,true,11.0f);TEST_ASSERT_TRUE(p.snapshot(now).lowWarning);
+ }
+}
+void test_low_warning_never_qualifies_above_11_or_from_stale_snapshot(void) {
+ for(float v:{11.001f,11.2f,11.6f,12.0f}) {
+  BatteryPolicy p;for(uint32_t now=0;now<=600000;now+=1000)p.sample(now,v,true,11.0f);
+  TEST_ASSERT_FALSE(p.snapshot(600000).lowWarning);
+ }
+ BatteryPolicy p;for(uint32_t now=0;now<=300000;now+=1000)p.sample(now,10.8f,true,11.0f);
+ TEST_ASSERT_TRUE(p.snapshot(300000).lowWarning);
+ TEST_ASSERT_FALSE(p.snapshot(302001).lowWarning);
+}
+void test_low_warning_u32_wrap_and_protection_calls_do_not_forge_time(void) {
+ BatteryPolicy p;uint32_t now=UINT32_MAX-10000;
+ for(int i=0;i<=300;i++){p.sample(now,11.0f,true,11.0f);if(i==100)p.restoreProtection();if(i<300)TEST_ASSERT_FALSE(p.snapshot(now).lowWarning);now+=1000;}
+ TEST_ASSERT_TRUE(p.snapshot(now-1000).lowWarning);
+}
+
 #ifdef NATIVE_BUILD
 int main(int argc, char **argv) {
     UNITY_BEGIN();
+    RUN_TEST(test_low_warning_needs_11v_for_300s_despite_early_protection);
+    RUN_TEST(test_low_warning_dip_invalid_or_gap_restart_continuity);
+    RUN_TEST(test_low_warning_never_qualifies_above_11_or_from_stale_snapshot);
+    RUN_TEST(test_low_warning_u32_wrap_and_protection_calls_do_not_forge_time);
+
     RUN_TEST(test_owner_11v_default_does_not_latch_at_field_sag);
     RUN_TEST(test_owner_11v_boundary_is_inclusive_with_original_dwell);
     RUN_TEST(test_owner_11v_charging_close_survives_previous_field_sag);
