@@ -1269,10 +1269,10 @@ class OpeningInrushHardware:public MockHardware {
  public:
  bool saturated=false;
  PowerReadFault fault=PowerReadFault::RANGE;
- float bus=10.084f,shunt=320,current=3200;uint8_t mask=6;
+ float bus=10.084f,shunt=320,current=3200;uint8_t mask=6,driver=1;
  PowerReading readPower() override {
   if(!saturated)return MockHardware::readPower();
-  PowerReading r{NAN,NAN,false,fault,1,0x399f,4096};
+  PowerReading r{NAN,NAN,false,fault,driver,0x399f,4096};
   r.rawBusV=bus;r.rawShuntMv=shunt;r.rawCurrentMa=current;r.rangeMask=mask;
   return r;
  }
@@ -1321,15 +1321,16 @@ void test_ultrasonic_open_uses_the_same_bounded_inrush_window(void) {
  hw.saturated=false;hw.advanceMillis(300);box.update();TEST_ASSERT_EQUAL(STATE_OPENING,box.getCurrentState());
 }
 
-void test_inrush_exception_rejects_unmatched_range_cohorts_and_closing(void) {
+void test_inrush_exception_rejects_unmatched_range_cohorts(void) {
  for(int scenario=0;scenario<6;scenario++) {
   OpeningInrushHardware hw;hw.setBatteryVoltage(12.5f);SmartBoxController box(hw);box.init();
-  if(scenario==5)box.forceClose();else box.forceOpen();box.update();hw.saturated=true;
+  box.forceOpen();box.update();hw.saturated=true;
   if(scenario==0)hw.bus=NAN;
   if(scenario==1)hw.mask=7;
   if(scenario==2)hw.shunt=330;
   if(scenario==3)hw.current=-3200;
   if(scenario==4)hw.bus=17;
+  if(scenario==5)hw.driver=0;
   hw.advanceMillis(200);box.update();
   TEST_ASSERT_EQUAL(STATE_SENSOR_RECHECK,box.getCurrentState());TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(6));
  }
@@ -1342,6 +1343,35 @@ void test_deferred_inrush_cannot_count_toward_ota_health(void) {
  hw.saturated=false;hw.advanceMillis(300);box.update();
  TEST_ASSERT_FALSE(box.powerSnapshot().otaReady);
 }
+void test_closing_inrush_can_settle_without_sensor_recheck(void) {
+ OpeningInrushHardware hw;hw.setBatteryVoltage(12.5f);SmartBoxController box(hw);box.init();box.forceClose();box.update();
+ hw.saturated=true;hw.advanceMillis(200);box.update();
+ TEST_ASSERT_EQUAL(STATE_CLOSING,box.getCurrentState());TEST_ASSERT_EQUAL(OUTPUT,hw.getPinMode(6));
+ TEST_ASSERT_FALSE(box.powerDiagnosticsFrame().reading.valid);TEST_ASSERT_FALSE(box.powerSnapshot().actuationAllowed);
+ hw.saturated=false;hw.setMotorCurrent(950);hw.advanceMillis(300);box.update();
+ TEST_ASSERT_EQUAL(STATE_CLOSING,box.getCurrentState());
+ for(int i=0;i<17;i++){hw.advanceMillis(200);box.update();}
+ TEST_ASSERT_EQUAL(STATE_IDLE,box.getCurrentState());TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(6));
+}
+void test_closing_inrush_deadline_cannot_be_extended_by_commands(void) {
+ OpeningInrushHardware hw;hw.setBatteryVoltage(12.5f);SmartBoxController box(hw);box.init();box.forceClose();box.update();
+ hw.saturated=true;hw.advanceMillis(200);box.update();
+ TEST_ASSERT_EQUAL(STATE_CLOSING,box.getCurrentState());
+ box.forceClose();box.forceOpen();box.startMaintenanceMode();
+ hw.advanceMillis(299);box.update();TEST_ASSERT_EQUAL(STATE_CLOSING,box.getCurrentState());
+ hw.advanceMillis(1);box.update();TEST_ASSERT_EQUAL(STATE_SENSOR_RECHECK,box.getCurrentState());
+ for(int p:{6,7,8})TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(p));
+}
+void test_closing_inrush_keeps_real_fault_and_protected_close_immediate_stop(void) {
+ for(auto fault:{PowerReadFault::CURRENT_IO,PowerReadFault::PROFILE_MISMATCH}) {
+  OpeningInrushHardware hw;SmartBoxController box(hw);box.init();box.forceClose();box.update();
+  hw.saturated=true;hw.fault=fault;hw.advanceMillis(200);box.update();
+  TEST_ASSERT_EQUAL(STATE_SENSOR_RECHECK,box.getCurrentState());TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(6));
+ }
+ OpeningInrushHardware hw;hw.setBatteryVoltage(12.5f);SmartBoxController box(hw);box.setInitialState(STATE_BATTERY_LOW_SHUTDOWN);box.init();box.update();
+ TEST_ASSERT_TRUE(box.requestChargingClose());hw.saturated=true;hw.advanceMillis(200);box.update();
+ TEST_ASSERT_EQUAL(ChargingCloseState::SENSOR_FAULT,box.chargingCloseState());TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(6));
+}
 
 #ifdef NATIVE_BUILD
 int main(int argc, char **argv) {
@@ -1351,8 +1381,11 @@ int main(int argc, char **argv) {
     RUN_TEST(test_opening_inrush_never_masks_real_sensor_fault_or_idle_fault);
     RUN_TEST(test_repeated_open_cannot_extend_inrush_window);
     RUN_TEST(test_ultrasonic_open_uses_the_same_bounded_inrush_window);
-    RUN_TEST(test_inrush_exception_rejects_unmatched_range_cohorts_and_closing);
+    RUN_TEST(test_inrush_exception_rejects_unmatched_range_cohorts);
     RUN_TEST(test_deferred_inrush_cannot_count_toward_ota_health);
+    RUN_TEST(test_closing_inrush_can_settle_without_sensor_recheck);
+    RUN_TEST(test_closing_inrush_deadline_cannot_be_extended_by_commands);
+    RUN_TEST(test_closing_inrush_keeps_real_fault_and_protected_close_immediate_stop);
     RUN_TEST(test_sensor_stop_inhibition_survives_recovery_ota_cleanup);
     RUN_TEST(test_sensor_glitch_does_not_create_persistent_battery_hold);
     RUN_TEST(test_sensor_recheck_cannot_clear_genuine_low_hold);

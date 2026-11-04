@@ -9,7 +9,7 @@ source_of_truth: true
 
 # SmartBox Wiki
 
-> 열기 장애: [기동500ms 유예와 범위 검사 충돌](opening_inrush_20261104.md). 수동·초음파 동일 중단.0.2.6은 제한 수정 후보이며 실제 개방은 미확인이다.
+> 현재: [0.2.6 설치·실제 열림 확인 및0.2.7 닫기 후속](opening_inrush_20261104.md). 사용자가 실제 개방을 확인했다. 자동 닫기 기동 범위 중단도 확인되어 일반 CLOSING의 동일500ms 유예를 준비한다. 닫힘·충전은 미수용이다.
 
 > 현재2026-11-04: [0.2.5 OTA 설치·정상 대기 수용](sensor_recheck_20261104.md). 순간 센서 범위 오류와 persistent battery hold를 분리하고 NAS11V/300초 경고 감시기 교체도 수용했다. 실제 개폐·range raw subcause는 별도다.
 

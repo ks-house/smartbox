@@ -57,7 +57,7 @@ void SmartBoxController::init() {
     
     lastPowerReading=hw.getMillis();
     lowBatteryOpening=false;
-    openingInrushPending=false;
+    motorInrushPending=false;
     if(initialState==STATE_BATTERY_LOW_SHUTDOWN) batteryPolicy.restoreProtection();
     readSensors();
 
@@ -328,7 +328,7 @@ void SmartBoxController::forceOpen() {
 
 void SmartBoxController::forceClose() {
     std::lock_guard<std::recursive_mutex> lock(dataMutex);
-    if(openingInrushPending)return; // No new admission from a deferred power cohort.
+    if(motorInrushPending)return; // No new admission from a deferred power cohort.
     if (powerSnapshot().actuationAllowed && currentState != STATE_SENSOR_RECHECK && currentState != STATE_OTA_UPDATING &&
         currentState != STATE_BATTERY_LOW_SHUTDOWN && currentState != STATE_EMERGENCY_STOP) {
         if (currentState != STATE_CLOSING && currentState != STATE_CLOSE_START) {
@@ -414,8 +414,8 @@ void SmartBoxController::readSensors() {
     // TI INA219: positive full-scale shunt/current is a lower bound, not an
     // accurate current or a failed I2C transfer. Respect the established motor
     // startup window, but NEVER label this cohort valid or extend the window.
-    const bool deferInrush=!completeValid && currentState==STATE_OPENING && !relaysIsolated &&
-        uint32_t(hw.getMillis()-stateTimer)<kOpeningInrushMs &&
+    const bool deferInrush=!completeValid && (currentState==STATE_OPENING || currentState==STATE_CLOSING) && !relaysIsolated &&
+        uint32_t(hw.getMillis()-stateTimer)<kMotorInrushMs &&
         reading.fault==PowerReadFault::RANGE && reading.driver==1 &&
         reading.configuration==0x399f && reading.calibration==4096 && reading.rangeMask==6 &&
         std::isfinite(reading.rawBusV) && reading.rawBusV>0 && reading.rawBusV<=16 &&
@@ -433,7 +433,7 @@ void SmartBoxController::readSensors() {
         if(powerFaultEpisodes<UINT32_MAX)++powerFaultEpisodes;
     }
     latestPowerRead=reading;
-    openingInrushPending=deferInrush;
+    motorInrushPending=deferInrush;
     if(reading.valid && std::isfinite(reading.voltage) && std::isfinite(reading.currentMa))lastVerifiedVoltage=reading.voltage;
     batteryVoltage=reading.voltage; motorCurrent=reading.currentMa;
     // Keep the previous voltage's original timestamp. No synthetic voltage,
@@ -447,7 +447,7 @@ bool SmartBoxController::servicePower() {
     const bool moving=isMotorRunning();
     const unsigned long period=before.protectedMode && !moving ? 1000 : 200;
     if(hw.getMillis()-lastPowerReading>=period ||
-       (openingInrushPending && uint32_t(hw.getMillis()-stateTimer)>=kOpeningInrushMs)) {
+       (motorInrushPending && uint32_t(hw.getMillis()-stateTimer)>=kMotorInrushMs)) {
         lastPowerReading=hw.getMillis(); readSensors();
     }
     const auto after=powerSnapshot();
