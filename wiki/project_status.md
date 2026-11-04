@@ -14,6 +14,11 @@ applies_to:
 
 # 현재 프로젝트 상태
 
+> 2026-11-04: [0.2.3 후보/11.0V 이하 보호](low_voltage_threshold_20261104.md) 구현 및 검증 중. 이전11.3V 저장값 전환 포함. 현장 적용은 아직 확인하지 않았다.
+
+> 2026-11-03 source candidate0.2.2 adds owner close-only/forced OTA and12.0V/300s recovery. [Current contract](battery_power_management.md). 2026-11-03 same-board USB write/readback and actual0.2.2-gdb96897 nativeUSB boot/30s loop are now confirmed. Bare-board INA219 absence is owner-confirmed; field sensor/physical close/charging/network/OTA acceptance remain pending.
+
+
 > MCU publication baseline: `7a55dd8253fc50681897b0ebe67292499bb10657` (0.2.0-g7a55dd8; installed acceptance unconfirmed)
 >
 > 이 문서는 checkout에서 확인한 구현을 설명한다. 현장 설치 또는 실기기 합격을 자동으로 뜻하지 않는다.
@@ -156,3 +161,40 @@ Physical lid/electrical/rollback qualification remains distinct.
 ## 2026-10-31 automatic battery recovery candidate
 
 [Battery power management](battery_power_management.md) describes the owner-approved automatic recovery, profile validity, savings, OTA reservation and monitoring. Source verification passes37 native/76 Python (9 environment skips)/C6 dummy compilation. Reviewed production publication, installed recovery and monitoring acceptance remain separate; no local dummy image is eligible for deployment.
+
+
+## 회귀 수정 후보0.2.1 (미적용)
+
+- 업데이트 직전 정상 값과 이후 전부 무효인 이력을 근거로 커스텀 INA219 경로를 우선 회귀 지점으로 다룬다. 현장 센서 고장으로 단정하지 않는다.
+- 기존 연속 측정 API 복귀, 읽기 성공/프로파일/보정/범위 검증과 단계별 진단을 추가했다.
+- 현재0.2.0의 센서 오류가 강제/자동 OTA를 함께 차단하는 복구 경로 결함도 확인했다. 후보는 명시적·만료·단발·출력 격리 유지 복구 경로를 분리하지만 현재 바이너리에 소급 적용할 수 없다.
+- [수정 후보와 증거 경계](ina219_regression.md)를 따른다. 실제 장치는 여전히0.2.0/SENSOR_FAULT이며 후보 설치·정상 측정 복구는 완료하지 않았다.
+
+### 2026-11-01 KST — additional remote recovery attempt
+
+- Exact installed0.2.0 accepts a separate MQTT reboot despite OTA lockout. Owner-authorized one-shot recovery reboot at01:09:04KST uses fresh protected sensor-fault admission, QoS0/non-retained and a durable no-resend intent. Fresh online + uptime12931ms confirms new boot; later retained status uptime300933ms and a fresh collector receipt still report sensor invalid/null voltage. This did not restore measurement or install0.2.1.
+- No registered dedicated HA power switch, field Tailnet route/jump host or installed Wi-Fi uploader was found. Scheduled reboot/config/protection release cannot supply the missing OTA admission. Matching installed Arduino3.3.11 SDK default confirms an image before sensor health and no app rollback command exists; actual OTA flash state remains unqueried.
+- Keep PR22 Draft/unmerged, version manifest held and power observer active. See [remote path evidence](ina219_regression.md#additional-remote-recovery-investigation-2026-11-01-kst). No further autonomous restart/OTA/motion trial is queued.
+
+### 2026-11-01 — field recovery preparation
+
+Owner requests an offline USB recovery kit; no new remote device action. Correction includes bounded version/typed INA219 Serial diagnostics and an explicit16MB image/bootloader header setting, previously inherited as8MB despite the16MB table. A native-USB field profile enables CDC with zero TX wait; normal UART profile is retained for ordinary builds. Actual hardware flash size, USB enumeration and commissioning remain pending.
+
+The private production bundle is built only on explicit exact-commit dispatch and uploaded only as AES256-GCM CMS ciphertext. The Windows tool defaults to offline verification, snapshots overwritten sectors/settings, writes app0+otadata only and keeps commissioning manual. [Equipment and field procedure](field_recovery.md). PR22 and release hold remain until real field acceptance.
+
+### 2026-11-02 — actual bare-board USB installation and boot confirmed
+
+Owner physically isolates motor/external board5V and connects the bare SmartBox. Actual ESP32-C6 rev0.2/16MB/security-disabled and unchanged original bootloader/table/NVS are verified.0.2.1-g4a57756 is written/readback-verified on COM5, and actual firmware-version plus periodic diagnostic logs confirm boot on nativeUSB COM6 of the same MCU. Sensor absent: fault10 is expected; field sensor/charging/motor/network/OTA acceptance remains pending. See [bench record](bench_usb_acceptance.md). Older0.2.0 deployment notes are history.
+
+### 2026-11-02 — actual field measurement resumes after reinstallation
+
+Owner reports reinstallation. Logged-in Grafana Explore provides five actual collector receipts19:10:01/19:14:49/19:19:50/19:24:49/19:29:49KST with varying voltage11.98802/11.96804/12.00404/12.00004/12.00006V. Each frame valid1/fault0/driver1/config14751(0x399f)/calibration4096; sample age at latest publication831ms. Device uptime advances12853→1200884ms, consistent with the same boot for20min and5min reports. This accepts the corrected measurement path in the field, not absolute DMM calibration.
+
+Latest state3/PROTECTED, actuation_allowed0, recovery_count0, remaining300s, recovery_voltage12.4V. The release dwell has not started because voltage remains below12.4;300s is not a promise of recovery five minutes after this check. Since-boot minimum11.78005V, motor branch current0.1mA, Wi-Fi RSSI-57dBm. Motor-branch current cannot establish whole-battery/solar charging current. Actual charged recovery, motor/lid action and independent OTA health remain pending; no device command sent.
+
+Signed SSH status authenticates but fails at noninteractive sudo with password required. Grafana/database and current collector reads work, so do not misclassify this as device/network loss. No credentials/permissions/settings changed. The root-only observer/notification runtime state and exact current firmware string were not independently queried in this turn.
+
+
+## 2026-11-03 field operation follow-up
+
+[Measured operation](field_power_operation_20261103.md) confirms actual0.2.2 field measurement/network. One requested close is interrupted by11.211V under-load cutoff; later requested open remains protected. Full lid position/charging remain unknown, not accepted.

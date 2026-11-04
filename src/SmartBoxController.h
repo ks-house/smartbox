@@ -21,6 +21,8 @@ public:
 extern MockSerial Serial;
 #endif
 
+enum class ChargingCloseState : uint8_t { NONE=0, RUNNING=1, STROKE_FINISHED=2, LOW_VOLTAGE=3, SENSOR_FAULT=4, OVERCURRENT=5, EXPIRED=6, CANCELLED=7 };
+
 enum State {
   STATE_IDLE,
   STATE_OPEN_START,
@@ -46,7 +48,7 @@ struct BoxConfig {
   unsigned long actuatorTime = 3800;
   unsigned long waitTime = 10000;
   unsigned long cooldownTime = 3000;
-  float voltageShutdownLimit = 11.3f;
+  float voltageShutdownLimit = BatteryPolicy::kDefaultCutoffVoltage;
   float currentStallLimit =
       3000.0f; // Dual actuator: 100N/60mm/s x2 @ 12V, normal run ~2000mA
   unsigned long emergencyRecoveryTime =
@@ -81,6 +83,12 @@ private:
   unsigned long lastPowerReading = 0;
   bool lowBatteryOpening = false;
   bool servicePower();
+  bool chargingCloseActive=false, chargingCloseUsed=false;
+  ChargingCloseState chargingCloseResult=ChargingCloseState::NONE;
+  uint32_t chargingCloseAt=0,chargingCloseRequestAt=0,chargingCloseTtl=0;
+  int chargingCloseStalls=0;
+  void stopChargingClose(ChargingCloseState reason);
+  bool chargingClosePowerSafe() const;
   float batteryVoltage;
   float motorCurrent;
   float currentDistance;
@@ -101,6 +109,10 @@ private:
   // Calibration flag to enforce one-time complete open/hold/close cycle on boot
   bool isCalibrationPhase;
   mutable std::recursive_mutex dataMutex;
+  PowerReading latestPowerRead{NAN,NAN,false};
+  float lastVerifiedVoltage=NAN; // Admission evidence only; never publish as current voltage.
+  bool otaRecoveryReserved=false,otaRecoveryUsed=false,otaMaintenanceReserved=false;
+  uint32_t otaRecoveryAt=0;
 
   void updateDistanceBuffer();
   float getFilteredDistance();
@@ -143,14 +155,17 @@ public:
       std::lock_guard<std::recursive_mutex> lock(dataMutex);
       return batteryPolicy.snapshot(static_cast<uint32_t>(hw.getMillis()));
   }
-  bool canStartOta() const {
-      std::lock_guard<std::recursive_mutex> lock(dataMutex);
-      return currentState == STATE_IDLE && batteryPolicy.snapshot(static_cast<uint32_t>(hw.getMillis())).otaReady;
+  PowerReading powerReadDiagnostics() const {
+      std::lock_guard<std::recursive_mutex> lock(dataMutex);return latestPowerRead;
   }
-  bool tryBeginOta();
+  bool canStartOta(bool sensorFaultRecovery=false,bool forceMaintenance=false) const;
+  bool tryBeginOta(bool sensorFaultRecovery=false,bool forceMaintenance=false);
   bool canContinueOta() const;
   void servicePowerDuringOta();
   void finishOtaWithoutReboot();
+  bool requestChargingClose(uint32_t ttlMs=120000);
+  ChargingCloseState chargingCloseState() const;
+  bool chargingCloseAttemptUsed() const {std::lock_guard<std::recursive_mutex> lock(dataMutex);return chargingCloseUsed;}
   void forceOpen();
   void forceClose();
   void resetEmergency();
@@ -165,7 +180,7 @@ public:
 #ifdef FIRMWARE_VERSION_OVERRIDE
   static constexpr const char *FIRMWARE_VERSION = FIRMWARE_VERSION_OVERRIDE;
 #else
-  static constexpr const char *FIRMWARE_VERSION = "0.2.0";
+  static constexpr const char *FIRMWARE_VERSION = "0.2.3";
 #endif
   const char *getFirmwareVersion() const { return FIRMWARE_VERSION; }
 

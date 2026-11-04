@@ -266,3 +266,147 @@ source_of_truth: true
 
 - Runtime retry33367ae2 succeeds under systemd219: observer active, existing identity reused, POWER_SENSOR_FAULT and pending0.22:13 final589aaefe verifies repeated observations, exactly one notification accepted22:08:16KST, collector/candidate/manifest-hold/API preserved. No device command.98 Python total/89 PASS/9 explicit skips, native37/C6 PASS; narrow static review has no Critical/Important findings.
 - Separate new dashboard-only receipt-age query uses latest battery_v OR power_schema. This fixes stale-age display when the valid new protocol deliberately omits voltage. Narrow review passes; actual Influx queryea506a57 returns133.7s. UI import and hosted exact-head check follow.
+
+
+## [2026-11-01] fix | Prepare firmware-first INA219 regression correction without claiming live repair
+
+- Owner correctly raises before/after regression and requests remote correction without field access. Remote history21 invalid/0 valid/no minimum voltage,206900B free heap and advancing uptime; old varying12.12V/current differs from nominal dummy. Exact0.2.0 reject stage is not exported, so do not declare hardware failure or an exact register cause.
+- Controlled production rollback to known Adafruit continuous0x399F/4096, per-read success/readback/finite/range checks,50ms baseline timeout/2ms first conversion/5s bounded re-probe. No fake nominal readings. Add numeric fault/config/calibration/driver diagnostics and a read-only request on existing topics.
+- Confirm in source that current0.2.0 rejects both forced and automatic OTA on invalid sensor; no alternate uploader exists. Candidate adds explicit authenticated control recovery with fresh nonce/TTL, no retained/replay, stable boot/protected HIZ/no motor/recent sample/once-per-boot reservation and final preflash checks. Automatic/normal OTA and GPIO/interlocks stay unchanged. It cannot retrofit current0.2.0; no device command or release unhold is performed.
+- Independent review2 Important findings reproduced RED/fixed GREEN: preserve unsafe verified voltage through NaN failure and check original TTL at the last flash gate. New queue coordination/cleanup issues also reproduced RED/fixed GREEN; targeted queue review has no new Critical/Important finding. Current focused native46 and actual updater16 tests PASS; full suite/C6 final gates follow.
+
+- Final local gates:107 Python tests total/98 executed PASS/9 explicit environment skips (including16 actual updater host scenarios), native46 PASS, ESP32-C6 public-dummy build PASS; RAM62324/327680B and flash1355650/6553600B. The final C6-only missing cstring include was corrected and the full suite rerun. Production image publication and field acceptance remain blocked; no local dummy binary is published.
+
+## [2026-11-01] test | Investigate and attempt one independent remote processor restart
+
+- Owner authorizes further remote recovery without field access. Re-audit exact7a55 installed commands, boot hold and initialization. Separate MQTT reboot exists independently of OTA gate. Five held/invalid boot cases and11 fresh-admission cases PASS; missing-hold/valid-critical negative control retains the intentional fail-open branch, so no universal no-motion or physical NVS proof is claimed.
+- Existing Windows Tailnet has no field route/jump host; Wi-Fi routes have no uploader; config/emergency/maintenance cannot add sensor recovery. Installed CI confirms Arduino3.3.11/libs5.5.5; matching SDK rollback default confirms the app before sensor checks, with no application rollback command. Do not attempt a reboot loop or speculative partition selection.
+- Durable exclusive intent jobe12d21c5 admits one fresh actual0.2 sensor-fault/protected frame and sends one QoS0/non-retained reboot at01:09:04KST, no OTA/motion command or resend. Fresh online + uptime12931ms confirms new boot, still sensor_valid0/state5/null power; manifest hold preserved. Additional read-only registry/passive observation follows.
+
+- Read-only follow-up727813a7 at01:17:24KST:25 SmartBox HA entities are MQTT-derived, no dedicated power switch.90s subscriber gets no new telemetry but retained status advances to uptime300933ms with SENSOR_FAULT/null voltage; separate observer/collector receipt is88.6s old at01:16:43KST and still invalid. Keep retained/live evidence distinct; new boot continued for5min without measured recovery. API/candidate/release hold unchanged. Candidate source remains uninstalled; no further reboot or OTA retry.
+
+- Documentation consistency, Python107 total/98 PASS/9 explicit skips, native46 and public-dummy C6 build PASS again after this investigation. No product source or operating firmware publication is changed by this follow-up.
+
+## [2026-11-01] code | Prepare private offline USB field recovery kit
+
+- Owner asks for equipment, actual corrected firmware and ready field steps. Add exact-commit/explicit-dispatch private field build: existing Actions provisioning stays in runner, only CMS AES256-GCM ciphertext and sanitized hashes uploaded. Local recipient private key remains owner-private in WSL. No operating publication, manifest unhold or device command.
+- Guarded Windows tool defaults to offline plan, requires physical motor isolation and USB-only board power, rejects unknown/secure/8MB/layout mismatches, snapshots changed sectors and first64KiB, flushes disk+durable metadata, writes only otadata/app0, explicitly verifies and checks NVS/table/bootloader unchanged. Same-MAC/hash-bound restore does not claim restored version. Vendor bounded internal retry is explicitly permitted only under supervised fixed-board isolation; own retry loop absent and configuration pinned.
+- Fresh review identifies8MB inherited image header, durable backup and restore-version reporting issues; fix and reproduce8MB rejection RED→GREEN. Official esptool5.3.0 release digest/executable hash verified, actual Windows version command succeeds.9 crypto/header/layout tests and13 Windows5.1 guards PASS; full116 Python/native46/default C6 gates PASS. Field USB profile build and hosted/private production build follow.
+- Add native USB field profile plus zero TX wait, offline startup version and5s typed sensor diagnostics. Standard UART profile preserved. Both C6 configurations explicitly16MB; local default app+bootloader headers now nibble4. Hardware flash capacity remains unverified and8MB aborts.
+- Korean field guide covers data cables/meter/R100 INA219 spare, single-source USB power, physical motor isolation,3.3V I2C logic, real Vin+ supply versus expected unpowered0V, sensor fault branches and12.4V/300s recovery acceptance. Correct INA219 VCC/pull-up wording in wiring guide without claiming field wiring fault. General NAS backup remains deferred. CP210x vendor download unavailable; native USB field path and official driver reference provided.
+
+- Native USB field C6 build PASS with16MB app/bootloader headers; source HWCDC review confirms zero-wait output and no host-wait loop. Focused independent review finds no remaining Critical/Important under the explicit supervised vendor-retry contract. Offline9 Python and13 Windows guard cases remain green; physical USB enumeration/runtime timing is pending.
+
+## [2026-11-02] fix | Apply actual USB recovery and correct persistent-stub baud
+
+- Owner confirms SmartBox motor12V/external5V removed and USB-only power. COM5 CH343 identifies actualC6 rev0.2/16MB and security-disabled. First460800 attempt fails before writes; default-reset115200 then no-reset115200 succeeds. Reproduce session speed drift in host transport tests, pin wrapper/module115200 and reject unsupported speed before transport.14 Windows guards PASS.
+- Original changed app0 sectors and first64KiB/otadata saved privately before one successful guarded write.0.2.1-g4a57756/1403584B/SHA6f58191c02128af4e98dba155179bbdac0314f35dae1a7b7323136db60b7cff6 written/verified. Original bootloader/table/NVS first0xe000 bytes unchanged. No erase-all or motor command.
+- Owner transfers to second nativeUSB COM6; same MCU identity and actual SYSTEM Firmware version plus five periodic POWER-DIAG samples confirm application boot. Owner confirms only bare board/no INA219; fault10/invalid readings do not prove a connected sensor fault. Real field voltage/charged recovery/actuation/OTA gates remain open. Preserve manifest hold and private backups; no NAS configuration change.
+
+- Final local follow-up:14 Windows transport guards,116 Python tests total/107 PASS/9 explicit environment skips, native46 PASS, normal UART and nativeUSB field C6 builds PASS. The installed credentialed image is unchanged; only recovery-tool baud defaults and acceptance records change.
+
+- Synchronize the regression page current-status banner with actual bare-board installation; original incident observations remain historical and field measurement acceptance remains open.
+
+## [2026-11-02] test | Confirm field voltage measurement recovery and protected low-charge wait
+
+- Owner reinstalls SmartBox. Signed-maintenance SSH status fails at sudo password-required; NAS Tailnet online/Grafana health200. Use existing logged-in Grafana read-only Explore, no credential extraction or permission change.
+- Inspect data frame JSON from the displayed query:5 collector receipts19:10:01–19:29:49KST, valid1/fault0/driver1/config0x399f/cal4096; voltage11.96804–12.00404V, latest12.00006V. Uptime12853→1200884ms and5min cadence show same-boot20min execution. Sample age831ms; no stale retained status substituted.
+- State3/protected, actuation0, release threshold12.4V/dwell300s/count0. Field measurement accepted; charging/dwell/physical movement/OTA health remain open. Minimum11.78005V/current motor branch0.1mA/RSSI-57 recorded without claiming solar charging or whole-device energy.
+- Exact firmware string and root-only monitor/notification state not independently available through this numeric query. Preserve prior USB boot evidence separately. No motor/OTA/reboot/diagnostic publish; no operating settings changed. Save UI dataframe receipt and dashboard proof, close temporary Explore tab.
+
+- Documentation checks: native46 PASS, default ESP32-C6 build PASS; relative links and no secret/artifact staging checked. No product behavior changes in this observation.
+
+
+## [2026-11-03] compile | Specify owner-requested close-only charging recovery
+
+- Owner reports the field lid must close for solar charging and explicitly chooses close-only recovery rather than general protection disable. Inspect installed-source forceClose/servicePower/OTA admission: protective latch currently denies close, maintenance and valid-low-voltage OTA. No existing configuration command clears this latch.
+- Draft explicit one-shot close with valid above-cutoff sensor evidence, retained/replay/expiry rejection, preserved relay interlocks/current/time guards, retained protection and normal detection only after existing charged dwell. Design remains pending approval; no product code/install/actuator/OTA/reboot or permission changes.
+- Signed-maintenance status still fails sudo password-required after SSH authentication; browser inventory reports local browser disabled. No fresh field voltage claim and no reused prior receipt as current state.
+
+- Owner additionally requests forced OTA. Extend the proposal with explicit same-version/low-protection maintenance admission, short authenticated request lifetime and one-per-boot reservation, preserving TLS/auth/held-manifest refusal and previous bootable slot. Actual synchronous updater interruption must be verified, not assumed. No firmware or device changes yet.
+
+- Baseline before implementation: native46 PASS; Python116 total/107 executed PASS/9 environment skips; default ESP32-C6 C6 build PASS. Python guard apply output belongs to isolated test fixture, not a NAS operation. Restore generated version header. Product behavior and deployed image remain unchanged.
+
+
+## [2026-11-03] code | Implement one-shot charging close and lower qualified recovery
+
+- Owner approves design and additionally requests lower protection criterion: release max(12.0V,cutoff+0.7V)/300s; default11.3V motor cutoff retained. New12.0V dwell regression failed on original policy then passed.
+- Controller explicit charging close remains within existing BATTERY_LOW_SHUTDOWN, one attempt per boot, <=3800ms, actual pre-drive and post-contact fresh power reads, low-voltage/invalid read/current-magnitude stop, fully isolated terminal outputs and latched protection. Standard force_close/open unchanged. New behavioral tests fail against nonfunctional interface then pass; no automatic physical stroke requested.
+- Native53 PASS, Python116 total/107 PASS/9 environment skips, default C6 build PASS. This checkpoint is source only; MQTT command/forced OTA integration follows. Existing deployed0.2.1 still has old admission. Generated header restored; no operating firmware/manifest/service/permission changes.
+
+
+## [2026-11-03] code | Add durable owner commands and explicit forced OTA
+
+- New close_for_charging/force_ota commands validate32hex IDs, bounded absolute expiry, retained/duplicate rejection and monotonic expiry watermark persisted before actuation. A storage boundary regression proves load/save failure and replay after reconstructed boot reject. HA command_template emits fresh per-press IDs/60s expiry under existing broker control ACL; two discovery buttons and numeric result/admission fields added.
+- Forced OTA requires fresh valid voltage above max(11.7V,cutoff+0.4V) for30s, uptime120s, stopped motor and atomic isolation. It permits reinstalling the same manifest version and bypasses general recovery latch only for explicit maintenance; final original TTL/power check, failed-state protection and shared once-per-boot reservation retained. Automatic and legacy sensor-fault recovery compatibility remain.
+- Upstream pinned Arduino Update source _verifyEnd validates the completed inactive image before esp_ota_set_boot_partition. No claim of guaranteed mid-stream cancellation or postboot health rollback. Normal operating manifest hold and prior image remain unchanged.
+- New forced updater four scenarios fail before implementation then pass; native57 PASS and actual-updater20 PASS. Full Python120 total/111 PASS/9 environment skips. Final both-profile builds and independent review follow. No device command/publish, physical close or installed0.2.2 claim.
+
+- Final pre-review integration checks: native57 PASS; Python120 total/111 executed PASS/9 environment skips; UART and nativeUSB C6 builds PASS. Power/close reporting caches update only after accepted telemetry publish; no permanent1Hz status loop introduced. Generated version header restored.
+
+- Private field builder had a historical hard-coded0.2.1 identity that would reject the requested0.2.2 image. New release-image regression reproduces rejection; derive exact base version from the single source literal and retain commit/image binding, rather than relabeling a prior image. Focused source/identity regressions follow. Old installed kit/receipts are preserved.
+
+
+## [2026-11-03] fix | Recheck original forced OTA expiry immediately before flash
+
+- Fresh read-only whole-change reviewer identifies one Important: the last preflash TTL condition still covers only sensor-fault recovery. Actual updater fixture reproduces force TTL1000ms/contact500ms/final delay600ms entering flash after expiry. Add forced final-expiry scenario RED, extend final condition to both maintenance modes, then run GREEN/full suites. No re-review cycle or device command.
+- Synchronize newly written current-status wording to approved/implemented0.2.2 source and12.0V recovery; old operating0.2.1 acceptance remains separate. Private builder now derives semantic version from the source literal;11 exact-image/layout/encryption tests PASS including0.2.2 and ambiguous-source rejection.
+
+- Final fix-pass validation: final forced-expiry regression GREEN (zero flash), full Python123 total/114 executed PASS/9 environment skips, native57 PASS, both UART/nativeUSB C6 builds PASS. Relative Markdown file links/diff check and example-only local provisioning PASS. Fresh reviewer found no Critical and one Important, now covered by RED→GREEN regression; no additional review round. Physical installation/lid/charging/live HA template/NVS hardware/hosted CI acceptance remain separate.
+
+
+## [2026-11-03] fix | Accept verified new release identity in Windows field tool
+
+- Real encrypted/private0.2.2-gdb96897 image assembled and authenticated; actual Windows plan exposed a second historical0.2.1-only version pin in Get-SmartBoxKit. Parametrize the complete host fixture for new release and reproduce rejection RED; allow semantic release version while retaining exact clean commit/image/layout/hash checks.14 cases PASS for0.2.2 and14 for0.2.1, actual plan passes with device_contacted=false.
+- Both hosted runs41591578580/41591748462 PASS at firmware commitdb96897; normal production publisher skipped. Actual image1410336B/SHA86fbf0dfee64a245cafd13839ecb05e2c1c435a93ea1efd7f3affb4d54427bb9 remains uninstalled. Owner-only new kit/receipt/hash list preserve all prior0.2.1 kits/backups. USB first adoption or old OTA conditions are still required; no physical close acceptance claimed.
+
+
+## [2026-11-03] compile | Prepare OTA pair while owner cannot connect USB
+
+- Owner cannot connect USB and requests OTA preparation. Use existing write_release_metadata contract to prepare the authenticated0.2.2-gdb96897 firmware/version/hash/build identity pair privately on WSL and owner-only Windows. Exact bytes remain1410336B/SHA86fbf0dfee64a245cafd13839ecb05e2c1c435a93ea1efd7f3affb4d54427bb9; no NAS staging, operating publication, trigger or installation.
+- Latest host-tool source38bb0ca CI41592656496 PASS, including Windows guards and both C6 profiles; firmware/private CI41591578580/41591748462 already PASS atdb96897. Windows and WSL candidate receipts explicitly preserve false nas_staged/ota_triggered/installed. Add ordered readiness/pair preservation/authenticated-readback/single-trigger/new-boot acceptance runbook.
+- Existing0.2.1 valid-low-protection OTA limitation cannot be retrofitted by a candidate manifest. Source-level forced maintenance becomes available only after first compatible installation. Signed-root sudo failure and disabled browser prevent live readiness verification; do not infer current voltage from prior telemetry or send speculative OTA. USB remains deferred as requested.
+
+
+## [2026-11-03] test | Write and verify corrected0.2.2 on owner-connected SmartBox
+
+- Owner explicitly confirms SmartBox/USB-only with motor12V and external5V removed. Read-only identification matches the prior C6 MCU; kit21 file hashes and exact credentialed0.2.2-gdb96897/1410336B/SHA86fbf0dfee64a245cafd13839ecb05e2c1c435a93ea1efd7f3affb4d54427bb9 verified before Apply.
+- One115200 guarded write invocation completes written_verified; original app0/first64KiB/otadata backup20261103-181213-95755dff is hashed and preserved. Old0.2.1 literal confirmed in backup. New app/selection data explicitly verify, before/after0..0xe000 match and NVS remains unchanged. Only e000/10000 writes, no erase-all or app1 operation; no motion/OTA request.
+- NativeUSB transfer requested for actual boot confirmation; board remains in download mode at this checkpoint. Current sensor attachment/field power/physical motion/charging/OTA health are not assumed. Native57/default C6 build PASS for wiki policy; generated header restored and dummy output not installed.
+
+
+## [2026-11-03] test | Confirm0.2.2 native USB boot on owner-confirmed bare board
+
+- Owner moves to nativeUSB; COM6 parent MCU identity matches prior UART device.30s read-only serial capture confirms SYSTEM Firmware0.2.2-gdb96897, completed initialization/FSM loop, isolated-output log and five periodic power diagnostic observations. Owner confirms INA219 is not attached: driver1/fault10/config0/cal0/valid0 is expected and not a diagnosed field sensor failure.
+- Zero further ROM/reset/fatal/panic markers after the expected version within this capture. One initial USB reset and an existing TWDT already initialized message are retained as observations; effective watchdog settings and long-term health are not inferred. Retained configured cutoff11.3/actuator3800/stall5000 observed without printing network credentials in wiki.
+- USB installation/new-version boot is accepted; physical field sensor/close/charging/HA/network/OTA Gates stay open. INSTALL-RECEIPT records actual evidence separately from historical build receipt. No actor/OTA command, service or operating publication. Native57/default C6 checks passed this turn and generated header restored; dummy local build not installed.
+
+
+## [2026-11-03] test | Observe one requested close low-voltage stop and later protected open request
+
+- Fresh field HA/MQTT confirms0.2.2-gdb96897/INA219 valid/fault0/config0x399f/cal4096 and actual BATTERY_LOW_SHUTDOWN/power PROTECTED. Owner provides Chrome HA login after existing signed-root sudo and saved UI sessions fail; existing authenticated publish/listen is reused without permission/settings changes.
+- Exclusive private intent precedes one close_for_charging/QoS0/non-retained/60s request. Device admission code1/used1 at11.90802V then terminal code3 at11.211V/1368.9mA below unchanged11.3 cutoff. DB receipts20:13:23/20:13:25KST independently preserve results; current rebounds11.94V/0.4mA. Owner cannot observe movement; no physical close/charging success claim or repeat.
+- Owner later requests fully open. One ordinary force_open publish followed by read-only diagnosis retains power PROTECTED/actuation0/BATTERY_LOW_SHUTDOWN and0.2-0.5mA idle branch current. No admission ACK/opening transition or physical open confirmation; no reset/reboot/OTA or guard changes. Four read-only diagnostic commands across both segments.
+- New HA owner buttons are absent; static SGK ACL discovery IDs exclude new IDs, but live operating ACL is unverified and unchanged. Record follow-up without claiming verified production root cause. Native57/default C6 PASS, generated header restored; no local dummy artifact deployed.
+
+## [2026-11-04] compile | Analyze solar charging and repeated low-battery reports without motion
+
+- Owner reports today's charging/open/close low-battery behavior and requests analysis. Today telemetry remains unverified: local browser disabled in Work settings; dedicated signed status return1/sudo password required. Do not reuse Nov3 samples as Nov4 measurements or bypass authority.
+- Recheck exact controller/policy: general valid low protection entry retains one bounded fail-open stroke, conflicting with owner-reported closed-for-charging installation. Explicit charging close instead retains latch on all terminal outcomes and does not reopen; NORMAL recovery requires12.0V/300s and returns IDLE without motion on that tick.
+- Prior measured11.90802→11.211V/1368.9mA close cutoff supports load sag but does not separate battery/cabling/mechanical causes or prove solar current. Record candidate recovery/actuation loop, UI ambiguity and priority policy/observability proposals as unimplemented.
+- Existing native57 PASS and default C6 build PASS; generated version header restored, dummy artifact not deployed. No device publish, reboot, OTA, setting/service/authority change. Relative Markdown links and diff whitespace checked.
+
+## [2026-11-04] code | Implement owner-approved inclusive11.0V cutoff and saved-value transition
+
+- Owner confirms same behavior today and explicitly requests protection at11V or below. Preserve3s normal qualification,12.0V/300s release, forceOTA floor11.7/30s and all sensor/current/interlock/TTL limits. No general fail-open behavior change or motion request.
+- New4 native cases reproduce RED for old default/equality/field11.211V close stop/11.001V admission. Change default/fallback/close floor to central11.0 and use strict-above admission/less-or-equal stop. Existing native61 now PASS.
+- Actual ConfigManager host fixture6 cases:4 RED before code; all6 GREEN afterward. Migrate legacy11.3/invalid stored cutoff by one key-only write; custom/other settings retained, no repeat write after success; persistence failure leaves new runtime cutoff with warning.
+- Version0.2.3 candidate; old0.2.2 installation is not relabeled. Full suites/build/review and artifact preparation follow. Primary checkout and prior USB kits untouched.
+
+- Final local validation: native61 PASS; Python129 total/120 executed PASS/9 explicit opt-in environment skips; UART and nativeUSB C6 builds PASS. Independent scoped review reports no findings and independently passes6 actual-loader cases. Generated header restored; no dummy artifact installed. Private exact-commit credentialed bundle preparation is next, distinct from installation.
+
+## [2026-11-04] compile | Prepare authenticated0.2.3 installation candidate and record access blocker
+
+- Exact code4f3d7b3 hosted CI41771908658 and private41771946349 PASS; normal deployment job skipped. Authenticated CMS owner decryption and GitHub archive digest/internal manifest/C6/layout checks produce0.2.3-g4f3d7b3/1410704B/SHA85e587a3ef6dd7133f11329b8f24217acf971699dd8816025b142efe2d32db59. OTA metadata and private PREPARED receipt distinguish false nas_staged/ota_triggered/installed; prior images/kits preserved.
+- New read-only status confirms maintenance, broker and HA dedicated keys all fail sudo password-required. Browser remains disabled in Work settings. No alternative privilege bypass, settings/service change, motion, reboot or OTA request. Actual0.2.3 threshold/migration acceptance remains pending.
+- PR22 title/body rewritten for final11V/close/forceOTA scope and re-fetched UTF8 equality/head/draft status verified. Issue19 comment likewise re-fetched and verified; remains open for installed acceptance.

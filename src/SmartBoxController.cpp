@@ -1,4 +1,5 @@
 #include "SmartBoxController.h"
+#include <algorithm>
 
 // Fixed pin assignments as per AGENTS.md
 static const int RELAY_MAIN_PIN = 6;
@@ -403,6 +404,8 @@ float SmartBoxController::getFilteredDistance() {
 
 void SmartBoxController::readSensors() {
     const auto reading=hw.readPower();
+    latestPowerRead=reading;
+    if(reading.valid && std::isfinite(reading.voltage) && std::isfinite(reading.currentMa))lastVerifiedVoltage=reading.voltage;
     batteryVoltage=reading.voltage; motorCurrent=reading.currentMa;
     batteryPolicy.sample(static_cast<uint32_t>(hw.getMillis()),reading.voltage,
                          reading.valid && std::isfinite(reading.currentMa),config.voltageShutdownLimit);
@@ -415,6 +418,20 @@ bool SmartBoxController::servicePower() {
         lastPowerReading=hw.getMillis(); readSensors();
     }
     const auto after=powerSnapshot();
+    if(chargingCloseActive) {
+        const uint32_t elapsed=uint32_t(hw.getMillis()-chargingCloseAt);
+        if(!after.valid) stopChargingClose(ChargingCloseState::SENSOR_FAULT);
+        else if(!chargingClosePowerSafe()) stopChargingClose(ChargingCloseState::LOW_VOLTAGE);
+        else if(currentState!=STATE_BATTERY_LOW_SHUTDOWN) stopChargingClose(ChargingCloseState::CANCELLED);
+        else if(uint32_t(hw.getMillis()-chargingCloseRequestAt)>=chargingCloseTtl) stopChargingClose(ChargingCloseState::EXPIRED);
+        else if(elapsed>=std::min(config.actuatorTime,3800UL)) stopChargingClose(ChargingCloseState::STROKE_FINISHED);
+        else if(elapsed>500) {
+            const float limit=std::isfinite(config.currentStallLimit) && config.currentStallLimit>0 ? config.currentStallLimit : 3000.0f;
+            chargingCloseStalls=std::fabs(motorCurrent)>limit ? chargingCloseStalls+1 : 0;
+            if(chargingCloseStalls>=3) stopChargingClose(ChargingCloseState::OVERCURRENT);
+        }
+        return true;
+    }
     if(after.protectedMode) {
         if(currentState==STATE_OTA_UPDATING) {forceAllRelaysOff(); return true;}
         if(currentState!=STATE_BATTERY_LOW_SHUTDOWN) {
@@ -443,17 +460,37 @@ bool SmartBoxController::servicePower() {
     if(!after.actuationAllowed && !moving) return true;
     return false;
 }
-bool SmartBoxController::tryBeginOta() {
+bool SmartBoxController::canStartOta(bool sensorFaultRecovery,bool forceMaintenance) const {
     std::lock_guard<std::recursive_mutex> lock(dataMutex);
-    if(!canStartOta()) return false;
-    forceAllRelaysOff();
-    transitionTo(STATE_OTA_UPDATING);
-    return true;
+    const uint32_t now=static_cast<uint32_t>(hw.getMillis());const auto power=batteryPolicy.snapshot(now);
+    if(sensorFaultRecovery && forceMaintenance)return false;
+    if(forceMaintenance)return !otaRecoveryUsed && now>=120000 && !isMotorRunning() &&
+        (currentState==STATE_IDLE || (currentState==STATE_BATTERY_LOW_SHUTDOWN && relaysIsolated)) &&
+        power.forceOtaReady && std::isfinite(motorCurrent) && std::fabs(motorCurrent)<=50.0f;
+    if(!sensorFaultRecovery)return currentState==STATE_IDLE && power.otaReady;
+    const float cutoff=std::isfinite(config.voltageShutdownLimit) && config.voltageShutdownLimit>0 && config.voltageShutdownLimit<25 ? config.voltageShutdownLimit : BatteryPolicy::kDefaultCutoffVoltage;
+    // Explicit owner recovery only; unknown battery capacity is not a healthy-voltage claim.
+    return !otaRecoveryUsed && now>=120000 && currentState==STATE_BATTERY_LOW_SHUTDOWN &&
+        relaysIsolated && !isMotorRunning() && power.state==BatteryState::SENSOR_FAULT &&
+        power.sampleAgeMs<=2000 && (!std::isfinite(lastVerifiedVoltage) || (lastVerifiedVoltage>cutoff && lastVerifiedVoltage<=16.0f));
+}
+bool SmartBoxController::tryBeginOta(bool sensorFaultRecovery,bool forceMaintenance) {
+    std::lock_guard<std::recursive_mutex> lock(dataMutex);
+    if(!canStartOta(sensorFaultRecovery,forceMaintenance))return false;
+    forceAllRelaysOff();otaRecoveryReserved=sensorFaultRecovery;otaMaintenanceReserved=forceMaintenance;
+    if(sensorFaultRecovery || forceMaintenance){otaRecoveryUsed=true;otaRecoveryAt=static_cast<uint32_t>(hw.getMillis());}
+    transitionTo(STATE_OTA_UPDATING);return true;
 }
 bool SmartBoxController::canContinueOta() const {
     std::lock_guard<std::recursive_mutex> lock(dataMutex);
-    return currentState==STATE_OTA_UPDATING && relaysIsolated &&
-        batteryPolicy.snapshot(static_cast<uint32_t>(hw.getMillis())).otaReady;
+    if(currentState!=STATE_OTA_UPDATING || !relaysIsolated || isMotorRunning())return false;
+    const uint32_t now=static_cast<uint32_t>(hw.getMillis());const auto power=batteryPolicy.snapshot(now);
+    if(otaMaintenanceReserved)return uint32_t(now-otaRecoveryAt)<=120000 && power.forceOtaReady &&
+        std::isfinite(motorCurrent) && std::fabs(motorCurrent)<=50.0f;
+    if(!otaRecoveryReserved)return power.otaReady;
+    const float cutoff=std::isfinite(config.voltageShutdownLimit) && config.voltageShutdownLimit>0 && config.voltageShutdownLimit<25 ? config.voltageShutdownLimit : BatteryPolicy::kDefaultCutoffVoltage;
+    return uint32_t(now-otaRecoveryAt)<=120000 && power.sampleAgeMs<=2000 &&
+        (!std::isfinite(lastVerifiedVoltage) || (lastVerifiedVoltage>cutoff && lastVerifiedVoltage<=16.0f));
 }
 void SmartBoxController::servicePowerDuringOta() {
     std::lock_guard<std::recursive_mutex> lock(dataMutex);
@@ -461,6 +498,7 @@ void SmartBoxController::servicePowerDuringOta() {
 }
 void SmartBoxController::finishOtaWithoutReboot() {
     std::lock_guard<std::recursive_mutex> lock(dataMutex);
+    otaRecoveryReserved=false;otaMaintenanceReserved=false;
     forceAllRelaysOff(); lowBatteryOpening=false;
     const bool held=powerSnapshot().protectedMode;
     if(held) batteryPolicy.restoreProtection();
@@ -514,6 +552,14 @@ void SmartBoxController::setRelayStates(bool mainOn, bool dirOpen, bool dirClose
         lastDirClose = dirClose;
     }
     
+    // Re-read after both contact delays: a closing recovery must never energize
+    // from admission evidence captured before the contacts separated.
+    if(mainOn && chargingCloseActive) {
+        lastPowerReading=hw.getMillis();readSensors();
+        if(!powerSnapshot().valid) {stopChargingClose(ChargingCloseState::SENSOR_FAULT);return;}
+        if(!chargingClosePowerSafe()) {stopChargingClose(ChargingCloseState::LOW_VOLTAGE);return;}
+        if(uint32_t(hw.getMillis()-chargingCloseRequestAt)>=chargingCloseTtl) {stopChargingClose(ChargingCloseState::EXPIRED);return;}
+    }
     // Control Main Power
     if (mainOn) {
         hw.setPinMode(RELAY_MAIN_PIN, OUTPUT);
@@ -537,6 +583,7 @@ void SmartBoxController::forceAllRelaysOff() {
 
 bool SmartBoxController::isMotorRunning() const {
     std::lock_guard<std::recursive_mutex> lock(dataMutex);
+    if(chargingCloseActive)return true;
     if (currentState == STATE_OPEN_START || currentState == STATE_OPENING ||
         currentState == STATE_CLOSE_START || currentState == STATE_CLOSING) {
         return true;
@@ -598,3 +645,32 @@ unsigned long SmartBoxController::getMaintenanceRemainingSeconds() const {
 }
 
 
+
+bool SmartBoxController::chargingClosePowerSafe() const {
+    const auto power=powerSnapshot();
+    const float cutoff=std::isfinite(config.voltageShutdownLimit) ? std::max(BatteryPolicy::kDefaultCutoffVoltage,config.voltageShutdownLimit) : BatteryPolicy::kDefaultCutoffVoltage;
+    return power.valid && std::isfinite(motorCurrent) && power.voltage>cutoff && power.voltage<=16.0f;
+}
+void SmartBoxController::stopChargingClose(ChargingCloseState reason) {
+    forceAllRelaysOff();chargingCloseActive=false;lowBatteryOpening=false;
+    chargingCloseResult=reason;batteryPolicy.restoreProtection();
+    Serial.printf("[POWER] Charging close stopped result=%u; protection retained; physical lid unconfirmed.\n",unsigned(reason));
+}
+bool SmartBoxController::requestChargingClose(uint32_t ttlMs) {
+    std::lock_guard<std::recursive_mutex> lock(dataMutex);
+    if(chargingCloseUsed || ttlMs==0 || ttlMs>120000 || currentState!=STATE_BATTERY_LOW_SHUTDOWN || isMotorRunning() || config.actuatorTime==0)return false;
+    lastPowerReading=hw.getMillis();readSensors();
+    if(!chargingClosePowerSafe() || !powerSnapshot().protectedMode || std::fabs(motorCurrent)>50.0f)return false;
+    chargingCloseUsed=true;chargingCloseActive=true;chargingCloseResult=ChargingCloseState::RUNNING;
+    chargingCloseRequestAt=uint32_t(hw.getMillis());chargingCloseTtl=ttlMs;chargingCloseStalls=0;
+    lowBatteryOpening=false;maintenanceRequested=false;isCalibrationPhase=false;
+    batteryPolicy.restoreProtection();
+    setRelayStates(true,false,true);
+    if(!chargingCloseActive)return false;
+    chargingCloseAt=uint32_t(hw.getMillis());
+    Serial.println("[POWER] Explicit one-shot charging close started; protection stays latched.");
+    return true;
+}
+ChargingCloseState SmartBoxController::chargingCloseState() const {
+    std::lock_guard<std::recursive_mutex> lock(dataMutex);return chargingCloseResult;
+}

@@ -147,7 +147,7 @@ ESP32-C6 보드와 각 모듈은 아래의 확정된 GPIO 번호에 정밀하게
 
 추가 상태:
 * **EMERGENCY_STOP:** 과전류 3회 연속 -> 5초 자동 복구 또는 reset_emergency 명령
-* **BATTERY_LOW_SHUTDOWN:** 11.3V 이하 3초 -> 강제 개방 -> 릴레이 격리 후 안정 전압 5분 확인 시 자동 재개
+* **BATTERY_LOW_SHUTDOWN:** 11.0V 이하 3초 -> 강제 개방 -> 릴레이 격리 후 안정 전압 5분 확인 시 자동 재개
 * **OTA_UPDATING:** 펌웨어 업데이트 중 -> 전 릴레이 차단, FSM 동결
 * **MAINTENANCE:** 5분 정비 모드 -> 자동 닫힘
 * **STARTUP_OPEN:** NVS가 이전 상태를 open으로 기록한 부팅에서 500ms 안정화 후 OPEN_START로 진입하여 open/hold/close 보정 사이클 수행
@@ -344,3 +344,36 @@ The measured NAS candidate failed before policy activation when the volatile boo
 ## 2026-10-31 배터리 자동 재개·감시
 
 [전원 정책과 검증 경계](../wiki/battery_power_management.md)를 따른다. 전압 센서 오류는 측정 불가로 표시하고, 회복 기준 전압이 연속5분 안정될 때 자동 재개한다. 재개 자체로 강제 개폐하지 않는다. HA는 전원 보호 단계·재개 대기·재개 횟수·예정 보고 주기·최저 전압·측정 오류를 표시한다. 전체 에너지 소비와 실제 뚜껑 위치는 별도 계측 대상이다.
+
+
+## INA219 회귀 수정과 원격 복구 경계
+
+0.2.1은 [회귀 수정 후보](../wiki/ina219_regression.md)이며 현재 설치판0.2.0과 구분한다. 생산 reader는 Adafruit 연속0x399F/4096으로 복귀하고 읽기마다 성공 여부를 확인한다. power_read_fault_code/config/calibration/driver와 get_power_diagnostics를 사용해 원격 실패 단계를 수집한다. dummy12.2V는 사용하지 않는다.
+
+추가된 명시적 maintenance recovery는 기존 broker control 권한에 한정되며 recovery=true/32hex request_id/120초 이내 expires_at이 필요하다. 기동2분·출력 격리·정지·최근 샘플 시도·검증된 위험 전압 이력 거절·부팅당1회·최종 TTL 확인을 적용한다. 모터 보호와 일반/자동 OTA 조건을 낮추지 않는다. 이 경로는 배터리 실측을 보증하지 않으며,0.2.0에는 없어 서버 설정이나 추가 인증으로 우회할 수 없다. 현재 장치에 지원되지 않는 명령을 보내거나 전압을 정상으로 위조하지 않는다.
+
+## Offline field recovery package
+
+[Field procedure](../wiki/field_recovery.md) defines a production-provisioned native-USB field image built only by exact-commit prepare-field-recovery dispatch. Only authenticated-encrypted CMS output is uploaded; the recipient private key stays local. Standard UART and field USB environments share16MB dual-slot layout/header. Default Windows script is offline-only; physical USB-only power and disconnected actuators precede any write. Back up changed sectors/settings, write app0/otadata only, verify unchanged NVS, and keep manual physical commissioning separate. Matching firmware bytes are not field health proof.
+
+
+## Close/force-OTA owner maintenance candidate
+
+
+
+## 2026-11-03 후보0.2.2: 충전용 닫기와 강제 OTA
+
+이 기능은0.2.2 후보 소스에 추가됐다. 현장0.2.1-g4a57756에는 아직 없으며 빌드/버튼 정의는 현장 설치 증거가 아니다.
+
+- 보호 진입 기본11.0V 이하/3초로 변경한다(0.2.3 후보; 설치 전에는 구형 기준). 보호 해제 기준은 기본12.0V/300초(설정 cutoff가 높으면 max(12.0,cutoff+0.7))로 낮춘다. 조건 충족 전에는 사람 감지/일반 열기가 동작하지 않는다. 해제 시 자동 스트로크 없이 이후 새 사람 감지부터 재개한다.
+- HA의 **충전을 위해 닫기**는 보호 중 유효 전압이 기본11.0V 초과일 때만 닫기1회를 요청한다. 최대3.8초이고 저전압·센서 오류·과전류는 중단한다. 완료 뒤 보호를 유지하고 출력은 격리한다. 시간 종료 표시는 실제 닫힌 위치를 보증하지 않는다.
+- **강제 펌웨어 업데이트**는 기본11.7V 이상30초·부팅120초·모터 정지 조건으로 일반 보호 대기/동일 버전 생략을 우회한다. 실제 전원 안정성을 보증하는 조건은 아니다. 센서 오류는 별도 기존 복구 경로이며, TLS/인증 실패와 게시 보류404를 무시하지 않는다.
+- 두 버튼은 기존 MQTT 권한 안에서 HA command_template으로 매번 새 요청 ID와60초 기한을 만든다([HA 공식 문서](https://www.home-assistant.io/integrations/button.mqtt/)). retained/중복/만료/재사용을 거절하고 기한 watermark를 NVS에 먼저 저장한다. 시계 미동기화/저장 실패도 거절한다. 같은 초의 연속 클릭은 기한 재사용으로 거절될 수 있다.
+- 닫기 시도는 부팅당1회, 강제/센서 복구 OTA 예약도 합쳐 부팅당1회다. 유효 요청 기록은 RAM8개 제한으로 가득 차면 거절하며 자동 반복하지 않는다. 새 MQTT nonce만 바꾸어 이 제한을 우회할 수 없다. 구동 실패 후 임의 재부팅/자동 재시도를 하지 말고 원인을 확인한다.
+- OTA는 기존 비활성 슬롯에 쓰고 끝의 이미지 검증 후에만 boot partition을 바꾸는 SDK Update 경로를 유지한다. 동기 HTTP flash 진행 중 소프트웨어 즉시 취소·새 이미지 boot-health 자동 rollback은 보장하지 않는다. 다운로드와 설치/재부팅 건강은 구분한다.
+- 새 데이터: power_charging_close_state(0없음/1실행/2시간종료/3저전압/4센서/5과전류/6기한만료/7중단), power_charging_close_used, power_force_ota_allowed, power_force_ota_voltage_v. 기존 schema1 필드는 유지한다.
+
+현재0.2.1은 유효한 저전압 보호 중 force_close 및 OTA를 거절한다. 새 기능을 소급 등록하는 원격 설정은 없다. 최초 적용은 USB 또는 기존 설치 조건 확보가 필요하며 운영 manifest hold는 별도 승인/검증 전 유지한다.
+
+
+0.2.3 저장 설정 전환 및 설치 확인 범위는 [11.0V 정책](../wiki/low_voltage_threshold_20261104.md)을 따른다. 소스의 새 기준과 설치 장치의 실제 적용값을 구분한다.

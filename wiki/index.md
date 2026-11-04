@@ -3,13 +3,15 @@ title: SmartBox wiki index
 type: index
 project: smartbox
 status: active
-updated: 2026-08-12
+updated: 2026-11-04
 source_of_truth: true
 ---
 
 # SmartBox Wiki
 
-> 저장소 기준: `main` commit `9f2facb` (2026-07-23). 코드 구현, 검증 증거, 현장 배포 상태를 서로 구분한다.
+> 2026-11-04 source0.2.3 후보: [11.0V 이하 보호/저장값 전환](low_voltage_threshold_20261104.md). 현장 설치 수용은 아직 별도다.
+
+>2026-11-03 field0.2.2 is online with valid measurement. Owner-requested close is admitted then stops at11.211V under load; later requested open remains protected/actuation0. Physical lid position is unknown. See [field operation](field_power_operation_20261103.md).
 
 ## 먼저 읽기
 
@@ -62,3 +64,19 @@ source_of_truth: true
 - [ota_diagnostic_acceptance.md](ota_diagnostic_acceptance.md): bounded manifest failure, authentication/expiry fixture and actual installed-device recovery gate.
 
 - [battery_power_management.md](battery_power_management.md): automatic low-voltage recovery, measurement validity, bounded savings and NAS/HA monitoring with installed-evidence boundaries.
+
+- [ina219_regression.md](ina219_regression.md): field-before/after evidence, continuous-reader rollback candidate, numeric failure diagnostics and the confirmed0.2.0 recovery-OTA lockout.
+
+- [field_recovery.md](field_recovery.md): owner-private offline USB firmware kit, equipment, guarded app0/otadata recovery and physical acceptance procedure.
+
+- [bench_usb_acceptance.md](bench_usb_acceptance.md):2026-11-02 actual16MB USB installation/boot evidence, fixed115200 session contract and remaining sensor/field gates.
+
+- [충전용 닫기 전용 복구 설계안](../docs/superpowers/specs/2026-11-03-low-power-close-design.md): owner-approved0.2.2 installed/booted on bare board; protection, close-only, forced OTA and12.0V/300s automatic-open recovery boundary; field acceptance pending.
+
+- [충전 복구 OTA 준비와 최초 적용 조건](charging_ota_readiness.md): verified private0.2.2 OTA candidate; later USB bench adoption accepted; NAS staging/OTA trigger and field acceptance remain deferred.
+
+- [2026-11-03 field close/open operation](field_power_operation_20261103.md): one close LOW_VOLTAGE_STOP, later open not observed, sensor healthy and physical position pending.
+
+- [2026-11-04 태양광 저전압 분석](solar_charging_low_voltage_analysis_20261104.md): 부하 전압 강하, 기존 저전압 fail-open과 충전 조건 충돌, 보호 유지/재진입 구분 및 오늘 조회 공백.
+
+- [11.0V 이하 보호 변경](low_voltage_threshold_20261104.md):0.2.3 후보, inclusive 경계·충전용 닫기·legacy NVS 전환과 수용 경계.

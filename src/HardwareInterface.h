@@ -3,7 +3,17 @@
 
 #include <stdint.h>
 #include <cmath>
-struct PowerReading { float voltage; float currentMa; bool valid; };
+enum class PowerReadFault : uint8_t {
+    NONE=0, CONFIGURATION_IO=1, PROFILE_MISMATCH=2, CALIBRATION_IO=3,
+    CALIBRATION_MISMATCH=4, BUS_IO=5, SHUNT_IO=6, CURRENT_IO=7,
+    NONFINITE=8, RANGE=9, NOT_INITIALIZED=10
+};
+struct PowerReading {
+    float voltage; float currentMa; bool valid;
+    PowerReadFault fault=PowerReadFault::NONE;
+    uint8_t driver=0;
+    uint16_t configuration=0,calibration=0;
+};
 
 #ifdef NATIVE_BUILD
 #ifndef INPUT

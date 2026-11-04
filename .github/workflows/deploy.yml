@@ -12,13 +12,22 @@ on:
         type: choice
         required: true
         default: verify-origin
-        options: [verify-origin, publish-firmware, verify-authenticated-origin]
+        options: [verify-origin, publish-firmware, verify-authenticated-origin, prepare-field-recovery]
       expected_version:
         description: Optional exact version for authenticated verification
         type: string
         default: ""
       expected_sha256:
         description: Optional exact image digest for authenticated verification
+        type: string
+        default: ""
+
+      field_expected_sha:
+        description: Exact reviewed commit for private USB recovery preparation
+        type: string
+        default: ""
+      field_recipient_b64:
+        description: Base64 public CMS recipient certificate only; never a private key
         type: string
         default: ""
 
@@ -55,9 +64,14 @@ jobs:
       - name: Validate power monitoring regressions
         run: python -m unittest discover -s test -p 'test_power*.py' -v
 
+      - name: Validate field bundle and Windows recovery guards
+        run: |
+          python -m unittest discover -s test -p 'test_field_recovery.py' -v
+          pwsh -NoProfile -File test/field_recovery.Tests.ps1
+
       - name: Validate target build without production secrets
         if: github.event_name == 'pull_request'
-        run: pio run -e esp32-c6-devkitc-1 -j 4
+        run: pio run -e esp32-c6-devkitc-1 -e esp32-c6-field-recovery -j 4
 
   verify_ota_origin:
     name: Verify public firmware refusal before credential-bearing publication
@@ -192,3 +206,44 @@ jobs:
           local_path: './dist/*'
           remote_path: ${{ secrets.NAS_TARGET_DIR }}
           sftp_only: true
+
+  prepare_field_recovery:
+    name: Build encrypted owner-only field recovery kit (no deployment)
+    needs: [test]
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.operation == 'prepare-field-recovery' &&
+      inputs.field_expected_sha == github.sha
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install PlatformIO
+        run: python -m pip install platformio
+      - name: Build exact firmware and encrypt before artifact creation
+        env:
+          FIELD_OPERATION: ${{ inputs.operation }}
+          FIELD_EXPECTED_SHA: ${{ inputs.field_expected_sha }}
+          FIELD_RECIPIENT_B64: ${{ inputs.field_recipient_b64 }}
+          SECRET_WIFI_SSID: ${{ secrets.SECRET_WIFI_SSID }}
+          SECRET_WIFI_PASS: ${{ secrets.SECRET_WIFI_PASS }}
+          SECRET_AP_PASS: ${{ secrets.SECRET_AP_PASS }}
+          SECRET_VERSION_URL: ${{ secrets.SECRET_VERSION_URL }}
+          SECRET_FIRMWARE_URL: ${{ secrets.SECRET_FIRMWARE_URL }}
+          SECRET_MQTT_HOST: ${{ secrets.SECRET_MQTT_HOST }}
+          SECRET_MQTT_PORT: ${{ secrets.SECRET_MQTT_PORT }}
+          SECRET_MQTT_USER: ${{ secrets.SECRET_MQTT_USER }}
+          SECRET_MQTT_PASS: ${{ secrets.SECRET_MQTT_PASS }}
+          SECRET_OTA_USER: ${{ secrets.SECRET_OTA_USER }}
+          SECRET_OTA_PASS: ${{ secrets.SECRET_OTA_PASS }}
+          SECRET_ROOT_CA_CERT: ${{ secrets.SECRET_ROOT_CA_CERT }}
+        run: python scripts/build_field_recovery.py
+      - name: Upload ciphertext and sanitized metadata only
+        uses: actions/upload-artifact@v4
+        with:
+          name: smartbox-field-encrypted-${{ github.sha }}
+          path: ${{ runner.temp }}/field-encrypted/
+          if-no-files-found: error
+          retention-days: 7

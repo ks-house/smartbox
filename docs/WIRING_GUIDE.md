@@ -26,7 +26,7 @@ graph TD
     subgraph "3. 5V 제어부 (MCU & 센서)"
         LM2596 -->|5.0V 정밀 출력| ESP32["🧠 ESP32-C6 보드"]
         ESP32 -->|GPIO 4, 5 & 5V/GND| Ultra["📡 초음파 센서 (AJ-SR04T)"]
-        ESP32 -->|GPIO 22, 23 & 5V/GND| INA219["⚡ INA219 전류센서"]
+        ESP32 -->|GPIO 22, 23 & 3.3V/GND| INA219["⚡ INA219 전류센서"]
         ESP32 -->|GPIO 6 & 5V/GND| Relay1["1채널 메인 릴레이"]
         ESP32 -->|GPIO 7, 8 & 5V/GND| Relay2["2채널 극성 릴레이"]
     end
@@ -66,7 +66,8 @@ graph TD
 
 | 출발지 (ESP32-C6 핀) | 도착지 (각 모듈의 핀) | 전선 기능/색상 추천 |
 | :---: | :---: | :--- |
-| **5V (VBUS)** | 4개 모듈의 **VCC / 5V** 단자에 공통 분기 | 🔴 빨간색 (5V 전원 공통) |
+| **5V (VBUS)** | 초음파·릴레이 모듈의 **VCC / 5V** 단자 | 🔴 빨간색 (모듈별 정격 확인) |
+| **3V3** | INA219의 **VCC** (Vin+와 다름) | I2C pull-up도 3.3V 로직, 별도 검증된 level shift가 있으면 해당 설계 확인 |
 | **GND** | 4개 모듈의 **GND / Ground** 단자에 공통 분기 | ⚫ 검은색 (그라운드 공통) |
 | **GPIO 4** | AJ-SR04T 초음파 센서의 **TRIG** 핀 | 🟢 초록색 (거리측정 트리거) |
 | **GPIO 5** | AJ-SR04T 초음파 센서의 **ECHO** 핀 | 🟡 노란색 (거리측정 에코) |
@@ -123,3 +124,7 @@ graph TD
 * **메인 소스코드:** [main.cpp](../src/main.cpp)
 * **통합 개발 매뉴얼:** [DEVELOPMENT_MANUAL.md](DEVELOPMENT_MANUAL.md)
 * **하드웨어 BOM 명세:** [HARDWARE_BOM.md](../HARDWARE_BOM.md)
+
+## USB 현장 복구 전원 조건
+
+[현장 복구 절차](../wiki/field_recovery.md)를 따른다. USB로 보드에 전원을 공급할 때 LM2596의 외부5V 보드 연결을 분리하고 모터12V 부하를 물리적으로 분리한다. INA219 Vin+의 측정 전압과 VCC의 제어 전압은 구분한다. 위3.3V 로직 설명은 문서 보완이며 현재 현장의 배선 상태나 장애 원인을 확인했다는 뜻은 아니다.

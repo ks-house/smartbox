@@ -1,3 +1,5 @@
+#include "RecoveryOtaRequest.h"
+#include <time.h>
 #include "MqttManager.h"
 #include "SmartBoxController.h"
 #include "WifiManager.h"
@@ -6,6 +8,20 @@
 #include "TelemetryManager.h"
 #include "secrets.h"
 #include <WiFi.h>
+#include <Preferences.h>
+
+namespace {
+class PreferencesOwnerStore:public OwnerRequestStore {
+ public:
+    explicit PreferencesOwnerStore(Preferences& preferences):prefs(preferences) {}
+    bool load(uint64_t& value) override {
+        if(prefs.isKey("expiry") && prefs.getType("expiry")!=PT_U64)return false;
+        value=prefs.getULong64("expiry",0);return true;
+    }
+    bool save(uint64_t value) override {return prefs.putULong64("expiry",value)==sizeof(uint64_t);}
+ private:Preferences& prefs;
+};
+}
 
 static MqttManager* g_mqttManagerInstance = nullptr;
 
@@ -142,11 +158,35 @@ void MqttManager::onMqttMessage(char* topic, char* payload, int retain, int qos,
             RLOG_E("[MQTT] JSON parse failed: %s\n", error.c_str());
             return;
         }
-        handleCommand(doc);
+        const bool recovery=doc["recovery"].is<bool>() && doc["recovery"].as<bool>();
+        if(recovery && doc["command"].is<const char*>() && strcmp(doc["command"].as<const char*>(),"trigger_ota")==0 && (retain || dup)) {
+            publishLog(LogLevel::WARN,"[MQTT] Retained/duplicate recovery request rejected");return;
+        }
+        uint32_t ownerTtl=0;
+        const char* command=doc["command"] | "";
+        if((strcmp(command,"close_for_charging")==0 || strcmp(command,"force_ota")==0) &&
+            !admitOwnerCommand(doc,retain!=0,dup,ownerTtl)) {
+            publishLog(LogLevel::WARN,"[MQTT] Owner maintenance request rejected: invalid, expired, repeated or durable record unavailable");return;
+        }
+        handleCommand(doc,ownerTtl);
     }
 }
 
-void MqttManager::handleCommand(const JsonDocument& doc) {
+bool MqttManager::admitOwnerCommand(const JsonDocument& doc,bool retained,bool duplicate,uint32_t& ttl) {
+    ttl=0;
+    if(!doc["request_id"].is<const char*>() || !doc["expires_at"].is<uint64_t>())return false;
+    std::lock_guard<std::mutex> lock(m_ownerRequestMutex);
+    Preferences prefs;if(!prefs.begin("smartbox-ctl",false))return false;
+    PreferencesOwnerStore store(prefs);
+    const uint64_t expiry=doc["expires_at"].as<uint64_t>();
+    const bool stored=acceptStoredOwnerRequest(m_ownerRequests,store,doc["request_id"].as<const char*>(),expiry,uint64_t(time(nullptr)),retained,duplicate,ttl);
+    prefs.end();
+    const uint64_t now=uint64_t(time(nullptr));
+    if(!stored || expiry<=now){ttl=0;return false;}
+    ttl=uint32_t((expiry-now)*1000);return true;
+}
+
+void MqttManager::handleCommand(const JsonDocument& doc,uint32_t ownerTtl) {
     if (doc["command"].isNull() || !doc["command"].is<const char*>()) {
         RLOG_W("[MQTT] Command missing or invalid string format\n");
         publishLog(LogLevel::WARN, "[MQTT] Invalid command format received");
@@ -156,7 +196,16 @@ void MqttManager::handleCommand(const JsonDocument& doc) {
     const char* cmd = doc["command"];
     RLOG_I("[MQTT] Processing command: %s\n", cmd);
 
-    if (strcmp(cmd, "force_open") == 0) {
+    if(strcmp(cmd,"close_for_charging")==0) {
+        const auto ota=AutoOtaManager::getDiagnostics();
+        const bool accepted=ownerTtl && !AutoOtaManager::isOtaInProgress() && !ota.requestPending && m_controller.requestChargingClose(ownerTtl);
+        publishLog(LogLevel::WARN,accepted ? "[MQTT] Charging close admitted; protection retained; physical result unconfirmed" : "[MQTT] Charging close rejected by power, state or one-shot guard");
+        publishTelemetry();
+    } else if(strcmp(cmd,"force_ota")==0) {
+        const bool accepted=ownerTtl && AutoOtaManager::startOtaUpdate(true,false,ownerTtl,true);
+        publishLog(LogLevel::WARN,accepted ? "[MQTT] Forced OTA queued; installation unconfirmed" : "[MQTT] Forced OTA rejected: power qualification, busy or already used");
+        publishTelemetry();
+    } else if (strcmp(cmd, "force_open") == 0) {
         m_controller.forceOpen();
         publishLog(LogLevel::INFO, "[MQTT] Executed command: force_open");
     } else if (strcmp(cmd, "force_close") == 0) {
@@ -170,7 +219,13 @@ void MqttManager::handleCommand(const JsonDocument& doc) {
         });
     } else if (strcmp(cmd, "trigger_ota") == 0) {
         RLOG_I("[MQTT] Manual OTA Update triggered via MQTT\n");
-        if (AutoOtaManager::startOtaUpdate(true)) {
+        const bool recovery=doc["recovery"].is<bool>() && doc["recovery"].as<bool>();
+        uint32_t ttl=120000;
+        if(recovery && (!doc["request_id"].is<const char*>() || !doc["expires_at"].is<uint64_t>() ||
+            !validateRecoveryOtaRequest(doc["request_id"].as<const char*>(),doc["expires_at"].as<uint64_t>(),uint64_t(time(nullptr)),ttl))) {
+            publishLog(LogLevel::WARN,"[MQTT] Recovery request requires fresh TTL and request id");return;
+        }
+        if (AutoOtaManager::startOtaUpdate(true,recovery,ttl)) {
             publishLog(LogLevel::INFO, "[MQTT] NAS HTTPS OTA update initiated successfully");
         } else {
             publishLog(LogLevel::ERROR, "[MQTT] Failed to initiate NAS HTTPS OTA update");
@@ -201,6 +256,8 @@ void MqttManager::handleCommand(const JsonDocument& doc) {
             RLOG_I("[MQTT] Dynamic Debug Logging DISABLED\n");
             publishLog(LogLevel::INFO, "[MQTT] Dynamic Debug Logging DISABLED");
         }
+    } else if (strcmp(cmd, "get_power_diagnostics") == 0) {
+        publishTelemetry();
     } else if (strcmp(cmd, "set_config") == 0) {
         handleSetConfig(doc);
     } else {
@@ -296,7 +353,7 @@ void MqttManager::update() {
     }
 
     const auto power = m_controller.powerSnapshot();
-    if (m_mqttClient.connected() && static_cast<int>(power.state) != m_lastPowerState &&
+    if (m_mqttClient.connected() && (static_cast<int>(power.state) != m_lastPowerState || static_cast<int>(m_controller.chargingCloseState())!=m_lastChargingCloseState) &&
         millis() - m_lastPowerAttempt >= 1000) {
         m_lastPowerAttempt = millis();
         publishTelemetry();
@@ -380,6 +437,12 @@ void MqttManager::publishTelemetry() {
     else doc["battery_v"] = nullptr;
     doc["firmware"] = m_controller.getFirmwareVersion();
     doc["power_schema"] = 1;
+    const auto read=m_controller.powerReadDiagnostics();
+    doc["power_read_fault_code"]=static_cast<unsigned>(read.fault);
+    doc["power_read_driver"]=read.driver;
+    doc["power_read_config"]=read.configuration;
+    doc["power_read_calibration"]=read.calibration;
+    doc["power_recovery_ota_allowed"]=m_controller.canStartOta(true)?1:0;
     doc["power_sensor_valid"] = power.valid ? 1 : 0;
     doc["power_state_code"] = static_cast<unsigned>(power.state);
     doc["power_state"] = BatteryPolicy::name(power.state);
@@ -392,6 +455,11 @@ void MqttManager::publishTelemetry() {
     doc["power_recovery_voltage_v"] = power.recoveryVoltage;
     doc["power_actuation_allowed"] = power.actuationAllowed ? 1 : 0;
     doc["power_ota_ready"] = power.otaReady ? 1 : 0;
+    doc["power_force_ota_allowed"]=m_controller.canStartOta(false,true)?1:0;
+    doc["power_force_ota_voltage_v"]=power.forceOtaVoltage;
+    const int closeState=static_cast<int>(m_controller.chargingCloseState());
+    doc["power_charging_close_state"]=closeState;
+    doc["power_charging_close_used"]=m_controller.chargingCloseAttemptUsed()?1:0;
     doc["current_scope"] = "MOTOR_BRANCH";
     doc["motor_current_ma"] = m_controller.getMotorCurrent(); // FEAT-2: 모터 전류 추가
     doc["distance_cm"] = m_controller.getDistance();
@@ -418,7 +486,7 @@ void MqttManager::publishTelemetry() {
     doc["ip"] = WiFi.localIP().toString();
     output = ""; serializeJson(doc, output);
     const int sent = m_mqttClient.publish("smartbox/status", 1, true, output.c_str());
-    if (sent > 0) m_lastPowerState = static_cast<int>(power.state);
+    if (sent > 0) {m_lastPowerState = static_cast<int>(power.state);m_lastChargingCloseState=closeState;}
 }
 
 void MqttManager::publishBatchTelemetry(const TelemetryData* data, int count, const char* batchType) {
@@ -534,6 +602,20 @@ void MqttManager::publishAutoDiscovery() {
         serializeJson(doc, payload);
         m_mqttClient.publish(topic.c_str(), 1, true, payload.c_str());
     };
+
+    // Owner-only one-shot operations use HA's supported command_template to mint
+    // a fresh ID/absolute expiry for each press. The broker remains the authority.
+    const char* ownerCommands[]={"close_for_charging","force_ota"};
+    const char* ownerNames[]={"[SmartBox] 충전을 위해 닫기","[SmartBox] 강제 펌웨어 업데이트"};
+    for(unsigned i=0;i<2;++i) {
+        JsonDocument doc=createDiscoveryDoc(ownerNames[i],ownerCommands[i],"button");
+        doc["command_topic"]="smartbox/command";doc["qos"]=0;doc["retain"]=false;doc["payload_press"]="PRESS";
+        doc["icon"]=i==0 ? "mdi:weather-sunny" : "mdi:cloud-download";
+        doc["command_template"]=String("{% set t=as_timestamp(now()) %}{{ dict(command='")+ownerCommands[i]+"', request_id='%032x'|format((t*1000000)|int), expires_at=(t|int)+60)|tojson }}";
+        String payload;serializeJson(doc,payload);
+        String topic=String("homeassistant/button/smartbox_01/")+ownerCommands[i]+"/config";
+        m_mqttClient.publish(topic.c_str(),1,true,payload.c_str());
+    }
 
     // 1. Buttons
     struct ButtonDef { const char* id; const char* name; const char* cmd; const char* icon; };
