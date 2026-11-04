@@ -80,4 +80,4 @@ source_of_truth: true
 - [2026-11-04 태양광 저전압 분석](solar_charging_low_voltage_analysis_20261104.md): 부하 전압 강하, 기존 저전압 fail-open과 충전 조건 충돌, 보호 유지/재진입 구분 및 오늘 조회 공백.
 
 - [11.0V 이하 보호 변경](low_voltage_threshold_20261104.md):0.2.3 후보, inclusive 경계·충전용 닫기·legacy NVS 전환과 수용 경계.
-\n- [0.2.3 OTA 설치 수용](ota_adoption_20261104.md): 첫 스트림 실패 보존, 재검증 뒤 새 버전/새 uptime/센서/UP_TO_DATE 확인 및 실물 Gate 분리.\n
+\n- [0.2.3 OTA 설치 수용](ota_adoption_20261104.md): 첫 스트림 실패 보존, 재검증 뒤 새 버전/새 uptime/센서/UP_TO_DATE 확인 및 실물 Gate 분리.\n\n- [2026-11-04 충전용 닫기](field_close_20261104.md): 새0.2.3에서 명시1회 close_state2 정상 구동 종료, 부하/정지 전류 확인; 실물 위치/충전은 별도.\n
