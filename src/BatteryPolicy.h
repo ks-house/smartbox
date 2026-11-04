@@ -35,6 +35,7 @@ class BatteryPolicy {
   static constexpr uint32_t kMaxSampleGapMs=2000;
   static constexpr uint32_t kSensorRecheckMs=1000;
   void sample(uint32_t now,float voltage,bool valid,float cutoff);
+  void interruptQualification();
   void restoreProtection();
   BatterySnapshot snapshot(uint32_t now) const;
   static const char* name(BatteryState state);
