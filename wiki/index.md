@@ -9,7 +9,7 @@ source_of_truth: true
 
 # SmartBox Wiki
 
-> 2026-11-04 운영OTA0.2.3-g1c09394 게시 및 인증 다운로드 해시 검증 완료. [11V 정책과 게시 증거](low_voltage_threshold_20261104.md). 장치 설치/새부팅/적용값은 아직 미확인이다.
+> 2026-11-04 운영0.2.3-g1c09394 OTA 설치·새 부팅·유효 센서/통신 수용. 첫 스트림 오류 뒤 재시도 성공. [설치 증거와 남은 실물 Gate](ota_adoption_20261104.md). raw cutoff 읽기와 실제 저전압/충전 시험은 별도다.
 
 >2026-11-03 field0.2.2 is online with valid measurement. Owner-requested close is admitted then stops at11.211V under load; later requested open remains protected/actuation0. Physical lid position is unknown. See [field operation](field_power_operation_20261103.md).
 
@@ -80,3 +80,4 @@ source_of_truth: true
 - [2026-11-04 태양광 저전압 분석](solar_charging_low_voltage_analysis_20261104.md): 부하 전압 강하, 기존 저전압 fail-open과 충전 조건 충돌, 보호 유지/재진입 구분 및 오늘 조회 공백.
 
 - [11.0V 이하 보호 변경](low_voltage_threshold_20261104.md):0.2.3 후보, inclusive 경계·충전용 닫기·legacy NVS 전환과 수용 경계.
+\n- [0.2.3 OTA 설치 수용](ota_adoption_20261104.md): 첫 스트림 실패 보존, 재검증 뒤 새 버전/새 uptime/센서/UP_TO_DATE 확인 및 실물 Gate 분리.\n

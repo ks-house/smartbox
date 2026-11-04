@@ -40,3 +40,4 @@ PR22는 최종head37a7c53의 CI41772499489 성공 후 ready로 전환했다. 일
 읽기 전용 검증41773546122도 PASS: 올바른 인증 HEAD/GET4개200, 익명·잘못된 인증 거절8개, TLS hostname/chain 검증, 실제 다운로드버전/크기/해시가 게시metadata와 일치했다. 실제 firmware/version.json이 OTA 경로에 게시된 것은 수용한다.
 
 장치의 명시 force_ota/trigger_ota는 아직 전송하지 않았다. 브라우저 기능이 Work settings에서 비활성화돼 기존HA 세션으로 최신 전원 상태/실제설치 버전을 읽지 못한다. 소유자에게 로컬 브라우저 사용과 HA 로그인 접근을 요청했다. 자동OTA가 설치했는지 추정하지 않으며, 설치·새부팅·11V migration 수용은 미확인이다. 서버root 접속 복구를 OTA의 필수 조건으로 다시 요구하지 않는다.
+\n\n## 이후 실제 설치 수용\n\n브라우저 접근 허용 후 기존HA에서 첫 일반OTA가 stream error6으로 확정 실패하고 기존0.2.2로 복귀했다. origin 재검증 뒤 두 번째 일반OTA로 실제0.2.3-g1c09394/새 uptime/센서정상/UP_TO_DATE를 확인했다. [상세 설치 수용](ota_adoption_20261104.md). 앞선 설치 미확인 단락은 당시 경계이며 이번 증거로 갱신한다. 실물 cutoff/NVS 직접 읽기와 저전압 차단/충전 성공은 별도다.\n

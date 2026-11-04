@@ -1,4 +1,4 @@
-# SmartBox OTA 적용 준비
+# SmartBox OTA 적용 준비\n\n> 2026-11-04 설치 후속: 기존HA에서 일반OTA 재시도로 실제0.2.3-g1c09394와 새 부팅·정상 센서·UP_TO_DATE를 수용했다. [설치 기록](ota_adoption_20261104.md). 아래 게시/설치 미확인 문구는 이전 시점 기록이다.
 
 > 2026-11-04: 기존 GitHub Actions/SFTP로 운영0.2.3-g1c09394 게시 및 인증 다운로드 검증을 완료했다. 관리자SSH는 게시 필수 조건이 아니다. 실제 설치는 HA/MQTT 새 버전·새 uptime으로 확인해야 하며 현재 미확인이다. [게시 기록](low_voltage_threshold_20261104.md).
 

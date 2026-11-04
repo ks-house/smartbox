@@ -198,3 +198,4 @@ Signed SSH status authenticates but fails at noninteractive sudo with password r
 ## 2026-11-03 field operation follow-up
 
 [Measured operation](field_power_operation_20261103.md) confirms actual0.2.2 field measurement/network. One requested close is interrupted by11.211V under-load cutoff; later requested open remains protected. Full lid position/charging remain unknown, not accepted.
+\n\n## 2026-11-04 actual OTA adoption\n\n[0.2.3-g1c09394 installed](ota_adoption_20261104.md): one confirmed stream-error6 failure preserves0.2.2; verified-origin bounded retry installs actual new boot, valid INA219/IDLE/NORMAL, automatic manifestUP_TO_DATE and >100s fresh uptime progression. Raw cutoff/NVS direct readback, actual low-voltage cutoff point, lid position and charging current remain separate.\n
