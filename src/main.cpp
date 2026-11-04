@@ -95,7 +95,7 @@ void setup() {
         if (next == STATE_OTA_UPDATING) {
             Serial.println("[SYSTEM] OTA mode entered. All background routines suspended.");
         } else {
-            ConfigManager::savePowerHold(next == STATE_BATTERY_LOW_SHUTDOWN);
+            ConfigManager::savePowerHold(controller.powerSnapshot().persistentHold);
             // 논리적 뚜껑 상태를 Preferences에 저장
             if (next == STATE_HOLD || next == STATE_OPENING ||
                 next == STATE_BATTERY_LOW_SHUTDOWN || next == STATE_STARTUP_OPEN) {
@@ -111,7 +111,7 @@ void setup() {
             mqtt->publishEventState((int)prev, (int)next);
 
             // 개폐 사이클 시작: IDLE → non-IDLE 전환
-            if (prev == STATE_IDLE && next != STATE_IDLE && next != STATE_BATTERY_LOW_SHUTDOWN) {
+            if (prev == STATE_IDLE && (next == STATE_OPEN_START || next == STATE_CLOSE_START)) {
                 cycleStartTime = millis();
                 cyclePeakCurrent = 0.0f;
                 cycleStartBatt = controller.getBatteryVoltage();
@@ -121,6 +121,7 @@ void setup() {
                 float cur = controller.getMotorCurrent();
                 if (cur > cyclePeakCurrent) cyclePeakCurrent = cur;
             }
+            if(next==STATE_SENSOR_RECHECK)cycleStartTime=0; // An interrupted stroke is not a completed cycle.
             // 개폐 사이클 완료: non-IDLE → IDLE 전환 시 요약 발행
             if (next == STATE_IDLE && prev != STATE_IDLE && cycleStartTime > 0) {
                 unsigned long duration = millis() - cycleStartTime;
@@ -131,6 +132,8 @@ void setup() {
             // 알람 이벤트 발행
             if (next == STATE_EMERGENCY_STOP) {
                 mqtt->publishEventAlarm("STALL_OVERCURRENT", controller.getMotorCurrent(), "Motor stall / emergency stop triggered");
+            } else if(next==STATE_SENSOR_RECHECK) {
+                mqtt->publishEventAlarm("POWER_SENSOR_FAULT",controller.getBatteryVoltage(),"Power measurement recheck; outputs isolated");
             } else if (next == STATE_BATTERY_LOW_SHUTDOWN) {
                 const auto power=controller.powerSnapshot();
                 mqtt->publishEventAlarm(power.valid ? "LOW_BATTERY" : "POWER_SENSOR_FAULT",

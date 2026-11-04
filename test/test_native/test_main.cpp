@@ -721,7 +721,7 @@ void test_bad_voltage_never_operates_motor(void) {
     SmartBoxController box(hw);box.init();
     hw.advanceMillis(200);box.update();box.forceOpen();box.update();
     TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(RELAY_MAIN_PIN));
-    TEST_ASSERT_EQUAL(STATE_BATTERY_LOW_SHUTDOWN,box.getCurrentState());
+    TEST_ASSERT_EQUAL(STATE_SENSOR_RECHECK,box.getCurrentState());
 }
 
 
@@ -768,6 +768,8 @@ void test_low_timers_do_not_cross_controller_instances(void) {
 }
 void test_ota_failed_recovery_cannot_clear_low_power_latch(void) {
     MockHardware hw;hw.setBatteryVoltage(12.6f);SmartBoxController box(hw);box.init();
+    hw.setBatteryVoltage(11.0f);for(int i=0;i<17;i++){hw.advanceMillis(200);box.update();}
+    TEST_ASSERT_TRUE(box.powerSnapshot().persistentHold);
     box.transitionTo(STATE_OTA_UPDATING);hw.setBatteryVoltage(NAN);
     hw.advanceMillis(200);box.servicePowerDuringOta();box.forceOpen();
     TEST_ASSERT_EQUAL(STATE_OTA_UPDATING,box.getCurrentState());
@@ -964,7 +966,7 @@ void test_sensor_fault_recovery_ota_is_explicit_isolated_and_once_per_boot(void)
  TEST_ASSERT_EQUAL(STATE_OTA_UPDATING,box.getCurrentState());TEST_ASSERT_TRUE(box.canContinueOta());
  box.forceOpen();box.forceClose();box.resetEmergency();box.startMaintenanceMode();box.stopMaintenanceMode();
  TEST_ASSERT_EQUAL(STATE_OTA_UPDATING,box.getCurrentState());for(int pin:{6,7,8})TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(pin));
- box.finishOtaWithoutReboot();TEST_ASSERT_EQUAL(STATE_BATTERY_LOW_SHUTDOWN,box.getCurrentState());TEST_ASSERT_FALSE(box.tryBeginOta(true));
+ box.finishOtaWithoutReboot();TEST_ASSERT_EQUAL(STATE_SENSOR_RECHECK,box.getCurrentState());TEST_ASSERT_FALSE(box.tryBeginOta(true));
 }
 void test_recovery_ota_cannot_bypass_known_critical_or_moving_or_stale_state(void){
  MockHardware hw;hw.setBatteryVoltage(11.0f);SmartBoxController box(hw);box.init();for(int n=0;n<121;n++){hw.advanceMillis(1000);box.update();}TEST_ASSERT_FALSE(box.tryBeginOta(true));
@@ -1183,9 +1185,97 @@ void test_low_warning_u32_wrap_and_protection_calls_do_not_forge_time(void) {
  TEST_ASSERT_TRUE(p.snapshot(now-1000).lowWarning);
 }
 
+
+void test_sensor_glitch_does_not_create_persistent_battery_hold(void) {
+ BatteryPolicy p;p.sample(0,12.5f,true,11);p.sample(200,NAN,false,11);
+ TEST_ASSERT_TRUE(p.snapshot(200).protectedMode);TEST_ASSERT_FALSE(p.snapshot(200).persistentHold);
+ p.sample(1200,12.5f,true,11);TEST_ASSERT_TRUE(p.snapshot(1200).protectedMode);
+ p.sample(2200,12.5f,true,11);TEST_ASSERT_FALSE(p.snapshot(2200).protectedMode);
+ TEST_ASSERT_TRUE(p.snapshot(2200).actuationAllowed);TEST_ASSERT_EQUAL_UINT32(0,p.snapshot(2200).recoveryCount);
+}
+void test_sensor_recheck_cannot_clear_genuine_low_hold(void) {
+ BatteryPolicy p;for(uint32_t n=0;n<=3000;n+=200)p.sample(n,11,true,11);
+ TEST_ASSERT_TRUE(p.snapshot(3000).persistentHold);
+ p.sample(3200,NAN,false,11);p.sample(4200,12.5f,true,11);p.sample(5200,12.5f,true,11);
+ TEST_ASSERT_TRUE(p.snapshot(5200).persistentHold);TEST_ASSERT_FALSE(p.snapshot(5200).actuationAllowed);
+}
+void test_sensor_recheck_invalid_and_gap_restart_stability(void) {
+ BatteryPolicy p;p.sample(0,NAN,false,11);p.sample(1000,12.5f,true,11);
+ p.sample(4001,12.5f,true,11);TEST_ASSERT_TRUE(p.snapshot(4001).protectedMode);
+ p.sample(5001,12.5f,true,11);TEST_ASSERT_FALSE(p.snapshot(5001).protectedMode);
+ p.sample(6001,NAN,false,11);p.sample(7001,12.5f,true,11);p.sample(7501,NAN,false,11);
+ p.sample(8501,12.5f,true,11);TEST_ASSERT_TRUE(p.snapshot(8501).protectedMode);
+ p.sample(9501,12.5f,true,11);TEST_ASSERT_FALSE(p.snapshot(9501).protectedMode);
+}
+class RangeOnceHardware:public MockHardware {
+ public:bool inject=false;
+ PowerReading readPower() override {
+  if(inject){inject=false;PowerReading r{NAN,NAN,false,PowerReadFault::RANGE,1,0x399f,4096};r.rawBusV=12.4f;r.rawShuntMv=330;r.rawCurrentMa=3300;r.rangeMask=6;return r;}
+  return MockHardware::readPower();
+ }
+};
+void test_range_stop_recovers_without_automatic_motion_and_keeps_reason(void) {
+ RangeOnceHardware hw;hw.setBatteryVoltage(12.5f);SmartBoxController box(hw);box.init();box.forceOpen();box.update();
+ hw.setDistanceCm(20);hw.inject=true;hw.advanceMillis(200);box.update();
+ TEST_ASSERT_EQUAL(STATE_SENSOR_RECHECK,box.getCurrentState());
+ for(int pin:{6,7,8})TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(pin));
+ TEST_ASSERT_FALSE(box.powerSnapshot().persistentHold);
+ hw.advanceMillis(1000);box.update();TEST_ASSERT_EQUAL(STATE_SENSOR_RECHECK,box.getCurrentState());
+ hw.advanceMillis(1000);box.update();TEST_ASSERT_EQUAL(STATE_IDLE,box.getCurrentState());
+ hw.clearEventHistory();
+ for(int i=0;i<30;i++){hw.advanceMillis(200);box.update();}
+ for(const auto& e:hw.getEventHistory())TEST_ASSERT_FALSE(e.type==EVENT_MODE&&e.pin==6&&e.value==OUTPUT);
+ TEST_ASSERT_EQUAL(PowerReadFault::RANGE,box.powerDiagnosticsFrame().lastFault.fault);
+ TEST_ASSERT_EQUAL_UINT8(6,box.powerDiagnosticsFrame().lastFault.rangeMask);
+ TEST_ASSERT_TRUE(box.getSensorDeadlockFlag());
+ const auto diagnostic=box.powerDiagnosticsFrame();TEST_ASSERT_TRUE(diagnostic.power.valid);TEST_ASSERT_TRUE(diagnostic.reading.valid);TEST_ASSERT_EQUAL_UINT32(1,diagnostic.faultCount);TEST_ASSERT_GREATER_OR_EQUAL_UINT32(2000,diagnostic.faultAgeMs);
+}
+void test_explicit_close_can_rehome_from_logical_idle(void) {
+ MockHardware hw;hw.setBatteryVoltage(12.5f);SmartBoxController box(hw);box.init();
+ box.forceClose();TEST_ASSERT_EQUAL(STATE_CLOSE_START,box.getCurrentState());box.update();
+ TEST_ASSERT_EQUAL(STATE_CLOSING,box.getCurrentState());
+}
+void test_sensor_fault_does_not_admit_commands_before_valid_stability(void) {
+ MockHardware hw;hw.setBatteryVoltage(NAN);SmartBoxController box(hw);box.init();box.update();
+ hw.setBatteryVoltage(12.5f);hw.advanceMillis(1000);box.update();box.forceOpen();box.forceClose();box.startMaintenanceMode();
+ TEST_ASSERT_EQUAL(STATE_SENSOR_RECHECK,box.getCurrentState());
+ for(int pin:{6,7,8})TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(pin));
+}
+void test_range_diagnostics_preserve_raw_values_without_valid_power(void) {
+ LegacyContinuousSource p;p.bus=12.4f;p.shunt=330;p.current=3300;
+ const auto r=sampleIna219Continuous(p);
+ TEST_ASSERT_FALSE(r.valid);TEST_ASSERT_EQUAL(PowerReadFault::RANGE,r.fault);TEST_ASSERT_TRUE(std::isnan(r.voltage));
+ TEST_ASSERT_EQUAL_UINT8(6,r.rangeMask);TEST_ASSERT_FLOAT_WITHIN(0.001f,3300,r.rawCurrentMa);
+ TEST_ASSERT_FLOAT_WITHIN(0.001f,330,r.rawShuntMv);TEST_ASSERT_FLOAT_WITHIN(0.001f,12.4f,r.rawBusV);
+}
+
+
+void test_sensor_stop_inhibition_survives_recovery_ota_cleanup(void) {
+ MockHardware hw;hw.setBatteryVoltage(12.5f);SmartBoxController box(hw);box.init();
+ for(int i=0;i<121;i++){hw.advanceMillis(1000);box.update();}
+ box.forceOpen();box.update();hw.setBatteryVoltage(NAN);hw.advanceMillis(200);box.update();
+ TEST_ASSERT_EQUAL(STATE_SENSOR_RECHECK,box.getCurrentState());TEST_ASSERT_TRUE(box.tryBeginOta(true));
+ hw.setBatteryVoltage(12.5f);hw.advanceMillis(1000);box.servicePowerDuringOta();
+ hw.advanceMillis(1000);box.servicePowerDuringOta();box.finishOtaWithoutReboot();
+ TEST_ASSERT_EQUAL(STATE_IDLE,box.getCurrentState());
+ hw.setDistanceCm(20);hw.clearEventHistory();
+ for(int i=0;i<40;i++){hw.advanceMillis(200);box.update();}
+ for(const auto& e:hw.getEventHistory())TEST_ASSERT_FALSE(e.type==EVENT_MODE&&e.pin==6&&e.value==OUTPUT);
+ TEST_ASSERT_TRUE(box.getSensorDeadlockFlag());
+}
+
 #ifdef NATIVE_BUILD
 int main(int argc, char **argv) {
     UNITY_BEGIN();
+    RUN_TEST(test_sensor_stop_inhibition_survives_recovery_ota_cleanup);
+    RUN_TEST(test_sensor_glitch_does_not_create_persistent_battery_hold);
+    RUN_TEST(test_sensor_recheck_cannot_clear_genuine_low_hold);
+    RUN_TEST(test_sensor_recheck_invalid_and_gap_restart_stability);
+    RUN_TEST(test_range_stop_recovers_without_automatic_motion_and_keeps_reason);
+    RUN_TEST(test_explicit_close_can_rehome_from_logical_idle);
+    RUN_TEST(test_sensor_fault_does_not_admit_commands_before_valid_stability);
+    RUN_TEST(test_range_diagnostics_preserve_raw_values_without_valid_power);
+
     RUN_TEST(test_low_warning_needs_11v_for_300s_despite_early_protection);
     RUN_TEST(test_low_warning_dip_invalid_or_gap_restart_continuity);
     RUN_TEST(test_low_warning_never_qualifies_above_11_or_from_stale_snapshot);
