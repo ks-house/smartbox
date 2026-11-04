@@ -2,6 +2,14 @@
 #include <cmath>
 #include <algorithm>
 
+void BatteryPolicy::interruptQualification() {
+  // An explicitly missing cohort cannot contribute to continuous qualification.
+  // Preserve original sample time/value and any existing protection latch.
+  lowTiming_=false;recoveryTiming_=false;healthyTiming_=false;
+  forceHealthyTiming_=false;lowWarningTiming_=false;stateTiming_=false;
+  faultRecoveryTiming_=false;
+}
+
 void BatteryPolicy::restoreProtection() {
   latched_=true; state_=BatteryState::PROTECTED;
   recoveryTiming_=false; lowTiming_=false; healthyTiming_=false; forceHealthyTiming_=false; stateTiming_=false;

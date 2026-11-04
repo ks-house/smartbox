@@ -36,3 +36,17 @@ Sensor-fault recovery OTA는 SENSOR_RECHECK에서도 기존 explicit/once/TTL/la
 - 독립 리뷰는 Important1개를 찾았다. Sensor recovery OTA 중 센서가 회복되면 cleanup이 직접 IDLE로 돌아가 자동 재구동 억제를 우회했다. 실제 native 재현 RED 후 무효 표본에서 억제 flag를 미리 세워 cleanup 경로에도 보존했다. 회귀 GREEN, 전체 native73 PASS.
 - 실제 updater21개 시나리오와 Python144 total/135 executed PASS/9 환경 skip, 두 C6 build PASS. Protected1Hz sampling의 real low3초를 검증하도록 fixture의 유효 관측 구간을 충분히 유지했다.
 - 생성 header는 복원했고 dummy image는 미배포다. 실제 새 버전 설치·boot·진단 readback 및 소유자의 다음 자연스러운 개폐 결과는 별도 gate다. ROOT NAS warning monitor1d1 후보/재인증 대기는 변경하지 않았다.
+
+## 실제0.2.5 설치 수용
+
+PR24 head52e487e673949f640b32934c28a892a9112ad4a6/CI41796565740 PASS 뒤 기존 관리자용 경로로 main945e031efdfc16b7232381e8898b433eff25c8af에 병합했다. 게시41797421488 및 별도 인증 readback41798406049 PASS. 운영0.2.5-g945e031/1421888B/SHA256b0cc2b931122c33670239fa801a8aaf5ab6e70854527a94fae74734f6b89b361다.
+
+Fresh0.2.4/12.30405V/valid1/age46ms/IDLE/NORMAL/idle0.5mA/OTAready1을 확인하고 exclusive intent 뒤17:21:56KST 일반 trigger_ota를QoS0/non-retained로1회 보냈다. 새0.2.5/new boot와1분 이상 지속된 non-retained 표본 및 자동 manifest200/UP_TO_DATE를 확인했다. 최종 관측uptime390334ms/12.28406V/IDLE/NORMAL/valid1/fault0/age101ms/idle0.3mA, persistent_hold0/recheck_remaining0/fault_episodes0였다. 경고11V/300초/active0 및 shutdown11V/3초도 유지됐다. HA 기기 정보의 새 버전과 대조하고 proof/private receipts를 저장했다.
+
+**단순 설치/정상 대기 수용이며 실제 개폐 재현은 하지 않았다.** 실제 range9의 raw 초과값/전기·기계 원인 및 새 정책의 다음 자연스러운 현장 동작은 별도다. 무효 측정 자체를 무시하거나 모터를 계속 구동하도록 만든 것은 아니다.
+
+## NAS 경고 감시기 후속 완료
+
+소유자가 기존 DSM password 단계를 완료해 비활성/root task가 실제 저장된 것을 확인했다. 저장 scriptSHA919b7d9ac74730edc89d6b60ef1aaaad42d736ac62bea61fb27ef6ed8fb726fd를 UI readback으로 재검증한 뒤 해당 작업만17:13:54KST 수동1회 실행했다. 새 SSH/sudo/account 권한이나 다른 서비스는 바꾸지 않았다.
+
+실제 NAS result.json은 updatedtrue/already_currentfalse/configuration_preservedtrue/service_activetrue, sourceSHA1d1d900b2b7e4c8dfb843115759db7063e870b4841db4a0b99ff7a4efedcd8f2, currentNORMAL/battery_warning_activefalse, policy11V/300초를 반환했다. 이 성공은 updater의 fresh worker marker/실제 source query/unit/config 보호 검사를 통과해야 반환된다. Candidate/원본 checkpoint를 보존했고 작업과 기존 Wake PC 모두 checkbox 비활성임을 다시 확인했다. NAS observer를 적용 대기로 남겨 둔 이전 시점 기록은 이 결과로 갱신한다.

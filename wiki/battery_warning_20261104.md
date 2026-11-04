@@ -48,3 +48,9 @@ PR23 headd986764587cc47dfae93b2b8ed68207077eb3975는 CI41782317800 성공 후 �
 2. 준비된 task의 codeSHA와 candidate source/기존 program/unit pin을 대조하고 해당 task만 수동1회 실행한다. Firmware 재설치는 필요하지 않다. Probe가 새 warning-schema cohort를 읽어야 service 교체가 진행된다.
 3. File Station docker 공유의 smartbox-warning-policy-20261104-result.json을 읽는다. updated/already_current, 새SHA/config 보존/service_active/current status를 확인한다. 실패이면 error_type/안전 reason과 원본 보존/rollback을 먼저 확인하고 무작정 반복하지 않는다.
 4. 새 worker warning_policy_schema1/신선한 observed_at과 새 경고 flag 수용을 확인한 뒤 NAS 알림 조건까지 완료로 기록한다. 현재 이 단계는 미수행이며 장치 펌웨어 적용과 혼동하지 않는다.
+
+## NAS 알림 정책 실제 적용 완료
+
+이후 소유자의 DSM 재인증이 완료되어 준비한 작업이 비활성/root로 저장됐다. 저장 codeSHA919b7d9를 대조한 뒤17:13:54KST1회 수동 실행했다. 실제 결과 파일에서 updatedtrue/service_activetrue/configuration_preservedtrue, 새 monitorSHA1d1d900b2b7e4c8dfb843115759db7063e870b4841db4a0b99ff7a4efedcd8f2 및 currentNORMAL/battery_warning_activefalse/policy11V300초를 읽었다. Fresh worker policy marker 검사를 통과한 적용을 수용한다. Password 대기/미적용 문구는 당시 기록이다.
+
+이 정책은 이후 실제 설치된0.2.5-g945e031에서도 warning schema1/11V300초/active0으로 유지된다.0.2.5의 sensor recheck는 battery warning이나 genuine low hold와 별개다. 작업은 비활성으로 남기고 자동 예약 실행은 켜지 않았다. 기존 Wake PC 및 config/계정/다른 서비스는 보존했다. 실제 방전이나 fake positive 경고를 만들지는 않았다.

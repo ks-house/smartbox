@@ -90,6 +90,10 @@ private:
   BatteryPolicy batteryPolicy;
   unsigned long lastPowerReading = 0;
   bool lowBatteryOpening = false;
+  // Only an already powered OPENING stroke may defer the known positive
+  // INA219 full-scale cohort, until the existing inrush deadline (never rearmed).
+  static constexpr uint32_t kOpeningInrushMs=500;
+  bool openingInrushPending=false;
   bool servicePower();
   bool chargingCloseActive=false, chargingCloseUsed=false;
   ChargingCloseState chargingCloseResult=ChargingCloseState::NONE;
@@ -163,7 +167,11 @@ public:
 
   BatterySnapshot powerSnapshot() const {
       std::lock_guard<std::recursive_mutex> lock(dataMutex);
-      return batteryPolicy.snapshot(static_cast<uint32_t>(hw.getMillis()));
+      auto out=batteryPolicy.snapshot(static_cast<uint32_t>(hw.getMillis()));
+      if(openingInrushPending) {
+          out.valid=false;out.actuationAllowed=false;out.otaReady=false;out.forceOtaReady=false;
+      }
+      return out;
   }
   PowerReading powerReadDiagnostics() const {
       std::lock_guard<std::recursive_mutex> lock(dataMutex);return latestPowerRead;
@@ -171,7 +179,7 @@ public:
   PowerDiagnosticsFrame powerDiagnosticsFrame() const {
       std::lock_guard<std::recursive_mutex> lock(dataMutex);
       const uint32_t now=uint32_t(hw.getMillis());
-      return {batteryPolicy.snapshot(now),latestPowerRead,lastPowerFaultRead,powerFaultEpisodes,
+      return {powerSnapshot(),latestPowerRead,lastPowerFaultRead,powerFaultEpisodes,
               powerFaultEpisodes ? now-lastPowerFaultAt : UINT32_MAX,motorCurrent};
   }
   bool canStartOta(bool sensorFaultRecovery=false,bool forceMaintenance=false) const;
@@ -196,7 +204,7 @@ public:
 #ifdef FIRMWARE_VERSION_OVERRIDE
   static constexpr const char *FIRMWARE_VERSION = FIRMWARE_VERSION_OVERRIDE;
 #else
-  static constexpr const char *FIRMWARE_VERSION = "0.2.5";
+  static constexpr const char *FIRMWARE_VERSION = "0.2.6";
 #endif
   const char *getFirmwareVersion() const { return FIRMWARE_VERSION; }
 
