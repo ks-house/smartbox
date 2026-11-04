@@ -9,7 +9,7 @@ source_of_truth: true
 
 # SmartBox Wiki
 
-> 2026-11-04 source0.2.3 후보: [11.0V 이하 보호/저장값 전환](low_voltage_threshold_20261104.md). 현장 설치 수용은 아직 별도다.
+> 2026-11-04 운영OTA0.2.3-g1c09394 게시 및 인증 다운로드 해시 검증 완료. [11V 정책과 게시 증거](low_voltage_threshold_20261104.md). 장치 설치/새부팅/적용값은 아직 미확인이다.
 
 >2026-11-03 field0.2.2 is online with valid measurement. Owner-requested close is admitted then stops at11.211V under load; later requested open remains protected/actuation0. Physical lid position is unknown. See [field operation](field_power_operation_20261103.md).
 
