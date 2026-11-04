@@ -5,7 +5,8 @@
 void ConfigManager::loadConfig(BoxConfig& config) {
     Preferences prefs;
     // Open namespace "smartbox" in read-only mode (true)
-    if (prefs.begin("smartbox", true)) {
+    const bool storedConfigAvailable=prefs.begin("smartbox", true);
+    if (storedConfigAvailable) {
         config.distThreshold = prefs.getFloat("dist", config.distThreshold);
         config.actuatorTime = prefs.getULong("act_time", config.actuatorTime);
         config.waitTime = prefs.getULong("wait_time", config.waitTime);
@@ -36,8 +37,27 @@ void ConfigManager::loadConfig(BoxConfig& config) {
     if (config.distThreshold < 5.0f) {
         config.distThreshold = 50.0f;
     }
-    if (config.voltageShutdownLimit < 5.0f) {
-        config.voltageShutdownLimit = 11.3f;
+    // Owner-approved 0.2.3 migration: changing only the default would leave
+    // the previous 11.3 V value active on installed boards.
+    const float storedCutoff=config.voltageShutdownLimit;
+    const bool legacyCutoff=std::isfinite(storedCutoff) &&
+                            std::fabs(storedCutoff-11.3f)<0.0001f;
+    const bool invalidCutoff=!std::isfinite(storedCutoff) ||
+                             storedCutoff<5.0f || storedCutoff>=25.0f;
+    if (legacyCutoff || invalidCutoff) {
+        config.voltageShutdownLimit = BatteryPolicy::kDefaultCutoffVoltage;
+        // Update just this key; preserve motor, network, OTA and lid settings.
+        // A failed write cannot silently revert the approved runtime threshold.
+        if (storedConfigAvailable) {
+            if (prefs.begin("smartbox", false)) {
+                const bool saved=prefs.putFloat("volt_lim",config.voltageShutdownLimit)==sizeof(float);
+                prefs.end();
+                Serial.println(saved ? "[CONFIG] Voltage cutoff migrated to 11.0 V." :
+                                       "[WARN] Cutoff persistence failed; runtime uses 11.0 V.");
+            } else {
+                Serial.println("[WARN] Cutoff persistence unavailable; runtime uses 11.0 V.");
+            }
+        }
     }
     if (config.currentStallLimit < 100.0f) {
         config.currentStallLimit = 3000.0f; // Dual actuator default

@@ -10,7 +10,7 @@ void BatteryPolicy::sample(uint32_t now,float voltage,bool valid,float cutoff) {
   const bool gap=sampled_ && uint32_t(now-sampleAt_)>kMaxSampleGapMs;
   if(gap) {lowTiming_=false; recoveryTiming_=false; healthyTiming_=false; forceHealthyTiming_=false; stateTiming_=false;}
   sampled_=true; sampleAt_=now;
-  cutoff_=std::isfinite(cutoff) && cutoff>0 && cutoff<25 ? cutoff : 11.3f;
+  cutoff_=std::isfinite(cutoff) && cutoff>0 && cutoff<25 ? cutoff : kDefaultCutoffVoltage;
   recovery_=std::max(12.0f,cutoff_+0.7f);
   forceFloor_=std::max(11.7f,cutoff_+0.4f);
   valid_=valid && std::isfinite(voltage) && voltage>0 && voltage<=16.0f;
@@ -37,7 +37,7 @@ void BatteryPolicy::sample(uint32_t now,float voltage,bool valid,float cutoff) {
     } else {recoveryTiming_=false; state_=BatteryState::PROTECTED;}
     return;
   }
-  if(voltage<cutoff_) {
+  if(voltage<=cutoff_) {
     if(!lowTiming_) {lowTiming_=true; lowAt_=now;}
     if(uint32_t(now-lowAt_)>=3000) {
       latched_=true; state_=BatteryState::PROTECTED;
@@ -63,7 +63,7 @@ BatterySnapshot BatteryPolicy::snapshot(uint32_t now) const {
   const uint32_t interval=blocked ? 300000 : state==BatteryState::SAVING ? 120000 :
                           state==BatteryState::WARNING ? 60000 : 30000;
   const uint32_t elapsed=recoveryTiming_ ? uint32_t(now-recoveryAt_) : 0;
-  return {state,fresh,blocked,fresh && !latched_ && voltage_>=cutoff_,
+  return {state,fresh,blocked,fresh && !latched_ && voltage_>cutoff_,
     fresh && !latched_ && healthyTiming_ && uint32_t(now-healthyAt_)>=30000,
     voltage_,minimum_,recovery_,latched_ ? (elapsed>=kRecoveryMs ? 0 : kRecoveryMs-elapsed) : 0,
     recoveries_,age,interval,fresh && forceHealthyTiming_ && uint32_t(now-forceHealthyAt_)>=30000,forceFloor_};

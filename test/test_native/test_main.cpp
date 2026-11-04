@@ -1061,7 +1061,7 @@ void test_charging_close_does_not_disable_cutoff_or_measurement_guard(void) {
  TEST_ASSERT_FALSE(box.requestChargingClose());TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(6));
  }
  MockHardware hw;hw.setBatteryVoltage(12);SmartBoxController box(hw);box.setInitialState(STATE_BATTERY_LOW_SHUTDOWN);box.init();box.update();TEST_ASSERT_TRUE(box.requestChargingClose());
- hw.setBatteryVoltage(11.2f);hw.advanceMillis(200);box.update();
+ hw.setBatteryVoltage(11.0f);hw.advanceMillis(200);box.update();
  TEST_ASSERT_EQUAL(ChargingCloseState::LOW_VOLTAGE,box.chargingCloseState());
  for(int pin:{6,7,8})TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(pin));
  for(int i=0;i<30;i++){hw.advanceMillis(200);box.update();}TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(6));
@@ -1106,9 +1106,54 @@ void test_lower_recovery_threshold_keeps_dwell_and_gap_guard(void) {
  TEST_ASSERT_EQUAL_UINT32(1,policy.snapshot(300000).recoveryCount);
 }
 
+
+void test_owner_11v_default_does_not_latch_at_field_sag(void) {
+ MockHardware hw;hw.setBatteryVoltage(11.211f);SmartBoxController box(hw);box.init();
+ TEST_ASSERT_FLOAT_WITHIN(0.0001f,11.0f,box.getConfig().voltageShutdownLimit);
+ for(int i=0;i<30;i++){hw.advanceMillis(200);box.update();}
+ TEST_ASSERT_FALSE(box.powerSnapshot().protectedMode);
+ TEST_ASSERT_TRUE(box.powerSnapshot().actuationAllowed);
+}
+void test_owner_11v_boundary_is_inclusive_with_original_dwell(void) {
+ BatteryPolicy p;
+ for(uint32_t now=0;now<=2800;now+=200)p.sample(now,11.0f,true,11.0f);
+ TEST_ASSERT_FALSE(p.snapshot(2800).protectedMode);
+ TEST_ASSERT_FALSE(p.snapshot(2800).actuationAllowed);
+ p.sample(3000,11.0f,true,11.0f);
+ TEST_ASSERT_TRUE(p.snapshot(3000).protectedMode);
+ BatteryPolicy above;
+ for(uint32_t now=0;now<=4000;now+=200)above.sample(now,11.001f,true,11.0f);
+ TEST_ASSERT_FALSE(above.snapshot(4000).protectedMode);
+ TEST_ASSERT_TRUE(above.snapshot(4000).actuationAllowed);
+}
+void test_owner_11v_charging_close_survives_previous_field_sag(void) {
+ MockHardware hw;hw.setBatteryVoltage(11.94f);SmartBoxController box(hw);
+ box.setInitialState(STATE_BATTERY_LOW_SHUTDOWN);box.init();box.update();
+ TEST_ASSERT_TRUE(box.requestChargingClose());
+ hw.setBatteryVoltage(11.211f);hw.setMotorCurrent(1368.9f);hw.advanceMillis(200);box.update();
+ TEST_ASSERT_EQUAL(ChargingCloseState::RUNNING,box.chargingCloseState());
+ TEST_ASSERT_TRUE(box.isMotorRunning());
+ hw.setBatteryVoltage(11.0f);hw.advanceMillis(200);box.update();
+ TEST_ASSERT_EQUAL(ChargingCloseState::LOW_VOLTAGE,box.chargingCloseState());
+ for(int pin:{6,7,8})TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(pin));
+ TEST_ASSERT_TRUE(box.powerSnapshot().protectedMode);
+}
+void test_owner_11v_close_can_start_above_cutoff_but_not_at_it(void) {
+ for(float v:{11.0f,11.001f}) {
+  MockHardware hw;hw.setBatteryVoltage(v);SmartBoxController box(hw);
+  box.setInitialState(STATE_BATTERY_LOW_SHUTDOWN);box.init();box.update();
+  TEST_ASSERT_EQUAL(v>11.0f,box.requestChargingClose());
+ }
+}
+
 #ifdef NATIVE_BUILD
 int main(int argc, char **argv) {
     UNITY_BEGIN();
+    RUN_TEST(test_owner_11v_default_does_not_latch_at_field_sag);
+    RUN_TEST(test_owner_11v_boundary_is_inclusive_with_original_dwell);
+    RUN_TEST(test_owner_11v_charging_close_survives_previous_field_sag);
+    RUN_TEST(test_owner_11v_close_can_start_above_cutoff_but_not_at_it);
+
     RUN_TEST(test_force_ota_requires_stable_above_floor_and_never_unlatches_protection);
     RUN_TEST(test_force_ota_dip_gap_bad_sensor_and_motion_remain_blocked);
     RUN_TEST(test_owner_command_requires_durable_write_and_rejects_replay_after_restart);

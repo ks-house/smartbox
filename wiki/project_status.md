@@ -14,6 +14,8 @@ applies_to:
 
 # 현재 프로젝트 상태
 
+> 2026-11-04: [0.2.3 후보/11.0V 이하 보호](low_voltage_threshold_20261104.md) 구현 및 검증 중. 이전11.3V 저장값 전환 포함. 현장 적용은 아직 확인하지 않았다.
+
 > 2026-11-03 source candidate0.2.2 adds owner close-only/forced OTA and12.0V/300s recovery. [Current contract](battery_power_management.md). 2026-11-03 same-board USB write/readback and actual0.2.2-gdb96897 nativeUSB boot/30s loop are now confirmed. Bare-board INA219 absence is owner-confirmed; field sensor/physical close/charging/network/OTA acceptance remain pending.
 
 

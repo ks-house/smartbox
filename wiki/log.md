@@ -388,3 +388,19 @@ source_of_truth: true
 - Exclusive private intent precedes one close_for_charging/QoS0/non-retained/60s request. Device admission code1/used1 at11.90802V then terminal code3 at11.211V/1368.9mA below unchanged11.3 cutoff. DB receipts20:13:23/20:13:25KST independently preserve results; current rebounds11.94V/0.4mA. Owner cannot observe movement; no physical close/charging success claim or repeat.
 - Owner later requests fully open. One ordinary force_open publish followed by read-only diagnosis retains power PROTECTED/actuation0/BATTERY_LOW_SHUTDOWN and0.2-0.5mA idle branch current. No admission ACK/opening transition or physical open confirmation; no reset/reboot/OTA or guard changes. Four read-only diagnostic commands across both segments.
 - New HA owner buttons are absent; static SGK ACL discovery IDs exclude new IDs, but live operating ACL is unverified and unchanged. Record follow-up without claiming verified production root cause. Native57/default C6 PASS, generated header restored; no local dummy artifact deployed.
+
+## [2026-11-04] compile | Analyze solar charging and repeated low-battery reports without motion
+
+- Owner reports today's charging/open/close low-battery behavior and requests analysis. Today telemetry remains unverified: local browser disabled in Work settings; dedicated signed status return1/sudo password required. Do not reuse Nov3 samples as Nov4 measurements or bypass authority.
+- Recheck exact controller/policy: general valid low protection entry retains one bounded fail-open stroke, conflicting with owner-reported closed-for-charging installation. Explicit charging close instead retains latch on all terminal outcomes and does not reopen; NORMAL recovery requires12.0V/300s and returns IDLE without motion on that tick.
+- Prior measured11.90802→11.211V/1368.9mA close cutoff supports load sag but does not separate battery/cabling/mechanical causes or prove solar current. Record candidate recovery/actuation loop, UI ambiguity and priority policy/observability proposals as unimplemented.
+- Existing native57 PASS and default C6 build PASS; generated version header restored, dummy artifact not deployed. No device publish, reboot, OTA, setting/service/authority change. Relative Markdown links and diff whitespace checked.
+
+## [2026-11-04] code | Implement owner-approved inclusive11.0V cutoff and saved-value transition
+
+- Owner confirms same behavior today and explicitly requests protection at11V or below. Preserve3s normal qualification,12.0V/300s release, forceOTA floor11.7/30s and all sensor/current/interlock/TTL limits. No general fail-open behavior change or motion request.
+- New4 native cases reproduce RED for old default/equality/field11.211V close stop/11.001V admission. Change default/fallback/close floor to central11.0 and use strict-above admission/less-or-equal stop. Existing native61 now PASS.
+- Actual ConfigManager host fixture6 cases:4 RED before code; all6 GREEN afterward. Migrate legacy11.3/invalid stored cutoff by one key-only write; custom/other settings retained, no repeat write after success; persistence failure leaves new runtime cutoff with warning.
+- Version0.2.3 candidate; old0.2.2 installation is not relabeled. Full suites/build/review and artifact preparation follow. Primary checkout and prior USB kits untouched.
+
+- Final local validation: native61 PASS; Python129 total/120 executed PASS/9 explicit opt-in environment skips; UART and nativeUSB C6 builds PASS. Independent scoped review reports no findings and independently passes6 actual-loader cases. Generated header restored; no dummy artifact installed. Private exact-commit credentialed bundle preparation is next, distinct from installation.

@@ -4,7 +4,7 @@ Status: source implementation and isolated validation; publication/installation 
 
 ## Power policy
 
-The system retains its12V lead-acid profile and default11.3V/3s guard. Warning=cutoff+0.7V, saving=cutoff+0.4V. Noncritical changes qualify for15s and have0.1V exit hysteresis to avoid repeated radio publications near a threshold. Recovery requires max(12.0V,cutoff+0.7V) continuously for300s with fresh valid samples; a gap>2s, invalid sample or voltage dip restarts qualification. These are software policy defaults, not measured SOC or a battery-manufacturer acceptance claim.
+The system retains its12V lead-acid profile and source0.2.3 default11.0V-inclusive/3s guard (installation pending). Warning=cutoff+0.7V, saving=cutoff+0.4V. Noncritical changes qualify for15s and have0.1V exit hysteresis to avoid repeated radio publications near a threshold. Recovery requires max(12.0V,cutoff+0.7V) continuously for300s with fresh valid samples; a gap>2s, invalid sample or voltage dip restarts qualification. These are software policy defaults, not measured SOC or a battery-manufacturer acceptance claim.
 
 A confirmed critical episode preserves the existing single3800ms fail-open stroke and interlock. Invalid/missing INA219 instead isolates immediately, including failure during that stroke; it never returns synthetic12.2V/0mA. Recovery leaves outputs isolated, clears pending movement/median/debounce and enters idle with3s blind time. Fresh normal detection may then run the existing FSM. Recovery alone does not force a lid stroke or prove physical position.
 
@@ -109,8 +109,8 @@ Approved source now lowers release to max(12.0V,cutoff+0.7V) for300s and impleme
 
 이 기능은0.2.2 후보 소스에 추가됐다. 현장0.2.1-g4a57756에는 아직 없으며 빌드/버튼 정의는 현장 설치 증거가 아니다.
 
-- 보호 진입 기본11.3V/3초는 유지한다. 보호 해제 기준은 기본12.0V/300초(설정 cutoff가 높으면 max(12.0,cutoff+0.7))로 낮춘다. 조건 충족 전에는 사람 감지/일반 열기가 동작하지 않는다. 해제 시 자동 스트로크 없이 이후 새 사람 감지부터 재개한다.
-- HA의 **충전을 위해 닫기**는 보호 중 유효 전압이 기본11.3V 이상일 때만 닫기1회를 요청한다. 최대3.8초이고 저전압·센서 오류·과전류는 중단한다. 완료 뒤 보호를 유지하고 출력은 격리한다. 시간 종료 표시는 실제 닫힌 위치를 보증하지 않는다.
+- 0.2.3 후보는 보호 진입 기본11.0V 이하/3초로 변경한다. 보호 해제 기준은 기본12.0V/300초(설정 cutoff가 높으면 max(12.0,cutoff+0.7))로 낮춘다. 조건 충족 전에는 사람 감지/일반 열기가 동작하지 않는다. 해제 시 자동 스트로크 없이 이후 새 사람 감지부터 재개한다.
+- HA의 **충전을 위해 닫기**는 보호 중 유효 전압이 기본11.0V 초과일 때만 닫기1회를 요청한다. 최대3.8초이고 저전압·센서 오류·과전류는 중단한다. 완료 뒤 보호를 유지하고 출력은 격리한다. 시간 종료 표시는 실제 닫힌 위치를 보증하지 않는다.
 - **강제 펌웨어 업데이트**는 기본11.7V 이상30초·부팅120초·모터 정지 조건으로 일반 보호 대기/동일 버전 생략을 우회한다. 실제 전원 안정성을 보증하는 조건은 아니다. 센서 오류는 별도 기존 복구 경로이며, TLS/인증 실패와 게시 보류404를 무시하지 않는다.
 - 두 버튼은 기존 MQTT 권한 안에서 HA command_template으로 매번 새 요청 ID와60초 기한을 만든다([HA 공식 문서](https://www.home-assistant.io/integrations/button.mqtt/)). retained/중복/만료/재사용을 거절하고 기한 watermark를 NVS에 먼저 저장한다. 시계 미동기화/저장 실패도 거절한다. 같은 초의 연속 클릭은 기한 재사용으로 거절될 수 있다.
 - 닫기 시도는 부팅당1회, 강제/센서 복구 OTA 예약도 합쳐 부팅당1회다. 유효 요청 기록은 RAM8개 제한으로 가득 차면 거절하며 자동 반복하지 않는다. 새 MQTT nonce만 바꾸어 이 제한을 우회할 수 없다. 구동 실패 후 임의 재부팅/자동 재시도를 하지 말고 원인을 확인한다.
@@ -123,3 +123,8 @@ Approved source now lowers release to max(12.0V,cutoff+0.7V) for300s and impleme
 ## 2026-11-03 USB adoption accepted
 
 Same physical SmartBox receives exact0.2.2-gdb96897 via guarded USB write/readback with original boot/table/NVS prefix preserved during programming. NativeUSB actual firmware line and30s continued execution accepted. Owner confirms bare board/no INA219, so fault10 is not connected-field measurement failure evidence. Connected voltage/physical charging close/new HA buttons/recovery/network/OTA health remain field Gates; see [bench evidence](bench_usb_acceptance.md).
+
+
+## 2026-11-04 승인된11.0V 이하 기준
+
+[새 기준 및 저장값 전환](low_voltage_threshold_20261104.md): 이전 기본11.3V 저장값까지11.0V로 전환한다. 앞선 날짜별11.3V 기록은 당시 정책이다. 새 source0.2.3을 현장 적용/확인하기 전에는 설치0.2.2 기준을 변경했다고 주장하지 않는다.

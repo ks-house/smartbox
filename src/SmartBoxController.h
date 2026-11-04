@@ -48,7 +48,7 @@ struct BoxConfig {
   unsigned long actuatorTime = 3800;
   unsigned long waitTime = 10000;
   unsigned long cooldownTime = 3000;
-  float voltageShutdownLimit = 11.3f;
+  float voltageShutdownLimit = BatteryPolicy::kDefaultCutoffVoltage;
   float currentStallLimit =
       3000.0f; // Dual actuator: 100N/60mm/s x2 @ 12V, normal run ~2000mA
   unsigned long emergencyRecoveryTime =
@@ -180,7 +180,7 @@ public:
 #ifdef FIRMWARE_VERSION_OVERRIDE
   static constexpr const char *FIRMWARE_VERSION = FIRMWARE_VERSION_OVERRIDE;
 #else
-  static constexpr const char *FIRMWARE_VERSION = "0.2.2";
+  static constexpr const char *FIRMWARE_VERSION = "0.2.3";
 #endif
   const char *getFirmwareVersion() const { return FIRMWARE_VERSION; }
 
