@@ -28,3 +28,16 @@
 ## 검증된 설치 후보 준비 결과
 
 GitHub CI41771908658와 비공개 build41771946349는 source4f3d7b37a93f342e449e8b7146e267b0f375d560에서 PASS했다. 후보0.2.3-g4f3d7b3 /1410704B /SHA25685e587a3ef6dd7133f11329b8f24217acf971699dd8816025b142efe2d32db59. CMS AES256-GCM 인증 복호화, artifact digest, 내부 파일 및 C6/layout 검증을 완료했다. 운영 게시/OTA 요청/설치는 미실시다. 기존3종 고정 status는 모두 sudo password-required로 거절되고 브라우저도 비활성화되어 실제 적용 확인이 남아 있다. PR22 draft와issue19에 이 경계를 기록했다.
+
+## 운영 OTA 게시 — 설치와 별도
+
+소유자가 OTA 경로 사용을 재요청했다. 관리자SSH sudo 실패가 OTA 게시 불가를 의미하지는 않는다. 기존CI의 별도SFTP 배포 계정으로 게시할 수 있음을 실제로 확인했다.
+
+PR22는 최종head37a7c53의 CI41772499489 성공 후 ready로 전환했다. 일반 병합은 기존 main update 제한에 걸렸으며, 실제 ruleset은 OrganizationAdmin always/current_user_can_bypass always를 지정한다. 기존 허용 관리자 경로로 squash 병합했고, ruleset·권한·계정 설정은 변경하지 않았다. 병합main1c093943108a04fdc01d13cc7eb5fed038f98f89의 자동 게시41773087153는 시험·익명 차단 검사·운영C6 build·SFTP 배포 모두 PASS다.
+
+게시version0.2.3-g1c09394 /1418992B /SHA256d0e788cbf94f525d7534a25dfc9e98897a79957c8606dcf19a7907853c897011. 기존 비공개nativeUSB 후보0.2.3-g4f3d7b3와 운영UART build는 서로 다른 이미지이므로 해시·버전을 섞지 않는다.
+
+읽기 전용 검증41773546122도 PASS: 올바른 인증 HEAD/GET4개200, 익명·잘못된 인증 거절8개, TLS hostname/chain 검증, 실제 다운로드버전/크기/해시가 게시metadata와 일치했다. 실제 firmware/version.json이 OTA 경로에 게시된 것은 수용한다.
+
+장치의 명시 force_ota/trigger_ota는 아직 전송하지 않았다. 브라우저 기능이 Work settings에서 비활성화돼 기존HA 세션으로 최신 전원 상태/실제설치 버전을 읽지 못한다. 소유자에게 로컬 브라우저 사용과 HA 로그인 접근을 요청했다. 자동OTA가 설치했는지 추정하지 않으며, 설치·새부팅·11V migration 수용은 미확인이다. 서버root 접속 복구를 OTA의 필수 조건으로 다시 요구하지 않는다.
+\n\n## 이후 실제 설치 수용\n\n브라우저 접근 허용 후 기존HA에서 첫 일반OTA가 stream error6으로 확정 실패하고 기존0.2.2로 복귀했다. origin 재검증 뒤 두 번째 일반OTA로 실제0.2.3-g1c09394/새 uptime/센서정상/UP_TO_DATE를 확인했다. [상세 설치 수용](ota_adoption_20261104.md). 앞선 설치 미확인 단락은 당시 경계이며 이번 증거로 갱신한다. 실물 cutoff/NVS 직접 읽기와 저전압 차단/충전 성공은 별도다.\n

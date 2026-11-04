@@ -6,7 +6,7 @@ spec=importlib.util.spec_from_file_location("power_monitor",ROOT/"ops/power_moni
 m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 
 def sample(**changes):
-    data={"schema":1,"at":1000,"valid":1,"state":0,"interval_s":30,"voltage":12.6,"sample_age_ms":200}
+    data={"schema":1,"at":1000,"valid":1,"state":0,"interval_s":30,"voltage":12.6,"sample_age_ms":200,"warning_schema":1,"warning_active":0,"warning_elapsed_s":0,"warning_voltage_v":11.0,"warning_required_s":300}
     data.update(changes);return data
 
 class PowerMonitorTests(unittest.TestCase):
@@ -27,17 +27,19 @@ class PowerMonitorTests(unittest.TestCase):
     def test_bad_state_or_interval_is_invalid(self):
         for row in [sample(state=99),sample(interval_s=1),sample(sample_age_ms=3000)]:
             self.assertIn(m.evaluate(row,1020)["status"],["SOURCE_INVALID","POWER_SENSOR_FAULT"])
-    def test_warning_dwell_and_dedup(self):
-        warning=m.evaluate(sample(state=1),1020)
-        state,event=m.advance({},warning,1020);self.assertIsNone(event)
-        state,event=m.advance(state,warning,1081);self.assertEqual("LOW_BATTERY",event["status"])
+    def test_qualified_warning_dedup_without_added_nas_dwell(self):
+        warning=m.evaluate(sample(state=3,voltage=11,warning_active=1,warning_elapsed_s=300),1020)
+        state,event=m.advance({},warning,1020);self.assertEqual("LOW_BATTERY",event["status"])
+        state,event=m.advance(state,warning,1081);self.assertIsNone(event)
         state,event=m.advance(state,warning,1200);self.assertIsNone(event)
-    def test_protection_immediate_and_recovery_once(self):
+    def test_protection_observed_but_only_qualified_warning_notifies(self):
         state,event=m.advance({},m.evaluate(sample(state=3),1020),1020)
-        self.assertEqual("BATTERY_PROTECTED",event["status"])
-        state,event=m.advance(state,m.evaluate(sample(),1020),1021)
+        self.assertIsNone(event);self.assertEqual("BATTERY_PROTECTED",state["current"]["status"])
+        state,event=m.advance(state,m.evaluate(sample(state=3,voltage=11,warning_active=1,warning_elapsed_s=300),1020),1021)
+        self.assertEqual("LOW_BATTERY",event["status"])
+        state,event=m.advance(state,m.evaluate(sample(),1020),1022)
         self.assertEqual("RECOVERED",event["status"])
-        state,event=m.advance(state,m.evaluate(sample(),1020),1022);self.assertIsNone(event)
+        state,event=m.advance(state,m.evaluate(sample(),1020),1023);self.assertIsNone(event)
     def test_first_normal_is_quiet(self):
         state,event=m.advance({},m.evaluate(sample(),1020),1020);self.assertIsNone(event)
     def test_flux_mixed_frame_is_rejected(self):

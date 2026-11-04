@@ -77,7 +77,7 @@ def existing_config(docker,recipient):
 
 def validate_observer_admission(sample,current,bootstrap=False):
     if type(bootstrap) is not bool:raise ValueError('explicit bootstrap decision required')
-    allowed={'NORMAL','LOW_BATTERY','ENERGY_SAVING','BATTERY_PROTECTED','RECOVERY_WAIT','POWER_SENSOR_FAULT','INITIALIZING','LEGACY_FIRMWARE','OFFLINE'}
+    allowed={'NORMAL','LOW_BATTERY','ENERGY_SAVING','BATTERY_PROTECTED','RECOVERY_WAIT','POWER_SENSOR_FAULT','INITIALIZING','LEGACY_FIRMWARE','OFFLINE','POWER_CAUTION','WARNING_POLICY_UNAVAILABLE'}
     if current.get('status') not in allowed:raise ValueError('healthy query and recognized source required')
     if not bootstrap and (sample is None or sample.get('schema')!=1):raise ValueError('new installed telemetry schema required')
 
