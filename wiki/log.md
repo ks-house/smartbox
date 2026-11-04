@@ -404,3 +404,9 @@ source_of_truth: true
 - Version0.2.3 candidate; old0.2.2 installation is not relabeled. Full suites/build/review and artifact preparation follow. Primary checkout and prior USB kits untouched.
 
 - Final local validation: native61 PASS; Python129 total/120 executed PASS/9 explicit opt-in environment skips; UART and nativeUSB C6 builds PASS. Independent scoped review reports no findings and independently passes6 actual-loader cases. Generated header restored; no dummy artifact installed. Private exact-commit credentialed bundle preparation is next, distinct from installation.
+
+## [2026-11-04] compile | Prepare authenticated0.2.3 installation candidate and record access blocker
+
+- Exact code4f3d7b3 hosted CI41771908658 and private41771946349 PASS; normal deployment job skipped. Authenticated CMS owner decryption and GitHub archive digest/internal manifest/C6/layout checks produce0.2.3-g4f3d7b3/1410704B/SHA85e587a3ef6dd7133f11329b8f24217acf971699dd8816025b142efe2d32db59. OTA metadata and private PREPARED receipt distinguish false nas_staged/ota_triggered/installed; prior images/kits preserved.
+- New read-only status confirms maintenance, broker and HA dedicated keys all fail sudo password-required. Browser remains disabled in Work settings. No alternative privilege bypass, settings/service change, motion, reboot or OTA request. Actual0.2.3 threshold/migration acceptance remains pending.
+- PR22 title/body rewritten for final11V/close/forceOTA scope and re-fetched UTF8 equality/head/draft status verified. Issue19 comment likewise re-fetched and verified; remains open for installed acceptance.

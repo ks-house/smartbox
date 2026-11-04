@@ -24,3 +24,7 @@
 - 실제 ConfigManager를 Preferences stub으로 실행하는6개 시험 중 이전값 전환/NaN/저장 실패/저장소 없음4개가 수정 전 실패. 수정 후6개 통과; 사용자 별도값/다른 설정 보존 및1회 쓰기 검증.
 - 수정 후 native61개 PASS. 전체 Python/양쪽 C6 build/코드 리뷰 결과는 이번 log의 최종 항목에서 확인한다.
 - 새 펌웨어 설치와 실제 적용 cutoff 확인은 별도 Gate다. 기존0.2.2-gdb96897 설치 증거와 섞지 않는다. source 변경·로컬 dummy 빌드는 장치 설정 변경이 아니다.
+
+## 검증된 설치 후보 준비 결과
+
+GitHub CI41771908658와 비공개 build41771946349는 source4f3d7b37a93f342e449e8b7146e267b0f375d560에서 PASS했다. 후보0.2.3-g4f3d7b3 /1410704B /SHA25685e587a3ef6dd7133f11329b8f24217acf971699dd8816025b142efe2d32db59. CMS AES256-GCM 인증 복호화, artifact digest, 내부 파일 및 C6/layout 검증을 완료했다. 운영 게시/OTA 요청/설치는 미실시다. 기존3종 고정 status는 모두 sudo password-required로 거절되고 브라우저도 비활성화되어 실제 적용 확인이 남아 있다. PR22 draft와issue19에 이 경계를 기록했다.
