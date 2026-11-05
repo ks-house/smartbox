@@ -3,7 +3,7 @@ title: SmartBox current project status
 type: reference
 project: smartbox
 status: active
-updated: 2026-11-04
+updated: 2026-11-05
 source_of_truth: true
 applies_to:
   - firmware
@@ -13,6 +13,8 @@ applies_to:
 ---
 
 # 현재 프로젝트 상태
+
+>2026-11-05 current: [operating0.2.8 SENSOR_RECHECK removal](sensor_recheck_removal_20261105.md), actual new-version boot/freshIDLE accepted. No new physical cycle test; previous0.2.7 operation acceptance is historical. Invalid measurement remains diagnostic and does not hold normal motion, as explicitly approved.
 
 > 2026-11-04 현재: [운영0.2.7/열기 사용자 확인·닫기 구동 완료](opening_inrush_20261104.md). 기동500ms 유예 뒤 열기HOLD와 닫기IDLE을 SENSOR_RECHECK 없이 확인했다.11V/3초 보호·11V/300초 경고는 유지한다. 완전 닫힘도 사용자 확인을 마쳤으며 태양광 충전 수용은 별도다.
 

@@ -9,7 +9,7 @@ source_of_truth: true
 
 # SmartBox Wiki
 
->2026-11-05 source candidate0.2.8: [SENSOR_RECHECK full removal](sensor_recheck_removal_20261105.md), owner risk-approved. Publication/device installation still pending.
+>2026-11-05: [SENSOR_RECHECK fully removed and0.2.8 actually installed](sensor_recheck_removal_20261105.md). New boot, fresh validIDLE/NORMAL and UP_TO_DATE accepted. Sensor-invalid normal-motion gates and1s wait are deleted; electrical measurement-unavailable risk is owner-approved.
 
 - [Historical0.2.7 SENSOR_RECHECK conditions, 2026-11-05](sensor_recheck_contract_20261105.md): source-confirmed trigger/exception/recovery contract; fresh incident cause unverified.
 
