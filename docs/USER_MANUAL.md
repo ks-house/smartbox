@@ -208,3 +208,5 @@ manifest_http_code는 버전 파일 요청 결과이며 updater_error는 펌웨�
 ## 2026-11-05 SENSOR_RECHECK removal in0.2.8 source
 
 [Approved removal contract](../wiki/sensor_recheck_removal_20261105.md) supersedes the earlier sensor recheck behavior. The operating state,1s wait,500ms sensor exception and invalid/stale sensor normal-motion gates are deleted. Measurement errors remain invalid diagnostics; historical HA rows remain. Normal manual/ultrasonic motion can run without a usable power sensor as explicitly approved, so electrical voltage/current protection cannot be evaluated then. Known low-voltage holds, stroke/relay/obstacle constraints, protected charging-close and fresh/isolated authenticated OTA remain separate. The legacy countdown field is fixed0, not an active feature. Source completion does not prove device installation.
+
+Operating acceptance2026-11-05: actual0.2.8-g9a185d1 installation/new boot/freshIDLE/NORMAL/UP_TO_DATE verified after one normal OTA. The earlier source-only checkpoint is resolved; see the removal contract. No extra physical cycle test was sent.
