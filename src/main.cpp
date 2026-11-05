@@ -121,7 +121,6 @@ void setup() {
                 float cur = controller.getMotorCurrent();
                 if (cur > cyclePeakCurrent) cyclePeakCurrent = cur;
             }
-            if(next==STATE_SENSOR_RECHECK)cycleStartTime=0; // An interrupted stroke is not a completed cycle.
             // 개폐 사이클 완료: non-IDLE → IDLE 전환 시 요약 발행
             if (next == STATE_IDLE && prev != STATE_IDLE && cycleStartTime > 0) {
                 unsigned long duration = millis() - cycleStartTime;
@@ -132,8 +131,6 @@ void setup() {
             // 알람 이벤트 발행
             if (next == STATE_EMERGENCY_STOP) {
                 mqtt->publishEventAlarm("STALL_OVERCURRENT", controller.getMotorCurrent(), "Motor stall / emergency stop triggered");
-            } else if(next==STATE_SENSOR_RECHECK) {
-                mqtt->publishEventAlarm("POWER_SENSOR_FAULT",controller.getBatteryVoltage(),"Power measurement recheck; outputs isolated");
             } else if (next == STATE_BATTERY_LOW_SHUTDOWN) {
                 const auto power=controller.powerSnapshot();
                 mqtt->publishEventAlarm(power.valid ? "LOW_BATTERY" : "POWER_SENSOR_FAULT",

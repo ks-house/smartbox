@@ -1,3 +1,5 @@
+> Historical0.2.7 contract, superseded in0.2.8 source by [approved full removal](sensor_recheck_removal_20261105.md). Device installation is separate.
+
 # SENSOR_RECHECK remaining contract (2026-11-05)
 
 The owner reports another SENSOR_RECHECK and asks why it remains after removal requests. This is a source-confirmed explanation, not fresh runtime fault attribution.

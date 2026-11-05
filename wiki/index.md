@@ -3,13 +3,15 @@ title: SmartBox wiki index
 type: index
 project: smartbox
 status: active
-updated: 2026-11-04
+updated: 2026-11-05
 source_of_truth: true
 ---
 
 # SmartBox Wiki
 
-- [SENSOR_RECHECK remaining conditions, 2026-11-05](sensor_recheck_contract_20261105.md): source-confirmed trigger/exception/recovery contract; fresh incident cause unverified.
+>2026-11-05 source candidate0.2.8: [SENSOR_RECHECK full removal](sensor_recheck_removal_20261105.md), owner risk-approved. Publication/device installation still pending.
+
+- [Historical0.2.7 SENSOR_RECHECK conditions, 2026-11-05](sensor_recheck_contract_20261105.md): source-confirmed trigger/exception/recovery contract; fresh incident cause unverified.
 
 > 현재: [0.2.7 설치와 닫기 구동 완료](opening_inrush_20261104.md). 실제 열림은 사용자 확인, 닫기는19:37:26~31 CLOSE_START/CLOSING/IDLE로 SENSOR_RECHECK 없이 완료했다. 물리 열림·완전 닫힘을 모두 사용자에게 확인받았다. 태양광 충전 전류는 별도다.
 

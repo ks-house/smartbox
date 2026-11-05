@@ -204,3 +204,7 @@ manifest_http_code는 버전 파일 요청 결과이며 updater_error는 펌웨�
 ## 2026-11-04 순간 전원 측정 재확인
 
 0.2.5 후보는 순간 범위/센서 오류를 배터리 부족5분 hold와 분리한다. 무효 측정 순간 출력은 즉시 격리하고 SENSOR_RECHECK에서 정상 표본1초 확인 후 대기로 복귀한다. 중단된 동작은 자동 재시작하지 않으며 자동 감지는 부재10초 후 새 접근으로 재무장한다. 실제11V/3초 보호, 경고11V/300초,12V/300초 회복과 구동 안전 조건은 유지한다. 명시 닫기는 논리 IDLE에서도 허용한다. [사건/계약/검증](../wiki/sensor_recheck_20261104.md)을 따른다.
+
+## 2026-11-05 SENSOR_RECHECK removal in0.2.8 source
+
+[Approved removal contract](../wiki/sensor_recheck_removal_20261105.md) supersedes the earlier sensor recheck behavior. The operating state,1s wait,500ms sensor exception and invalid/stale sensor normal-motion gates are deleted. Measurement errors remain invalid diagnostics; historical HA rows remain. Normal manual/ultrasonic motion can run without a usable power sensor as explicitly approved, so electrical voltage/current protection cannot be evaluated then. Known low-voltage holds, stroke/relay/obstacle constraints, protected charging-close and fresh/isolated authenticated OTA remain separate. The legacy countdown field is fixed0, not an active feature. Source completion does not prove device installation.

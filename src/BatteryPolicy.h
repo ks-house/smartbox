@@ -24,7 +24,6 @@ struct BatterySnapshot {
   bool lowWarning=false;
   uint32_t lowWarningElapsedMs=0;
   bool persistentHold=false;
-  uint32_t sensorRecheckRemainingMs=0;
 };
 class BatteryPolicy {
  public:
@@ -33,9 +32,7 @@ class BatteryPolicy {
   static constexpr uint32_t kLowWarningMs=300000;
   static constexpr uint32_t kRecoveryMs=300000;
   static constexpr uint32_t kMaxSampleGapMs=2000;
-  static constexpr uint32_t kSensorRecheckMs=1000;
   void sample(uint32_t now,float voltage,bool valid,float cutoff);
-  void interruptQualification();
   void restoreProtection();
   BatterySnapshot snapshot(uint32_t now) const;
   static const char* name(BatteryState state);
@@ -44,8 +41,8 @@ class BatteryPolicy {
   bool stateTiming_=false;
   uint32_t stateAt_=0;
   bool valid_=false, latched_=false, sampled_=false;
-  bool faultHeld_=false,faultRecoveryTiming_=false;
-  uint32_t faultRecoveryAt_=0;
+  bool admissionVoltageKnown_=false;
+  float admissionVoltage_=0;
   bool lowTiming_=false, recoveryTiming_=false, healthyTiming_=false;
   float voltage_=0, minimum_=0, cutoff_=kDefaultCutoffVoltage, recovery_=12.0f;
   bool lowWarningTiming_=false;

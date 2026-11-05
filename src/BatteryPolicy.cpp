@@ -2,33 +2,27 @@
 #include <cmath>
 #include <algorithm>
 
-void BatteryPolicy::interruptQualification() {
-  // An explicitly missing cohort cannot contribute to continuous qualification.
-  // Preserve original sample time/value and any existing protection latch.
-  lowTiming_=false;recoveryTiming_=false;healthyTiming_=false;
-  forceHealthyTiming_=false;lowWarningTiming_=false;stateTiming_=false;
-  faultRecoveryTiming_=false;
-}
-
 void BatteryPolicy::restoreProtection() {
   latched_=true; state_=BatteryState::PROTECTED;
   recoveryTiming_=false; lowTiming_=false; healthyTiming_=false; forceHealthyTiming_=false; stateTiming_=false;
 }
 void BatteryPolicy::sample(uint32_t now,float voltage,bool valid,float cutoff) {
   const bool gap=sampled_ && uint32_t(now-sampleAt_)>kMaxSampleGapMs;
-  if(gap) {faultRecoveryTiming_=false; lowWarningTiming_=false; lowTiming_=false; recoveryTiming_=false; healthyTiming_=false; forceHealthyTiming_=false; stateTiming_=false;}
+  if(gap) { lowWarningTiming_=false; lowTiming_=false; recoveryTiming_=false; healthyTiming_=false; forceHealthyTiming_=false; stateTiming_=false;}
   sampled_=true; sampleAt_=now;
   cutoff_=std::isfinite(cutoff) && cutoff>0 && cutoff<25 ? cutoff : kDefaultCutoffVoltage;
   recovery_=std::max(12.0f,cutoff_+0.7f);
   forceFloor_=std::max(11.7f,cutoff_+0.4f);
+  if(valid && std::isfinite(voltage) && voltage>0) {admissionVoltageKnown_=true;admissionVoltage_=voltage;}
   valid_=valid && std::isfinite(voltage) && voltage>0 && voltage<=16.0f;
   voltage_=voltage;
   if(!valid_) {
     lowWarningTiming_=false;
-    faultHeld_=true;faultRecoveryTiming_=false;state_=BatteryState::SENSOR_FAULT;
+    state_=BatteryState::SENSOR_FAULT;
     lowTiming_=false; recoveryTiming_=false; healthyTiming_=false; forceHealthyTiming_=false; stateTiming_=false;
     return;
   }
+  if(state_==BatteryState::SENSOR_FAULT) {state_=BatteryState::UNKNOWN;stateTiming_=false;}
   // Qualify the owner notification independently of the faster motor guard.
   // Keep counting through a protective latch, but never through invalid/gapped data.
   if(voltage<=kLowWarningVoltage) {
@@ -55,13 +49,7 @@ void BatteryPolicy::sample(uint32_t now,float voltage,bool valid,float cutoff) {
       }
     } else recoveryTiming_=false;
   }
-  // Bad data stops outputs immediately but does not invent a battery hold.
-  // Require fresh valid observations spanning1s before admitting a new command.
-  if(faultHeld_) {
-    if(!faultRecoveryTiming_) {faultRecoveryTiming_=true;faultRecoveryAt_=now;}
-    if(uint32_t(now-faultRecoveryAt_)<kSensorRecheckMs) {state_=BatteryState::SENSOR_FAULT;return;}
-    faultHeld_=false;faultRecoveryTiming_=false;state_=BatteryState::UNKNOWN;stateTiming_=false;
-  }
+  // Measurement faults are diagnostic, not a motor hold or recheck timer.
   if(latched_) {
     state_=voltage>=recovery_ ? BatteryState::RECOVERING : BatteryState::PROTECTED;
     return;
@@ -81,18 +69,18 @@ BatterySnapshot BatteryPolicy::snapshot(uint32_t now) const {
   const bool fresh=valid_ && age<=kMaxSampleGapMs;
   BatteryState state=state_;
   if(sampled_ && !fresh) state=BatteryState::SENSOR_FAULT;
-  const bool blocked=latched_ || faultHeld_ || !fresh;
-  const uint32_t interval=blocked ? 300000 : state==BatteryState::SAVING ? 120000 :
+  const bool blocked=latched_;
+  const bool admitted=!latched_ && (!admissionVoltageKnown_ || (admissionVoltage_>cutoff_ && admissionVoltage_<=16.0f));
+  const uint32_t interval=blocked ? 300000 : !fresh ? 30000 : state==BatteryState::SAVING ? 120000 :
                           state==BatteryState::WARNING ? 60000 : 30000;
   const uint32_t warningElapsed=fresh && lowWarningTiming_ && voltage_<=kLowWarningVoltage ?
       std::min(uint32_t(now-lowWarningAt_),kLowWarningMs) : 0;
   const bool lowWarning=fresh && lowWarningTiming_ && warningElapsed>=kLowWarningMs;
   const uint32_t elapsed=recoveryTiming_ ? uint32_t(now-recoveryAt_) : 0;
-  return {state,fresh,blocked,fresh && !latched_ && !faultHeld_ && voltage_>cutoff_,
-    fresh && !latched_ && !faultHeld_ && healthyTiming_ && uint32_t(now-healthyAt_)>=30000,
+  return {state,fresh,blocked,admitted,
+    fresh && !latched_ && healthyTiming_ && uint32_t(now-healthyAt_)>=30000,
     voltage_,minimum_,recovery_,latched_ ? (elapsed>=kRecoveryMs ? 0 : kRecoveryMs-elapsed) : 0,
-    recoveries_,age,interval,fresh && !faultHeld_ && forceHealthyTiming_ && uint32_t(now-forceHealthyAt_)>=30000,forceFloor_,lowWarning,warningElapsed,latched_,
-    faultHeld_ ? (faultRecoveryTiming_ ? kSensorRecheckMs-std::min(uint32_t(now-faultRecoveryAt_),kSensorRecheckMs) : kSensorRecheckMs) : 0};
+    recoveries_,age,interval,fresh && forceHealthyTiming_ && uint32_t(now-forceHealthyAt_)>=30000,forceFloor_,lowWarning,warningElapsed,latched_};
 }
 const char* BatteryPolicy::name(BatteryState state) {
   switch(state) {

@@ -34,8 +34,7 @@ enum State {
   STATE_BATTERY_LOW_SHUTDOWN,
   STATE_STARTUP_OPEN,
   STATE_OTA_UPDATING,
-  STATE_MAINTENANCE,
-  STATE_SENSOR_RECHECK
+  STATE_MAINTENANCE
 };
 
 // Tuning Constants
@@ -90,10 +89,6 @@ private:
   BatteryPolicy batteryPolicy;
   unsigned long lastPowerReading = 0;
   bool lowBatteryOpening = false;
-  // Only an already powered normal OPENING/CLOSING stroke may defer the known positive
-  // INA219 full-scale cohort, until the existing inrush deadline (never rearmed).
-  static constexpr uint32_t kMotorInrushMs=500;
-  bool motorInrushPending=false;
   bool servicePower();
   bool chargingCloseActive=false, chargingCloseUsed=false;
   ChargingCloseState chargingCloseResult=ChargingCloseState::NONE;
@@ -167,11 +162,7 @@ public:
 
   BatterySnapshot powerSnapshot() const {
       std::lock_guard<std::recursive_mutex> lock(dataMutex);
-      auto out=batteryPolicy.snapshot(static_cast<uint32_t>(hw.getMillis()));
-      if(motorInrushPending) {
-          out.valid=false;out.actuationAllowed=false;out.otaReady=false;out.forceOtaReady=false;
-      }
-      return out;
+      return batteryPolicy.snapshot(static_cast<uint32_t>(hw.getMillis()));
   }
   PowerReading powerReadDiagnostics() const {
       std::lock_guard<std::recursive_mutex> lock(dataMutex);return latestPowerRead;
@@ -204,7 +195,7 @@ public:
 #ifdef FIRMWARE_VERSION_OVERRIDE
   static constexpr const char *FIRMWARE_VERSION = FIRMWARE_VERSION_OVERRIDE;
 #else
-  static constexpr const char *FIRMWARE_VERSION = "0.2.7";
+  static constexpr const char *FIRMWARE_VERSION = "0.2.8";
 #endif
   const char *getFirmwareVersion() const { return FIRMWARE_VERSION; }
 

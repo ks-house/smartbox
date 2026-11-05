@@ -389,3 +389,7 @@ The measured NAS candidate failed before policy activation when the volatile boo
 설치된0.2.6은 일반 열기의 기존500ms 기동 구간에서 관측된 양의320mV/3200mA RANGE만 제한 보류하고 실제 열림을 사용자에게 확인받았다. 설치된0.2.7은 일반 닫기에도 동일 조건을 적용하여19:37 닫기 구동을 완료했다. invalid 값을 정상으로 바꾸지 않고 연속 자격 시간을 끊으며500ms 경계에 재측정한다. 통신/다른 오류, 계속 포화되는 입력은 격리한다. 보호 닫기나 OTA의 보호는 완화하지 않는다. [계약과 실제 장애 증거](../wiki/opening_inrush_20261104.md)를 따른다.
 
 0.2.5 후보는 순간 범위/센서 오류를 배터리 부족5분 hold와 분리한다. 무효 측정 순간 출력은 즉시 격리하고 SENSOR_RECHECK에서 정상 표본1초 확인 후 대기로 복귀한다. 중단된 동작은 자동 재시작하지 않으며 자동 감지는 부재10초 후 새 접근으로 재무장한다. 실제11V/3초 보호, 경고11V/300초,12V/300초 회복과 구동 안전 조건은 유지한다. 명시 닫기는 논리 IDLE에서도 허용한다. [사건/계약/검증](../wiki/sensor_recheck_20261104.md)을 따른다.
+
+## 2026-11-05 SENSOR_RECHECK removal in0.2.8 source
+
+[Approved removal contract](../wiki/sensor_recheck_removal_20261105.md) supersedes the earlier sensor recheck behavior. The operating state,1s wait,500ms sensor exception and invalid/stale sensor normal-motion gates are deleted. Measurement errors remain invalid diagnostics; historical HA rows remain. Normal manual/ultrasonic motion can run without a usable power sensor as explicitly approved, so electrical voltage/current protection cannot be evaluated then. Known low-voltage holds, stroke/relay/obstacle constraints, protected charging-close and fresh/isolated authenticated OTA remain separate. The legacy countdown field is fixed0, not an active feature. Source completion does not prove device installation.
