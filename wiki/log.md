@@ -489,3 +489,9 @@ source_of_truth: true
 
 - Owner replies “완전히 닫혔음” to the19:37 single-close result. Accept physical closing in addition to source/CI/publication/installation/FSM/current proof. Prior physical-close-pending checkpoint is resolved; prior0.2.6 actual opening was also owner-confirmed.
 - No further physical command/OTA/reboot. Preserve actual RANGE startup history as bounded invalid data, not a measured peak or continuing sensor shutdown. Issue19 remains open for separate solar/net charging, current range/component ratings and long-term recovery acceptance. Update current wiki and final PR/issue descriptions; preserve historical records and primary checkout.
+
+## [2026-11-05] compile | Explain retained SENSOR_RECHECK after owner recurrence report
+
+- Current source keeps the state and immediate invalid-power isolation;0.2.7 only defers exact positive full-scale normal opening/closing startup below500ms. Record all triggers,2s data age,1s valid stability and separate11V battery rules. Owner removal request had been implemented more narrowly than stated intent. No new firmware correction is claimed.
+- Current live cause remains unverified: browser runtime launch fails and existing maintenance status requires sudo password. No guessed fault attribution, physical command, OTA, reboot or service/security change. Previous Nov4 successful operation is historical, not current health proof.
+- Documentation-only validation checks: {"native": 0, "c6": 0}. Generated header restored; local dummy image not installed.

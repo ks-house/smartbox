@@ -9,6 +9,8 @@ source_of_truth: true
 
 # SmartBox Wiki
 
+- [SENSOR_RECHECK remaining conditions, 2026-11-05](sensor_recheck_contract_20261105.md): source-confirmed trigger/exception/recovery contract; fresh incident cause unverified.
+
 > 현재: [0.2.7 설치와 닫기 구동 완료](opening_inrush_20261104.md). 실제 열림은 사용자 확인, 닫기는19:37:26~31 CLOSE_START/CLOSING/IDLE로 SENSOR_RECHECK 없이 완료했다. 물리 열림·완전 닫힘을 모두 사용자에게 확인받았다. 태양광 충전 전류는 별도다.
 
 > 현재2026-11-04: [0.2.5 OTA 설치·정상 대기 수용](sensor_recheck_20261104.md). 순간 센서 범위 오류와 persistent battery hold를 분리하고 NAS11V/300초 경고 감시기 교체도 수용했다. 실제 개폐·range raw subcause는 별도다.
