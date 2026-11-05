@@ -3,7 +3,7 @@ title: SmartBox current project status
 type: reference
 project: smartbox
 status: active
-updated: 2026-10-31
+updated: 2026-11-04
 source_of_truth: true
 applies_to:
   - firmware
@@ -14,7 +14,7 @@ applies_to:
 
 # 현재 프로젝트 상태
 
-> 2026-11-04: [0.2.3 후보/11.0V 이하 보호](low_voltage_threshold_20261104.md) 구현 및 검증 중. 이전11.3V 저장값 전환 포함. 현장 적용은 아직 확인하지 않았다.
+> 2026-11-04 현재: [운영0.2.7/열기 사용자 확인·닫기 구동 완료](opening_inrush_20261104.md). 기동500ms 유예 뒤 열기HOLD와 닫기IDLE을 SENSOR_RECHECK 없이 확인했다.11V/3초 보호·11V/300초 경고는 유지한다. 완전 닫힘도 사용자 확인을 마쳤으며 태양광 충전 수용은 별도다.
 
 > 2026-11-03 source candidate0.2.2 adds owner close-only/forced OTA and12.0V/300s recovery. [Current contract](battery_power_management.md). 2026-11-03 same-board USB write/readback and actual0.2.2-gdb96897 nativeUSB boot/30s loop are now confirmed. Bare-board INA219 absence is owner-confirmed; field sensor/physical close/charging/network/OTA acceptance remain pending.
 

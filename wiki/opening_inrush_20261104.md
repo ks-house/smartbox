@@ -40,3 +40,13 @@ PR25/CI41811125185 PASS 후 main36bde09dc09b7d20113a580c7b92d5dbaccc8736에 병�
 ##0.2.7 일반 닫기 후속 후보
 
 같은 exact cohort와500ms 유예를 일반 CLOSING에도 적용한다. protected close/BATTERY_LOW_SHUTDOWN의 즉시 측정/전압/TTL 제한은 유지한다. 공통 이름을 motorInrushPending/kMotorInrushMs로 바꾸며 유예 중 다른 명령으로 시간 연장 불가, 경계 재측정, 연속 시간 초기화, invalid/raw 보존은 동일하다. CLOSING 재현2건 RED를 확인한 뒤 수정했고 일반 닫기 회복/정확한 경계/반복 명령/실제 센서 오류·보호 닫기 즉시 정지를 검사한다. 운영 설치와 닫힘 결과는 별도 수용한다.
+
+##0.2.7 실제 설치와 닫기 구동 완료
+
+PR26 heade8e20be28b17fb14512dacc4eff69a5484ed8153/CI41813670982 PASS 뒤 main798af34e003f8a96ca1214da4e371946fa8901de에 병합했다. 게시41814300613과 외부 인증41814786933은 TLS/4인증/8거절/정확한 해시·크기 검증 PASS. 운영0.2.7-g798af34/1422368B/SHA2566dc572361108ef0d28d89005f90eea306b41c7c387bdb7bd6682fcb45c19626b다.
+
+19:33:44 일반 OTA1회 뒤19:36:19 새 버전/새 부팅을 확인했다. 정상IDLE/NORMAL/valid1/12.17206V 및UP_TO_DATE 뒤 소유자가 요청한 일반 force_close1회를 보냈다. HA는19:37:26 CLOSE_START →19:37:27 CLOSING →19:37:31 IDLE이며 SENSOR_RECHECK를 거치지 않았다. MCU77783 →77988 →81989ms와 독립 대조했다.
+
+구동 표본은1037.6~1364.1mA/11.61856~11.74357V였다. 사후110606ms/12.16003V/0.5mA/valid1/read_fault0/NORMAL/IDLE/persistent_hold0/UP_TO_DATE다. last_fault9/raw10.036V/320mV/3200mA/episodes1은 제한 보류한 기동 표본의 이력이며 지속 오류나 SENSOR_RECHECK 진입을 뜻하지 않는다. 유효한 최대 실제 기동 전류로 해석하지 않는다.
+
+닫기 구동 완료와 현재 정상 측정은 수용했다. 사용자가 CCTV에서 “완전히 닫혔음”을 확인하여 물리 닫힘도 수용했다. 열림도 앞서 사용자 확인까지 수용됐다. 태양광 충전 전류·장기 전원 회복은 별도다. 추가 열기·닫기 반복/리부트/강제 OTA는0이며 일반 OTA1/명시 닫기1만 수행했다. native83/Python144(135실행/9명시적 opt-in skip)/일반·USB C6 및 독립 장애물/반전 리뷰 PASS.

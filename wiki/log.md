@@ -478,3 +478,27 @@ source_of_truth: true
 
 - Extend only exact-cohort normalCLOSING; retain500ms forced deadline, invalid/raw values, all continuity resets and no new admission during deferred readings. Rename shared pending/deadline members to motor names. Protected close/BLOW, voltage/TTL, sensor faults and OTA unchanged.
 - Two new closing behaviors reproduce RED then GREEN. Native83 PASS, Python144 total/135 executed PASS/9 opt-in skips, default/nativeUSB C6 PASS. Independent review83 PASS/no findings; separate obstacle/reversal harness confirms immediate closing stop and no powered reversal with invalid readings. Generated header restored, dummy image not installed.0.2.7 candidate; operating publication/install/physical closing remain separate.
+
+## [2026-11-04] test | Accept0.2.7 installed and one normal close without SENSOR_RECHECK
+
+- PR26 exacte8e20be CI41813670982 PASS/merged798af34. Operating41814300613 and authenticated41814786933 verify0.2.7-g798af34/1422368B/SHA6dc572361108ef0d28d89005f90eea306b41c7c387bdb7bd6682fcb45c19626b, TLS/4auth/8denial. One ordinaryOTA19:33:44 yields actual new boot/version19:36:19, healthy12.17206V/valid1/NORMAL/IDLE/UP_TO_DATE.
+- One requested normal force_close: HA19:37:26 CLOSE_START ->19:37:27 CLOSING ->19:37:31 IDLE, matching MCU77783/77988/81989. Under-load1037.6~1364.1mA/11.61856~11.74357V; no SENSOR_RECHECK. Post12.16003V/0.5mA/valid1/fault0/hold0/IDLE. Retained last RANGE9/episode1/raw10.036V/320mV/3200mA records allowed transient, not a continuing fault or a measured true maximum current.
+- Firmware installation and close-command completion accepted; physical fully closed and solar charging await separate confirmation. Owner already confirmed actual opening on0.2.6. Explicit close1/normalOTA1/extra open0/forcedOTA0/reboot0; no repeat actuation or security/service changes. Source/native83/Python144(135executed/9opt-in skip)/dual-C6 and resolved independent reviews preserved. HA closing history proof saved locally; issue19 stays open for physical/charging/rating acceptance.
+
+## [2026-11-04] test | Owner confirms actual fully closed lid after0.2.7 command
+
+- Owner replies “완전히 닫혔음” to the19:37 single-close result. Accept physical closing in addition to source/CI/publication/installation/FSM/current proof. Prior physical-close-pending checkpoint is resolved; prior0.2.6 actual opening was also owner-confirmed.
+- No further physical command/OTA/reboot. Preserve actual RANGE startup history as bounded invalid data, not a measured peak or continuing sensor shutdown. Issue19 remains open for separate solar/net charging, current range/component ratings and long-term recovery acceptance. Update current wiki and final PR/issue descriptions; preserve historical records and primary checkout.
+
+## [2026-11-05] compile | Explain retained SENSOR_RECHECK after owner recurrence report
+
+- Current source keeps the state and immediate invalid-power isolation;0.2.7 only defers exact positive full-scale normal opening/closing startup below500ms. Record all triggers,2s data age,1s valid stability and separate11V battery rules. Owner removal request had been implemented more narrowly than stated intent. No new firmware correction is claimed.
+- Current live cause remains unverified: browser runtime launch fails and existing maintenance status requires sudo password. No guessed fault attribution, physical command, OTA, reboot or service/security change. Previous Nov4 successful operation is historical, not current health proof.
+- Documentation-only validation checks: {"native": 0, "c6": 0}. Generated header restored; local dummy image not installed.
+
+## [2026-11-05] code | Remove SENSOR_RECHECK after explicit approval of measurement-unavailable normal motion
+
+- Initial automatic approval rejects broad production removal. Owner then explicitly approves after disclosure that disconnected/invalid power measurement would no longer stop normal manual/ultrasonic motion and electrical damage cannot be ruled out. Approved scope applied; no privilege/security bypass.
+- Delete operating enum/state emission/transitions,1s fault hold and normal-motion invalid/stale admission/stop paths; remove temporary500ms exception. Keep invalid/raw diagnostics and legacy countdown fixed0. Preserve known-low/overvoltage admission, actual voltage latch/warning/recovery, protected-close restrictions and authenticated atomic OTA. Missing power data cannot establish voltage/current safety; accepted risk is documented.
+- Four behavior cases RED then GREEN; diagnostic recovery RED corrected. Retire obsolete hold assertions; native77 incl full no-sensor ultrasonic cycle and repeated-command timeout PASS. Actual OTA fixture21 PASS after replacing removed enum and requiring all-output isolation only after actual reservation; queued-expiry now explicitly asserts zero HTTP queries. Full Python144/135executed/9opt-in skips and both C6 PASS. Independent reviewer no outstanding Critical/Important findings.
+- Source candidate0.2.8 only. Browser runtime unavailable and existing maintenance sudo authentication fails; no current live-device acceptance or new fault attribution. No actuator/OTA/reboot/service/permission action performed in this implementation phase. Prior dirty notes preserved in commits before isolated branch work; generated header restored and dummy artifacts not installed.

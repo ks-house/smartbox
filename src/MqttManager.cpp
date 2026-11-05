@@ -408,7 +408,6 @@ const char* MqttManager::stateToString(int state) {
         case STATE_STARTUP_OPEN: return "STARTUP_OPEN";
         case STATE_OTA_UPDATING: return "OTA_UPDATING";
         case STATE_MAINTENANCE: return "MAINTENANCE";
-        case STATE_SENSOR_RECHECK: return "SENSOR_RECHECK";
         default: return "UNKNOWN";
     }
 }
@@ -440,7 +439,7 @@ void MqttManager::publishTelemetry() {
     doc["firmware"] = m_controller.getFirmwareVersion();
     doc["power_schema"] = 1;
     doc["power_persistent_hold"] = power.persistentHold ? 1 : 0;
-    doc["power_sensor_recheck_remaining_ms"] = power.sensorRecheckRemainingMs;
+    doc["power_sensor_recheck_remaining_ms"] = 0; // Retired N-1 wire field, no control timer.
     const auto previousFault=frame.lastFault;
     const auto faultCount=frame.faultCount;
     doc["power_fault_episodes"] = faultCount;

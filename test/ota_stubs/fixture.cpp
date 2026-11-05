@@ -42,16 +42,17 @@ int main(int argc,char** argv){
  }else if(scenario.rfind("recovery_",0)==0 || scenario=="normal_sensor_fault"){
    if(scenario=="recovery_preempt_normal")ok=AutoOtaManager::startOtaUpdate(true);
    stable(NAN,125);
-   box.registerStateCallback([](State previous,State next){if(previous==STATE_OTA_UPDATING && (next==STATE_BATTERY_LOW_SHUTDOWN || next==STATE_SENSOR_RECHECK) && !AutoOtaManager::isOtaInProgress())cleanupBusyLeaked=true;});
+   box.registerStateCallback([](State previous,State next){if(previous==STATE_OTA_UPDATING && (next==STATE_BATTERY_LOW_SHUTDOWN || next==STATE_IDLE) && !AutoOtaManager::isOtaInProgress())cleanupBusyLeaked=true;});
    if(scenario=="recovery_replace_expired"){ok=AutoOtaManager::startOtaUpdate(true,true,1000);hw.advanceMillis(1500);box.update();}
    if(scenario=="recovery_current")fixtureManifest=String("{\"version\":\"")+box.getFirmwareVersion()+"\"}";
    if(scenario=="recovery_manifest_fail")fixtureHttpCode=503;
    if(scenario=="normal_sensor_fault")ok=!AutoOtaManager::startOtaUpdate(true) && fixtureQueries==0;
    else if(scenario=="recovery_concurrent"){std::atomic<int> accepted{0};std::vector<std::thread> senders;for(int i=0;i<8;++i)senders.emplace_back([&]{if(AutoOtaManager::startOtaUpdate(true,true))++accepted;});for(auto& sender:senders)sender.join();ok=accepted==1;AutoOtaManager::update();}
    else {ok=AutoOtaManager::startOtaUpdate(true,true,scenario.find("expiry")!=std::string::npos?1000:120000);if(scenario=="recovery_expiry_queued"){hw.advanceMillis(1500);box.update();}AutoOtaManager::update();}
+   if(scenario=="recovery_expiry_queued")ok=ok && fixtureQueries==0;
    const bool shouldFlash=scenario=="recovery_no_update" || scenario=="recovery_fail" || scenario=="recovery_preempt_normal" || scenario=="recovery_replace_expired" || scenario=="recovery_concurrent";
-   ok=ok && fixtureFlashes==(shouldFlash?1:0) && box.getCurrentState()==(scenario=="recovery_known_low"?STATE_BATTERY_LOW_SHUTDOWN:STATE_SENSOR_RECHECK) && !AutoOtaManager::isOtaInProgress();
-   for(int pin:{6,7,8})ok=ok && hw.getPinMode(pin)==INPUT;
+   ok=ok && fixtureFlashes==(shouldFlash?1:0) && box.getCurrentState()==(scenario=="recovery_known_low"?STATE_BATTERY_LOW_SHUTDOWN:STATE_IDLE) && !AutoOtaManager::isOtaInProgress();
+   for(int pin:{6,7,8})if((scenario!="normal_sensor_fault" && scenario!="recovery_expiry_queued") || pin==6)ok=ok && hw.getPinMode(pin)==INPUT;
    if(scenario!="normal_sensor_fault" && scenario!="recovery_expiry_queued")ok=ok && !AutoOtaManager::startOtaUpdate(true,true);
  }else if(scenario=="catchup"){
    fixtureManifest=String("{\"version\":\"")+box.getFirmwareVersion()+"\"}";
