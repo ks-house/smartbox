@@ -29,6 +29,7 @@ class BatteryPolicy {
  public:
   static constexpr float kDefaultCutoffVoltage=11.0f;
   static constexpr float kLowWarningVoltage=11.0f;
+  static constexpr uint32_t kLowProtectionDwellMs = 60000;
   static constexpr uint32_t kLowWarningMs=300000;
   static constexpr uint32_t kRecoveryMs=300000;
   static constexpr uint32_t kMaxSampleGapMs=2000;

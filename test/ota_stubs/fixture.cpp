@@ -18,7 +18,7 @@ unsigned long millis(){return hardware->getMillis();}
 bool getLocalTime(struct tm* t,uint32_t){++timeCalls;std::memset(t,0,sizeof(*t));t->tm_year=126;t->tm_yday=dayNow;t->tm_hour=hourNow;return true;}
 bool WifiManager::isConnected(){return true;}
 void ESPFixture::restart(){++reboots;}
-void faultPower(){hardware->setBatteryVoltage(11.0f);for(int i=0;i<26;i++){hardware->advanceMillis(200);controller->servicePowerDuringOta();}}
+void faultPower(){hardware->setBatteryVoltage(11.0f);for(int i=0;i<301;i++){hardware->advanceMillis(200);controller->servicePowerDuringOta();}}
 void delay(unsigned long ms){hardware->advanceMillis(ms);if(ms==500 && (scenario=="contact_fault" || scenario=="recovery_known_low"))faultPower();}
 void fixtureManifestHook(){if(scenario=="recovery_expiry_after_manifest"){hardware->advanceMillis(1500);controller->servicePowerDuringOta();}if(scenario=="reboot_guard"){int before=timeCalls;PowerManager::update();rebootGuardLeaked=timeCalls!=before;}if(scenario=="busy_manifest"){controller->forceOpen();controller->update();}}
 void fixtureBeforeFlashHook(){if(scenario=="force_expiry_final"){hardware->advanceMillis(600);controller->servicePowerDuringOta();}if(scenario=="force_last_fault")faultPower();if(scenario=="recovery_expiry_final"){hardware->advanceMillis(600);controller->servicePowerDuringOta();}if(scenario=="last_admission_fault")faultPower();}
@@ -29,7 +29,7 @@ int main(int argc,char** argv){
  scenario=argc>1?argv[1]:"";MockHardware hw;hardware=&hw;hw.setBatteryVoltage(12.6f);SmartBoxController box(hw);controller=&box;box.init();stable(12.6f,35);AutoOtaManager::init(box);PowerManager::init(box);
  bool ok=true;
  if(scenario.rfind("force_",0)==0){
-   stable(11.0f,10);stable(11.8f,125);
+   stable(11.0f,65);stable(11.8f,125);
    if(scenario=="force_current")fixtureManifest=String("{\"version\":\"")+box.getFirmwareVersion()+"\"}";
    if(scenario=="force_manifest_fail")fixtureHttpCode=404;
    ok=AutoOtaManager::startOtaUpdate(true,false,scenario.find("expiry")!=std::string::npos?1000:120000,true);

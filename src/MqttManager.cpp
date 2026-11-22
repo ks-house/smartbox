@@ -460,7 +460,7 @@ void MqttManager::publishTelemetry() {
     doc["power_low_warning_voltage_v"] = BatteryPolicy::kLowWarningVoltage;
     doc["power_low_warning_required_s"] = BatteryPolicy::kLowWarningMs / 1000;
     doc["power_shutdown_voltage_v"] = m_controller.getConfig().voltageShutdownLimit;
-    doc["power_shutdown_dwell_s"] = 3;
+    doc["power_shutdown_dwell_s"] = BatteryPolicy::kLowProtectionDwellMs / 1000;
     const auto read=frame.reading;
     doc["power_read_fault_code"]=static_cast<unsigned>(read.fault);
     doc["power_read_driver"]=read.driver;

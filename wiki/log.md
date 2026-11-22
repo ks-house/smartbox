@@ -502,3 +502,16 @@ source_of_truth: true
 - Delete operating enum/state emission/transitions,1s fault hold and normal-motion invalid/stale admission/stop paths; remove temporary500ms exception. Keep invalid/raw diagnostics and legacy countdown fixed0. Preserve known-low/overvoltage admission, actual voltage latch/warning/recovery, protected-close restrictions and authenticated atomic OTA. Missing power data cannot establish voltage/current safety; accepted risk is documented.
 - Four behavior cases RED then GREEN; diagnostic recovery RED corrected. Retire obsolete hold assertions; native77 incl full no-sensor ultrasonic cycle and repeated-command timeout PASS. Actual OTA fixture21 PASS after replacing removed enum and requiring all-output isolation only after actual reservation; queued-expiry now explicitly asserts zero HTTP queries. Full Python144/135executed/9opt-in skips and both C6 PASS. Independent reviewer no outstanding Critical/Important findings.
 - Source candidate0.2.8 only. Browser runtime unavailable and existing maintenance sudo authentication fails; no current live-device acceptance or new fault attribution. No actuator/OTA/reboot/service/permission action performed in this implementation phase. Prior dirty notes preserved in commits before isolated branch work; generated header restored and dummy artifacts not installed.
+
+## [2026-11-05] test | Accept approved full-removal0.2.8 publication and actual installed new boot
+
+- After initial automatic approval rejection of administrator-main merge, owner explicitly approves PR27 protected-main merge/operating publication. Exact747ce6f CI42027415342 PASS merges9a185d1. Main42028498469 and authenticated42029174037 verify0.2.8-g9a185d1/1421456B/SHA51220c79c4e7ca4d31b2bb578932bc85dfae6ae02d8ebf956edfd48a623c2cb7/TLS/4auth/8denial. Both authorization blocks are resolved before their respective actions.
+- Owner requests browser retry; browser MCP becomes available after prior launcher/access failures. Existing HA session and MQTT UI give fresh non-retained12.36403V/valid1/fault0/IDLE/OTAready1. Preserve previous last RANGE9/mask4/raw11.08V/304.03mV/3200mA as historical fault evidence, not a measured true peak. It was outside the former mask6-only exception.
+- One HA normalOTA press21:53:00; actual new-version IDLE21:56:13. Non-retained new uptime progression to60142ms,12.31604V/0.1mA/valid1/fault0/NORMAL/IDLE/hold0/fault_count0 and UP_TO_DATE; independent HA firmware0.2.8 info verified. Save screenshot and private acceptance. Actual installation accepted; no new open/close, explicit reboot, forced/recovery OTA or physical cycle test. Legacy countdown fixed0 is compatibility data, not a remaining feature. Old HA history retained.
+- Native77/actual OTA21/fullPython144(135executed/9opt-in skip)/dualC6 and resolved independent review remain source checks. Record operating acceptance on the feature branch without triggering a redundant main firmware build. Solar/net charge, component ratings and long-term power acceptance stay open in issue19.
+
+## 2026-11-22 저전압 보호 진입 시간을 60초로 변경
+
+0.2.9에서 유효 측정값이 기본 11.0 V 이하로 60초 연속 유지되면 저전압 보호에 진입한다. 기준 초과, 무효값 또는 2초 초과 측정 간격에 시간은 초기화된다. 동일 기준을 MQTT에 60초로 발행한다. 보호 해제와 경고 기준은 각각 기존 300초다.
+
+기존 3초 구현에서 새 경계값 테스트가 실패함을 확인한 뒤 수정했다. 네이티브 78개 통과, Python 144개 중 135개 통과 및 환경 조건에 따른 9개 건너뜀.
