@@ -109,7 +109,7 @@ Home Assistant UI에서 드롭다운 선택만으로 설정값을 변경할 수 
 | CLOSE_START | 닫힘 시작. 방향 릴레이 반전 -> 인터락 적용 |
 | CLOSING | 닫힘 중. 인체 재감지 시 즉시 재개방 |
 | EMERGENCY_STOP | 과전류 비상 정지. 5초 후 자동 복구 또는 수동 리셋 |
-| BATTERY_LOW_SHUTDOWN | 저전압(11.0V 이하, 3초 연속) 강제 개방 후 전원 완전 격리 |
+| BATTERY_LOW_SHUTDOWN | 저전압(11.0V 이하, 60초 연속) 강제 개방 후 전원 완전 격리 |
 | OTA_UPDATING | OTA 업데이트 중. 모든 릴레이 차단. FSM 동결 |
 | MAINTENANCE | 정비 모드. 뚜껑 열린 상태 5분간 유지 후 자동 닫힘 |
 | STARTUP_OPEN | 재시작 후 이전 열림 상태 감지 -> 홈(Homing) 닫힘 실행 |
@@ -120,7 +120,7 @@ Home Assistant UI에서 드롭다운 선택만으로 설정값을 변경할 수 
   개폐 중 모터 전류가 currentStallLimit(기본 3,000mA)을 500ms 인러시 구간 이후 3회 연속 초과하면 즉시 비상 정지 및 릴레이 고임피던스 격리. 5초 후 자동 복구 또는 Home Assistant에서 수동 해제 가능.
 
 * **저전압 배터리 보호 (STATE_BATTERY_LOW_SHUTDOWN):**
-  배터리 전압이 11.0V 이하로 3초 이상 유지되면 뚜껑을 강제 완전 개방 후 릴레이를 격리하고 유효한 회복 전압이 5분 안정되면 자동 재개. OTA 시작은 유효 전압·충분한 안정 시간이 확보된 때만 허용하며, 실패 복귀도 전원 보호 상태를 유지합니다.
+  배터리 전압이 11.0V 이하로 60초 연속 유지되면 뚜껑을 강제 완전 개방 후 릴레이를 격리하고 유효한 회복 전압이 5분 안정되면 자동 재개. OTA 시작은 유효 전압·충분한 안정 시간이 확보된 때만 허용하며, 실패 복귀도 전원 보호 상태를 유지합니다.
 
 * **센서 데드락 방지 (Self-Healing):**
   HOLD 상태에서 최대 보유 시간(기본 3분) 초과 시 강제 닫힘을 실행. 이후 경로가 10초간 연속으로 청결(인체 미감지) 상태가 유지되면 자동으로 플래그가 해제됩니다.
@@ -210,3 +210,7 @@ manifest_http_code는 버전 파일 요청 결과이며 updater_error는 펌웨�
 [Approved removal contract](../wiki/sensor_recheck_removal_20261105.md) supersedes the earlier sensor recheck behavior. The operating state,1s wait,500ms sensor exception and invalid/stale sensor normal-motion gates are deleted. Measurement errors remain invalid diagnostics; historical HA rows remain. Normal manual/ultrasonic motion can run without a usable power sensor as explicitly approved, so electrical voltage/current protection cannot be evaluated then. Known low-voltage holds, stroke/relay/obstacle constraints, protected charging-close and fresh/isolated authenticated OTA remain separate. The legacy countdown field is fixed0, not an active feature. Source completion does not prove device installation.
 
 Operating acceptance2026-11-05: actual0.2.8-g9a185d1 installation/new boot/freshIDLE/NORMAL/UP_TO_DATE verified after one normal OTA. The earlier source-only checkpoint is resolved; see the removal contract. No extra physical cycle test was sent.
+
+## 저전압 보호 진입과 해제 (0.2.9)
+
+기본 설정에서 유효 배터리 전압이 11.0V 이하로 60초 연속 유지되면 저전압 보호에 진입합니다. 전압이 기준을 넘거나 측정이 무효이거나 2초 넘게 끊기면 진입 시간을 다시 셉니다. 기본 해제 기준은 12.0V 이상 5분 연속이며, 배터리 경고는 11.0V 이하 5분 연속입니다. 기준 이하에서 새 일반 개폐를 시작하는 제한과 보호 중 충전용 닫기의 즉시 중단 조건은 별도로 적용합니다. [배터리 보호 기록](../wiki/low_voltage_dwell_20261122.md)을 참고하세요.

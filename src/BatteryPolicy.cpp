@@ -34,11 +34,11 @@ void BatteryPolicy::sample(uint32_t now,float voltage,bool valid,float cutoff) {
   if(voltage>=recovery_) {
     if(!healthyTiming_) {healthyTiming_=true; healthyAt_=now;}
   } else healthyTiming_=false;
-  // True low-voltage protection still qualifies in3s, independently of a sensor recheck.
+  // Qualify the persistent hold only from consecutive valid low-voltage samples.
   if(!latched_) {
     if(voltage<=cutoff_) {
       if(!lowTiming_) {lowTiming_=true;lowAt_=now;}
-      if(uint32_t(now-lowAt_)>=3000) {latched_=true;recoveryTiming_=false;stateTiming_=false;}
+      if(uint32_t(now-lowAt_)>=kLowProtectionDwellMs) {latched_=true;recoveryTiming_=false;stateTiming_=false;}
     } else lowTiming_=false;
   }
   if(latched_) {

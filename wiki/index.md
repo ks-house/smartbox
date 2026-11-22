@@ -3,11 +3,13 @@ title: SmartBox wiki index
 type: index
 project: smartbox
 status: active
-updated: 2026-11-05
+updated: 2026-11-22
 source_of_truth: true
 ---
 
 # SmartBox Wiki
+
+> 2026-11-22 소스에서 [저전압 보호 진입을 연속 60초로 변경](low_voltage_dwell_20261122.md). 기본 11.0 V 기준.
 
 >2026-11-05: [SENSOR_RECHECK fully removed and0.2.8 actually installed](sensor_recheck_removal_20261105.md). New boot, fresh validIDLE/NORMAL and UP_TO_DATE accepted. Sensor-invalid normal-motion gates and1s wait are deleted; electrical measurement-unavailable risk is owner-approved.
 
@@ -17,7 +19,7 @@ source_of_truth: true
 
 > 현재2026-11-04: [0.2.5 OTA 설치·정상 대기 수용](sensor_recheck_20261104.md). 순간 센서 범위 오류와 persistent battery hold를 분리하고 NAS11V/300초 경고 감시기 교체도 수용했다. 실제 개폐·range raw subcause는 별도다.
 
-> 경고 정책: [장치·NAS11V/300초 적용 완료](battery_warning_20261104.md). 일반 구동 보호11V/3초와 구분한다.
+> 경고 정책: [장치·NAS11V/300초 적용 완료](battery_warning_20261104.md). 일반 구동 보호와 별도로 기록한다.
 
 > 2026-11-04 운영0.2.3-g1c09394 OTA 설치·새 부팅·유효 센서/통신 수용. 첫 스트림 오류 뒤 재시도 성공. [설치 증거와 남은 실물 Gate](ota_adoption_20261104.md). raw cutoff 읽기와 실제 저전압/충전 시험은 별도다.
 

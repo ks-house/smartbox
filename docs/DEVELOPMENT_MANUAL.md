@@ -147,7 +147,7 @@ ESP32-C6 보드와 각 모듈은 아래의 확정된 GPIO 번호에 정밀하게
 
 추가 상태:
 * **EMERGENCY_STOP:** 과전류 3회 연속 -> 5초 자동 복구 또는 reset_emergency 명령
-* **BATTERY_LOW_SHUTDOWN:** 11.0V 이하 3초 -> 강제 개방 -> 릴레이 격리 후 안정 전압 5분 확인 시 자동 재개
+* **BATTERY_LOW_SHUTDOWN:** 11.0V 이하 60초 연속 → 강제 개방 -> 릴레이 격리 후 안정 전압 5분 확인 시 자동 재개
 * **OTA_UPDATING:** 펌웨어 업데이트 중 -> 전 릴레이 차단, FSM 동결
 * **MAINTENANCE:** 5분 정비 모드 -> 자동 닫힘
 * **STARTUP_OPEN:** NVS가 이전 상태를 open으로 기록한 부팅에서 500ms 안정화 후 OPEN_START로 진입하여 open/hold/close 보정 사이클 수행
@@ -395,3 +395,7 @@ The measured NAS candidate failed before policy activation when the volatile boo
 [Approved removal contract](../wiki/sensor_recheck_removal_20261105.md) supersedes the earlier sensor recheck behavior. The operating state,1s wait,500ms sensor exception and invalid/stale sensor normal-motion gates are deleted. Measurement errors remain invalid diagnostics; historical HA rows remain. Normal manual/ultrasonic motion can run without a usable power sensor as explicitly approved, so electrical voltage/current protection cannot be evaluated then. Known low-voltage holds, stroke/relay/obstacle constraints, protected charging-close and fresh/isolated authenticated OTA remain separate. The legacy countdown field is fixed0, not an active feature. Source completion does not prove device installation.
 
 Operating acceptance2026-11-05: actual0.2.8-g9a185d1 installation/new boot/freshIDLE/NORMAL/UP_TO_DATE verified after one normal OTA. The earlier source-only checkpoint is resolved; see the removal contract. No extra physical cycle test was sent.
+
+## 저전압 보호 진입과 해제 (0.2.9)
+
+기본 설정에서 유효 배터리 전압이 11.0V 이하로 60초 연속 유지되면 저전압 보호에 진입합니다. 전압이 기준을 넘거나 측정이 무효이거나 2초 넘게 끊기면 진입 시간을 다시 셉니다. 기본 해제 기준은 12.0V 이상 5분 연속이며, 배터리 경고는 11.0V 이하 5분 연속입니다. 기준 이하에서 새 일반 개폐를 시작하는 제한과 보호 중 충전용 닫기의 즉시 중단 조건은 별도로 적용합니다. [배터리 보호 기록](../wiki/low_voltage_dwell_20261122.md)을 참고하세요.

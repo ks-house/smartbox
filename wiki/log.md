@@ -509,3 +509,9 @@ source_of_truth: true
 - Owner requests browser retry; browser MCP becomes available after prior launcher/access failures. Existing HA session and MQTT UI give fresh non-retained12.36403V/valid1/fault0/IDLE/OTAready1. Preserve previous last RANGE9/mask4/raw11.08V/304.03mV/3200mA as historical fault evidence, not a measured true peak. It was outside the former mask6-only exception.
 - One HA normalOTA press21:53:00; actual new-version IDLE21:56:13. Non-retained new uptime progression to60142ms,12.31604V/0.1mA/valid1/fault0/NORMAL/IDLE/hold0/fault_count0 and UP_TO_DATE; independent HA firmware0.2.8 info verified. Save screenshot and private acceptance. Actual installation accepted; no new open/close, explicit reboot, forced/recovery OTA or physical cycle test. Legacy countdown fixed0 is compatibility data, not a remaining feature. Old HA history retained.
 - Native77/actual OTA21/fullPython144(135executed/9opt-in skip)/dualC6 and resolved independent review remain source checks. Record operating acceptance on the feature branch without triggering a redundant main firmware build. Solar/net charge, component ratings and long-term power acceptance stay open in issue19.
+
+## 2026-11-22 저전압 보호 진입 시간을 60초로 변경
+
+0.2.9에서 유효 측정값이 기본 11.0 V 이하로 60초 연속 유지되면 저전압 보호에 진입한다. 기준 초과, 무효값 또는 2초 초과 측정 간격에 시간은 초기화된다. 동일 기준을 MQTT에 60초로 발행한다. 보호 해제와 경고 기준은 각각 기존 300초다.
+
+기존 3초 구현에서 새 경계값 테스트가 실패함을 확인한 뒤 수정했다. 네이티브 78개 통과, Python 144개 중 135개 통과 및 환경 조건에 따른 9개 건너뜀.

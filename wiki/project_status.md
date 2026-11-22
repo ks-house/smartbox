@@ -14,6 +14,8 @@ applies_to:
 
 # 현재 프로젝트 상태
 
+> 2026-11-22 기준 0.2.9 소스의 [저전압 보호 진입](low_voltage_dwell_20261122.md)은 기본 11.0 V 이하 60초 연속이다. 해제는 기본 12.0 V 이상 5분 연속이다.
+
 >2026-11-05 current: [operating0.2.8 SENSOR_RECHECK removal](sensor_recheck_removal_20261105.md), actual new-version boot/freshIDLE accepted. No new physical cycle test; previous0.2.7 operation acceptance is historical. Invalid measurement remains diagnostic and does not hold normal motion, as explicitly approved.
 
 > 2026-11-04 현재: [운영0.2.7/열기 사용자 확인·닫기 구동 완료](opening_inrush_20261104.md). 기동500ms 유예 뒤 열기HOLD와 닫기IDLE을 SENSOR_RECHECK 없이 확인했다.11V/3초 보호·11V/300초 경고는 유지한다. 완전 닫힘도 사용자 확인을 마쳤으며 태양광 충전 수용은 별도다.
@@ -61,7 +63,7 @@ IDLE
 
 - 열림 중 stall 3회는 물리 open limit로 취급해 relay를 끄고 HOLD로 이동한다.
 - 닫힘 중 stall 3회는 `EMERGENCY_STOP`으로 이동한다.
-- 저전압이 기본 11.3 V 미만으로 3초 지속되면 남은 전력으로 open 방향을 구동한 뒤 timeout 후 relay를 격리한다.
+- 유효 전압이 기본 11.0 V 이하로 60초 연속 유지되면 남은 전력으로 open 방향을 구동한 뒤 timeout 후 relay를 격리한다.
 - `STARTUP_OPEN`은 NVS가 이전 lid 상태를 open으로 기록했을 때만 `main.cpp`에서 초기 상태로 선택된다.
 
 ## 코드에서 확인한 기본값

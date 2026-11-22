@@ -167,23 +167,18 @@ void test_low_battery_shutdown(void) {
     SmartBoxController controller(hw);
     controller.init();
     
-    // Simulate low battery (11.0V, under 11.3V threshold)
     hw.setBatteryVoltage(11.0f);
-    
-    // Run update for 2 seconds (sensor reads every 200ms).
-    // FSM should NOT shutdown yet (threshold is 3 seconds)
-    for (int i = 0; i < 10; ++i) {
+    // The first low sample is at 200 ms. At 60,000 ms only 59,800 ms qualify.
+    for (int i = 0; i < 300; ++i) {
         hw.advanceMillis(200);
         controller.update();
     }
     TEST_ASSERT_NOT_EQUAL(STATE_BATTERY_LOW_SHUTDOWN, controller.getCurrentState());
-    
-    // Advance virtual clock by another 1.6 seconds (total 3.6 seconds of continuous low battery)
-    for (int i = 0; i < 8; ++i) {
-        hw.advanceMillis(200);
-        controller.update();
-    }
-    
+    TEST_ASSERT_EQUAL(INPUT, hw.getPinMode(RELAY_MAIN_PIN));
+
+    hw.advanceMillis(200);
+    controller.update();
+
     // FSM must now transition to STATE_BATTERY_LOW_SHUTDOWN
     TEST_ASSERT_EQUAL(STATE_BATTERY_LOW_SHUTDOWN, controller.getCurrentState());
     
@@ -694,7 +689,7 @@ void test_battery_recovers_only_after_continuous_safe_voltage(void) {
     SmartBoxController box(hw);
     box.init();
     hw.setBatteryVoltage(11.0f);
-    for (int i=0;i<40;i++) { hw.advanceMillis(200); box.update(); }
+    for (int i=0;i<305;i++) { hw.advanceMillis(200); box.update(); }
     TEST_ASSERT_EQUAL(STATE_BATTERY_LOW_SHUTDOWN,box.getCurrentState());
     hw.setBatteryVoltage(12.6f);
     for (int i=0;i<299;i++) { hw.advanceMillis(1000); box.update(); }
@@ -706,7 +701,7 @@ void test_battery_recovers_only_after_continuous_safe_voltage(void) {
 void test_battery_recovery_dip_restarts_stable_window(void) {
     MockHardware hw; SmartBoxController box(hw); box.init();
     hw.setBatteryVoltage(11.0f);
-    for(int i=0;i<40;i++){hw.advanceMillis(200);box.update();}
+    for(int i=0;i<305;i++){hw.advanceMillis(200);box.update();}
     hw.setBatteryVoltage(12.6f);
     for(int i=0;i<200;i++){hw.advanceMillis(1000);box.update();}
     hw.setBatteryVoltage(11.9f); hw.advanceMillis(1000); box.update();
@@ -722,7 +717,7 @@ void test_battery_recovery_dip_restarts_stable_window(void) {
 void test_sensor_failure_during_protective_stroke_stops_now(void) {
     MockHardware hw; SmartBoxController box(hw);box.init();
     hw.setBatteryVoltage(11.0f);
-    for(int i=0;i<17;i++){hw.advanceMillis(200);box.update();}
+    for(int i=0;i<301;i++){hw.advanceMillis(200);box.update();}
     TEST_ASSERT_EQUAL(OUTPUT,hw.getPinMode(RELAY_MAIN_PIN));
     hw.setBatteryVoltage(NAN);hw.advanceMillis(200);box.update();
     TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(RELAY_MAIN_PIN));
@@ -761,7 +756,7 @@ void test_low_timers_do_not_cross_controller_instances(void) {
 }
 void test_ota_failed_recovery_cannot_clear_low_power_latch(void) {
     MockHardware hw;hw.setBatteryVoltage(12.6f);SmartBoxController box(hw);box.init();
-    hw.setBatteryVoltage(11.0f);for(int i=0;i<17;i++){hw.advanceMillis(200);box.update();}
+    hw.setBatteryVoltage(11.0f);for(int i=0;i<301;i++){hw.advanceMillis(200);box.update();}
     TEST_ASSERT_TRUE(box.powerSnapshot().persistentHold);
     box.transitionTo(STATE_OTA_UPDATING);hw.setBatteryVoltage(NAN);
     hw.advanceMillis(200);box.servicePowerDuringOta();box.forceOpen();
@@ -783,7 +778,7 @@ void test_emergency_reset_is_independent_of_removed_sensor_gate(void) {
  MockHardware hw;SmartBoxController box(hw);box.init();box.transitionTo(STATE_EMERGENCY_STOP);
  hw.advanceMillis(3000);box.resetEmergency();TEST_ASSERT_EQUAL(STATE_IDLE,box.getCurrentState());
  box.transitionTo(STATE_EMERGENCY_STOP);hw.setBatteryVoltage(11);
- for(int i=0;i<17;i++){hw.advanceMillis(200);box.update();}
+ for(int i=0;i<301;i++){hw.advanceMillis(200);box.update();}
  TEST_ASSERT_TRUE(box.powerSnapshot().persistentHold);box.resetEmergency();
  TEST_ASSERT_EQUAL(STATE_BATTERY_LOW_SHUTDOWN,box.getCurrentState());
 }
@@ -843,7 +838,7 @@ void test_atomic_ota_reservation_blocks_all_motion_commands(void) {
     box.forceOpen();box.forceClose();box.startMaintenanceMode();box.stopMaintenanceMode();box.resetEmergency();box.update();
     TEST_ASSERT_EQUAL(STATE_OTA_UPDATING,box.getCurrentState());
     TEST_ASSERT_EQUAL(INPUT,hw.getPinMode(RELAY_MAIN_PIN));TEST_ASSERT_TRUE(box.canContinueOta());
-    hw.setBatteryVoltage(11);for(int i=0;i<17;i++){hw.advanceMillis(200);box.servicePowerDuringOta();}
+    hw.setBatteryVoltage(11);for(int i=0;i<301;i++){hw.advanceMillis(200);box.servicePowerDuringOta();}
     TEST_ASSERT_FALSE(box.canContinueOta());box.finishOtaWithoutReboot();
     TEST_ASSERT_EQUAL(STATE_BATTERY_LOW_SHUTDOWN,box.getCurrentState());
 }
@@ -1112,18 +1107,49 @@ void test_owner_11v_default_does_not_latch_at_field_sag(void) {
  TEST_ASSERT_FALSE(box.powerSnapshot().protectedMode);
  TEST_ASSERT_TRUE(box.powerSnapshot().actuationAllowed);
 }
-void test_owner_11v_boundary_is_inclusive_with_original_dwell(void) {
- BatteryPolicy p;
- for(uint32_t now=0;now<=2800;now+=200)p.sample(now,11.0f,true,11.0f);
- TEST_ASSERT_FALSE(p.snapshot(2800).protectedMode);
- TEST_ASSERT_FALSE(p.snapshot(2800).actuationAllowed);
- p.sample(3000,11.0f,true,11.0f);
- TEST_ASSERT_TRUE(p.snapshot(3000).protectedMode);
- BatteryPolicy above;
- for(uint32_t now=0;now<=4000;now+=200)above.sample(now,11.001f,true,11.0f);
- TEST_ASSERT_FALSE(above.snapshot(4000).protectedMode);
- TEST_ASSERT_TRUE(above.snapshot(4000).actuationAllowed);
+void test_owner_11v_boundary_requires_one_continuous_minute(void) {
+    BatteryPolicy policy;
+    for (uint32_t now = 0; now < 60000; now += 1000)
+        policy.sample(now, 11.0f, true, 11.0f);
+    policy.sample(59999, 11.0f, true, 11.0f);
+    TEST_ASSERT_FALSE(policy.snapshot(59999).protectedMode);
+    TEST_ASSERT_FALSE(policy.snapshot(59999).actuationAllowed);
+    policy.sample(60000, 11.0f, true, 11.0f);
+    TEST_ASSERT_TRUE(policy.snapshot(60000).persistentHold);
+    TEST_ASSERT_FALSE(policy.snapshot(60000).lowWarning);
+
+    BatteryPolicy above;
+    for (uint32_t now = 0; now <= 61000; now += 1000)
+        above.sample(now, 11.001f, true, 11.0f);
+    TEST_ASSERT_FALSE(above.snapshot(61000).protectedMode);
+    TEST_ASSERT_TRUE(above.snapshot(61000).actuationAllowed);
 }
+
+void test_low_voltage_protection_restarts_after_interruption(void) {
+    for (int interruption = 0; interruption < 3; ++interruption) {
+        BatteryPolicy policy;
+        for (uint32_t now = 0; now <= 59000; now += 1000)
+            policy.sample(now, 11.0f, true, 11.0f);
+
+        uint32_t restart = 60000;
+        if (interruption == 0) {
+            policy.sample(restart, 11.001f, true, 11.0f);
+            restart += 1000;
+        } else if (interruption == 1) {
+            policy.sample(restart, NAN, false, 11.0f);
+            restart += 1000;
+        } else {
+            restart = 61001; // The next valid sample arrives after a >2 s gap.
+        }
+
+        for (uint32_t elapsed = 0; elapsed < 60000; elapsed += 1000)
+            policy.sample(restart + elapsed, 11.0f, true, 11.0f);
+        TEST_ASSERT_FALSE(policy.snapshot(restart + 59000).persistentHold);
+        policy.sample(restart + 60000, 11.0f, true, 11.0f);
+        TEST_ASSERT_TRUE(policy.snapshot(restart + 60000).persistentHold);
+    }
+}
+
 void test_owner_11v_charging_close_survives_previous_field_sag(void) {
  MockHardware hw;hw.setBatteryVoltage(11.94f);SmartBoxController box(hw);
  box.setInitialState(STATE_BATTERY_LOW_SHUTDOWN);box.init();box.update();
@@ -1184,10 +1210,10 @@ void test_low_warning_u32_wrap_and_protection_calls_do_not_forge_time(void) {
 
 
 void test_invalid_power_cannot_clear_genuine_low_hold(void) {
- BatteryPolicy p;for(uint32_t n=0;n<=3000;n+=200)p.sample(n,11,true,11);
- TEST_ASSERT_TRUE(p.snapshot(3000).persistentHold);
- p.sample(3200,NAN,false,11);p.sample(4200,12.5f,true,11);p.sample(5200,12.5f,true,11);
- TEST_ASSERT_TRUE(p.snapshot(5200).persistentHold);TEST_ASSERT_FALSE(p.snapshot(5200).actuationAllowed);
+ BatteryPolicy p;for(uint32_t n=0;n<=60000;n+=200)p.sample(n,11,true,11);
+ TEST_ASSERT_TRUE(p.snapshot(60000).persistentHold);
+ p.sample(60200,NAN,false,11);p.sample(61200,12.5f,true,11);p.sample(62200,12.5f,true,11);
+ TEST_ASSERT_TRUE(p.snapshot(62200).persistentHold);TEST_ASSERT_FALSE(p.snapshot(62200).actuationAllowed);
 }
 
 class RangeOnceHardware:public MockHardware {
@@ -1296,9 +1322,9 @@ void test_removed_sensor_gate_does_not_forget_known_low_voltage(void) {
  BatteryPolicy p;p.sample(0,11.0f,true,11);p.sample(200,NAN,false,11);
  TEST_ASSERT_FALSE(p.snapshot(200).actuationAllowed);
  p.sample(400,12.5f,true,11);TEST_ASSERT_TRUE(p.snapshot(400).actuationAllowed);
- for(uint32_t n=600;n<=3600;n+=200)p.sample(n,11.0f,true,11);
- p.sample(3800,NAN,false,11);
- TEST_ASSERT_TRUE(p.snapshot(3800).persistentHold);TEST_ASSERT_FALSE(p.snapshot(3800).actuationAllowed);
+ for(uint32_t n=600;n<=60600;n+=200)p.sample(n,11.0f,true,11);
+ p.sample(60800,NAN,false,11);
+ TEST_ASSERT_TRUE(p.snapshot(60800).persistentHold);TEST_ASSERT_FALSE(p.snapshot(60800).actuationAllowed);
 }
 void test_removed_sensor_gate_admits_explicit_open_with_no_valid_sensor(void) {
  MockHardware hw;hw.setBatteryVoltage(NAN);SmartBoxController box(hw);box.init();box.forceOpen();box.update();
@@ -1353,7 +1379,8 @@ int main(int argc, char **argv) {
     RUN_TEST(test_low_warning_u32_wrap_and_protection_calls_do_not_forge_time);
 
     RUN_TEST(test_owner_11v_default_does_not_latch_at_field_sag);
-    RUN_TEST(test_owner_11v_boundary_is_inclusive_with_original_dwell);
+    RUN_TEST(test_owner_11v_boundary_requires_one_continuous_minute);
+    RUN_TEST(test_low_voltage_protection_restarts_after_interruption);
     RUN_TEST(test_owner_11v_charging_close_survives_previous_field_sag);
     RUN_TEST(test_owner_11v_close_can_start_above_cutoff_but_not_at_it);
 

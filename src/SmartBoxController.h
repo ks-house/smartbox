@@ -195,7 +195,7 @@ public:
 #ifdef FIRMWARE_VERSION_OVERRIDE
   static constexpr const char *FIRMWARE_VERSION = FIRMWARE_VERSION_OVERRIDE;
 #else
-  static constexpr const char *FIRMWARE_VERSION = "0.2.8";
+  static constexpr const char *FIRMWARE_VERSION = "0.2.9";
 #endif
   const char *getFirmwareVersion() const { return FIRMWARE_VERSION; }
 
