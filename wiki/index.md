@@ -9,7 +9,7 @@ source_of_truth: true
 
 # SmartBox Wiki
 
-> 2026-11-22 소스에서 [저전압 보호 진입을 연속 60초로 변경](low_voltage_dwell_20261122.md). 기본 11.0 V 기준.
+> 2026-11-22 [저전압 보호 진입을 연속 60초로 변경](low_voltage_dwell_20261122.md)한 0.2.9 운영 게시 및 인증 다운로드 검증을 완료했다. 기기 설치 확인은 대기 중이다.
 
 >2026-11-05: [SENSOR_RECHECK fully removed and0.2.8 actually installed](sensor_recheck_removal_20261105.md). New boot, fresh validIDLE/NORMAL and UP_TO_DATE accepted. Sensor-invalid normal-motion gates and1s wait are deleted; electrical measurement-unavailable risk is owner-approved.
 
