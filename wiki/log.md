@@ -520,3 +520,10 @@ source_of_truth: true
 
 - Add scoped Tailscale SFTP with a trusted host-key pin, read-only connection preflight, non-web staging and no public fallback. Preserve authenticated device downloads and check the exact manifest and image on publication.
 - Local Python suite: 150 tests discovered; 141 executed and passed, nine skipped due to opt-in environments. YAML and embedded Bash syntax checked. No NAS or device changes; operating publication and healthy installation not established.
+
+## [2026-11-28] fix | Gate SmartBox private publishing on one reviewed commit and preserve rollback
+
+- TWORIM reviewed PR #29 at f8294ae with hosted CI 46117383256 passing. Existing checkouts were preserved. Follow-up work runs in an isolated worktree. The GitHub environment accepts only the protected main branch and has no transport credentials.
+- Require explicit publication, a read-only SFTP proof for the same commit, dedicated SmartBox secrets and one NAS reservation per commit. Withdraw discovery during promotion and verify exact authenticated bytes before making the new manifest available. Retain a verified private rollback pair.
+- Native 78 cases, 147 Python cases (9 opt-in skips), and both ESP32-C6 builds with fixture credentials passed. Current authenticated HTTPS readback job 140897893162 passed separately. Both new publication failure fixtures verify rollback. Tailscale and NAS admin sign-in, trusted SFTP endpoint and non-web directory checks, and live SFTP preflight remain pending.
+- Production publication 0. Device OTA requests 0. Latest HA disconnect at 14:14:37 KST. Broker reported offline and the read-only diagnostic produced no fresh voltage, relay, installed version or admission status.

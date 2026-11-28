@@ -13,6 +13,14 @@ on:
         required: true
         default: verify-origin
         options: [verify-origin, verify-private-sftp, publish-firmware, verify-authenticated-origin, prepare-field-recovery]
+      expected_commit:
+        description: Full reviewed main commit for a one-time firmware publication
+        type: string
+        default: ""
+      preflight_run_id:
+        description: Successful read-only private SFTP verification run on that commit
+        type: string
+        default: ""
       expected_version:
         description: Optional exact version for authenticated verification
         type: string
@@ -114,13 +122,12 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main' &&
       github.repository == 'ks-house/smartbox' &&
-      ((github.event_name == 'workflow_dispatch' && inputs.operation == 'verify-private-sftp') ||
-       (vars.SMARTBOX_OTA_PUBLISH_ENABLED == 'true' &&
-        (github.event_name == 'push' ||
-         (github.event_name == 'workflow_dispatch' && inputs.operation == 'publish-firmware'))))
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.operation == 'verify-private-sftp' || inputs.operation == 'publish-firmware')
     environment: smartbox-private-ota
     permissions:
       contents: read
+      actions: read
       id-token: write
     concurrency:
       group: smartbox-private-ota
@@ -132,6 +139,14 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Require successful read-only preflight on the reviewed commit
+        if: inputs.operation == 'publish-firmware'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+          PREFLIGHT_RUN_ID: ${{ inputs.preflight_run_id }}
+        run: python3 scripts/verify_private_preflight_run.py
+
       - name: Join scoped SmartBox publisher network
         uses: tailscale/github-action@306e68a486fd2350f2bfc3b19fcd143891a4a2d8 # v4
         with:
@@ -139,6 +154,7 @@ jobs:
           audience: ${{ secrets.SMARTBOX_TS_OIDC_AUDIENCE }}
           tags: tag:smartbox-github-ota
           version: 1.94.2
+          use-cache: false
           sha256sum: c6f99a5d774c7783b56902188d69e9756fc3dddfb08ac6be4cb2585f3fecdc32
 
       - name: Verify pinned private SFTP connection (read-only)
@@ -147,10 +163,15 @@ jobs:
           SMARTBOX_SFTP_PORT: ${{ secrets.SMARTBOX_SFTP_PORT }}
           SMARTBOX_SFTP_HOST_KEY: ${{ secrets.SMARTBOX_SFTP_HOST_KEY }}
           SMARTBOX_SFTP_STAGE_DIR: ${{ secrets.SMARTBOX_SFTP_STAGE_DIR }}
-          NAS_USER: ${{ secrets.NAS_USER }}
-          NAS_PASSWORD: ${{ secrets.NAS_PASSWORD }}
-          NAS_TARGET_DIR: ${{ secrets.NAS_TARGET_DIR }}
+          SMARTBOX_SFTP_ROLLBACK_DIR: ${{ secrets.SMARTBOX_SFTP_ROLLBACK_DIR }}
+          SMARTBOX_SFTP_USER: ${{ secrets.SMARTBOX_SFTP_USER }}
+          SMARTBOX_SFTP_PASSWORD: ${{ secrets.SMARTBOX_SFTP_PASSWORD }}
+          SMARTBOX_SFTP_TARGET_DIR: ${{ secrets.SMARTBOX_SFTP_TARGET_DIR }}
         run: python3 scripts/publish_private_ota.py preflight
+
+      - name: Record successful read-only SmartBox preflight
+        if: inputs.operation == 'verify-private-sftp'
+        run: echo 'Pinned private SFTP read-only preflight passed.'
 
       - name: Create secrets.h from GitHub Secrets
         if: inputs.operation != 'verify-private-sftp'
@@ -241,23 +262,15 @@ jobs:
           SMARTBOX_SFTP_PORT: ${{ secrets.SMARTBOX_SFTP_PORT }}
           SMARTBOX_SFTP_HOST_KEY: ${{ secrets.SMARTBOX_SFTP_HOST_KEY }}
           SMARTBOX_SFTP_STAGE_DIR: ${{ secrets.SMARTBOX_SFTP_STAGE_DIR }}
-          NAS_USER: ${{ secrets.NAS_USER }}
-          NAS_PASSWORD: ${{ secrets.NAS_PASSWORD }}
-          NAS_TARGET_DIR: ${{ secrets.NAS_TARGET_DIR }}
-        run: python3 scripts/publish_private_ota.py publish
-
-      - name: Verify exact published version and digest over authenticated HTTPS
-        if: inputs.operation != 'verify-private-sftp'
-        env:
+          SMARTBOX_SFTP_ROLLBACK_DIR: ${{ secrets.SMARTBOX_SFTP_ROLLBACK_DIR }}
+          SMARTBOX_SFTP_USER: ${{ secrets.SMARTBOX_SFTP_USER }}
+          SMARTBOX_SFTP_PASSWORD: ${{ secrets.SMARTBOX_SFTP_PASSWORD }}
+          SMARTBOX_SFTP_TARGET_DIR: ${{ secrets.SMARTBOX_SFTP_TARGET_DIR }}
           SECRET_VERSION_URL: ${{ secrets.SECRET_VERSION_URL }}
           SECRET_FIRMWARE_URL: ${{ secrets.SECRET_FIRMWARE_URL }}
           SECRET_OTA_USER: ${{ secrets.SECRET_OTA_USER }}
           SECRET_OTA_PASS: ${{ secrets.SECRET_OTA_PASS }}
-        run: |
-          set -euo pipefail
-          EXPECTED_VERSION="$FULL_VERSION" \
-            EXPECTED_SHA256="$(sha256sum dist/firmware.bin | cut -d' ' -f1)" \
-            python3 scripts/verify_authenticated_ota_origin.py
+        run: python3 scripts/publish_private_ota.py publish
 
   prepare_field_recovery:
     name: Build encrypted owner-only field recovery kit (no deployment)
