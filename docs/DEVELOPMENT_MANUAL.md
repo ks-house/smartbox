@@ -241,7 +241,7 @@ SmartBoxController는 std::recursive_mutex dataMutex로 배터리 전압, 모터
 
 1. **CI - Test:** main 브랜치 푸시 시 Ubuntu에서 pio test -e native 실행
 2. **CI - Build:** 테스트 통과 시 pio run -e esp32-c6-devkitc-1 실행
-3. **CD - Deploy:** firmware.bin 및 version.json을 Synology NAS의 지정 디렉토리로 SFTP 안전 배포
+3. **CD - Deploy:** [SmartBox 사설 OTA 게시 계약](../wiki/private_ota_transport_20261128.md)을 따른다. GitHub Actions에서 NAS로 Tailscale SFTP를 사용하고 기기 HTTPS 다운로드는 유지한다. 사전 접속 검사와 운영 활성화 없이는 게시하지 않는다.
 
 ---
 

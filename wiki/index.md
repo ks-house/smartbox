@@ -3,11 +3,13 @@ title: SmartBox wiki index
 type: index
 project: smartbox
 status: active
-updated: 2026-11-22
+updated: 2026-11-28
 source_of_truth: true
 ---
 
 # SmartBox Wiki
+
+- [Private OTA publishing](private_ota_transport_20261128.md): candidate NAS transfer contract and its live acceptance gates.
 
 > 2026-11-22 소스에서 [저전압 보호 진입을 연속 60초로 변경](low_voltage_dwell_20261122.md). 기본 11.0 V 기준.
 

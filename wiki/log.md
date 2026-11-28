@@ -515,3 +515,8 @@ source_of_truth: true
 0.2.9에서 유효 측정값이 기본 11.0 V 이하로 60초 연속 유지되면 저전압 보호에 진입한다. 기준 초과, 무효값 또는 2초 초과 측정 간격에 시간은 초기화된다. 동일 기준을 MQTT에 60초로 발행한다. 보호 해제와 경고 기준은 각각 기존 300초다.
 
 기존 3초 구현에서 새 경계값 테스트가 실패함을 확인한 뒤 수정했다. 네이티브 78개 통과, Python 144개 중 135개 통과 및 환경 조건에 따른 9개 건너뜀.
+
+## 2026-11-28 candidate | Private SmartBox OTA transport
+
+- Add scoped Tailscale SFTP with a trusted host-key pin, read-only connection preflight, non-web staging and no public fallback. Preserve authenticated device downloads and check the exact manifest and image on publication.
+- Local Python suite: 150 tests discovered; 141 executed and passed, nine skipped due to opt-in environments. YAML and embedded Bash syntax checked. No NAS or device changes; operating publication and healthy installation not established.
