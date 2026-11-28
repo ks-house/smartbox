@@ -29,20 +29,33 @@ def request(opener,url,method,authorization=None,limit=8388608):
         return error.code,b""
 
 
-def main():
+def verify_expected_identity(manifest, digest, size, expected_version, expected_sha):
+    if expected_version and manifest.get("version") != expected_version:
+        raise RuntimeError("outside version mismatch")
+    if expected_sha and (digest != expected_sha or manifest.get("sha256") != expected_sha
+                         or type(manifest.get("size")) is not int or manifest["size"] != size):
+        raise RuntimeError("outside firmware or manifest identity mismatch")
+
+
+def authenticated_access():
     version_url,firmware_url=validate_urls(os.environ["SECRET_VERSION_URL"],os.environ["SECRET_FIRMWARE_URL"])
     identity=os.environ["SECRET_OTA_USER"];password=os.environ["SECRET_OTA_PASS"]
     if not identity or not re.fullmatch(r"[a-f0-9]{64}",password):
         raise ValueError("private probe identity missing")
+    opener=build_opener(NoRedirect(),HTTPSHandler(context=ssl.create_default_context()))
+    valid=base64.b64encode((identity+":"+password).encode()).decode()
+    wrong=base64.b64encode((identity+":invalid-probe-password").encode()).decode()
+    return opener, version_url, firmware_url, valid, wrong
+
+
+def main():
+    opener, version_url, firmware_url, valid, wrong = authenticated_access()
     expected_version=os.environ.get("EXPECTED_VERSION","")
     expected_sha=os.environ.get("EXPECTED_SHA256","")
     if expected_version and not re.fullmatch(r"[A-Za-z0-9.+_-]{1,96}",expected_version):
         raise ValueError("invalid expected version")
     if expected_sha and not re.fullmatch(r"[a-f0-9]{64}",expected_sha):
         raise ValueError("invalid expected image digest")
-    opener=build_opener(NoRedirect(),HTTPSHandler(context=ssl.create_default_context()))
-    valid=base64.b64encode((identity+":"+password).encode()).decode()
-    wrong=base64.b64encode((identity+":invalid-probe-password").encode()).decode()
     denied=accepted=0
     bodies={}
     for url in (version_url,firmware_url):
@@ -60,8 +73,7 @@ def main():
     if not re.fullmatch(r"[A-Za-z0-9.+_-]{1,96}",version):
         raise ValueError("bounded manifest version missing")
     digest=hashlib.sha256(bodies[firmware_url]).hexdigest()
-    if expected_version and version!=expected_version:raise RuntimeError("outside version mismatch")
-    if expected_sha and digest!=expected_sha:raise RuntimeError("outside image mismatch")
+    verify_expected_identity(manifest,digest,len(bodies[firmware_url]),expected_version,expected_sha)
     print(json.dumps({"outside_denial_cases":denied,"outside_authenticated_cases":accepted,
                       "tls_hostname_chain_verified":True,"version":version,
                       "firmware_sha256":digest,"firmware_bytes":len(bodies[firmware_url])},
